@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 
 type Customer = {
@@ -103,6 +104,7 @@ function getDeviceLine(devices: Device[]): string {
 }
 
 export default function HomePage() {
+const router = useRouter()
 const supabase = createClient()
   const mapRef = useRef<HTMLDivElement | null>(null)
   const kakaoMapRef = useRef<any>(null)
