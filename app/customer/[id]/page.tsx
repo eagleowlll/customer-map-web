@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
-
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
 import { createClient } from '@/lib/supabase/client'
 
@@ -50,26 +49,41 @@ type ServiceHistory = {
   visitor: string | null
 }
 
+const PAGE_BG = '#06070a'
+const PANEL_BG = '#17181d'
+const CARD_BG = '#1c1d22'
+const INNER_CARD_BG = '#111216'
+const INPUT_BG = '#0d0e12'
+const INPUT_BORDER = '#2c2f36'
+const TEXT_PRIMARY = '#f5f5f5'
+const TEXT_SECONDARY = '#b5b7be'
+const TEXT_MUTED = '#7d818c'
+const WHITE_BUTTON_BG = '#f4f4f5'
+const WHITE_BUTTON_TEXT = '#111113'
+const DANGER_BG = '#dc2626'
+
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: 12,
-  border: '1px solid #ccc',
-  borderRadius: 8,
+  border: `1px solid ${INPUT_BORDER}`,
+  borderRadius: 10,
   boxSizing: 'border-box',
-  color: '#111827',
-  background: '#fff',
+  color: TEXT_PRIMARY,
+  background: INPUT_BG,
+  outline: 'none',
 }
 
 const textareaStyle: CSSProperties = {
   width: '100%',
   padding: 12,
-  border: '1px solid #ccc',
-  borderRadius: 8,
+  border: `1px solid ${INPUT_BORDER}`,
+  borderRadius: 10,
   resize: 'vertical',
-  color: '#111827',
+  color: TEXT_PRIMARY,
   boxSizing: 'border-box',
   lineHeight: 1.5,
-  background: '#fff',
+  background: INPUT_BG,
+  outline: 'none',
 }
 
 function getInstallDisplay(device: Device) {
@@ -79,8 +93,6 @@ function getInstallDisplay(device: Device) {
   if (!rawDate && !rawYear) return '-'
 
   if (rawYear && rawDate) {
-    // 예전 데이터는 year/date 분리형이면 "2024 - 09" 같이 보여주고
-    // 새 데이터처럼 date 자체에 2026-03-18 전체가 들어있는 경우 중복 방지
     if (rawDate.startsWith(rawYear)) {
       return rawDate
     }
@@ -92,7 +104,7 @@ function getInstallDisplay(device: Device) {
 }
 
 export default function CustomerDetailPage() {
-const supabase = createClient()
+  const supabase = createClient()
   const params = useParams()
   const router = useRouter()
   const customerId = Number(params.id)
@@ -784,27 +796,12 @@ const supabase = createClient()
     return map
   }, [devices, history])
 
-  const addCardStyle: CSSProperties = {
-    minWidth: 320,
-    maxWidth: 320,
-    background: '#fff',
-    borderRadius: 18,
-    padding: 18,
-    color: '#fff',
-    border: '1px solid transparent',
-    flex: '0 0 auto',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-  }
-
   const iconButtonStyle: CSSProperties = {
     width: 34,
     height: 34,
     borderRadius: '50%',
-    background: '#fff',
-    color: '#234ea2',
+    background: WHITE_BUTTON_BG,
+    color: WHITE_BUTTON_TEXT,
     border: 'none',
     cursor: 'pointer',
     fontSize: 16,
@@ -821,12 +818,12 @@ const supabase = createClient()
         <style jsx global>{`
           html,
           body {
-            background: #ffffff;
+            background: ${PAGE_BG};
           }
         `}</style>
 
-        <main style={{ padding: 20, background: '#fff', minHeight: '100vh', color: '#111827' }}>
-          <a href="/" style={{ color: '#111827', textDecoration: 'none', fontWeight: 700 }}>
+        <main style={{ padding: 20, background: PAGE_BG, minHeight: '100vh', color: TEXT_PRIMARY }}>
+          <a href="/" style={{ color: TEXT_PRIMARY, textDecoration: 'none', fontWeight: 700 }}>
             ← 지도로 돌아가기
           </a>
           <p style={{ marginTop: 16 }}>불러오는 중...</p>
@@ -840,13 +837,19 @@ const supabase = createClient()
       <style jsx global>{`
         html,
         body {
-          background: #ffffff;
+          background: ${PAGE_BG};
         }
 
         input::placeholder,
         textarea::placeholder {
-          color: #6b7280;
+          color: ${TEXT_MUTED};
           opacity: 1;
+        }
+
+        select {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
         }
       `}</style>
 
@@ -855,7 +858,7 @@ const supabase = createClient()
           padding: 20,
           maxWidth: 1400,
           margin: '0 auto',
-          background: '#fff',
+          background: PAGE_BG,
           minHeight: '100vh',
         }}
       >
@@ -863,7 +866,7 @@ const supabase = createClient()
           <a
             href="/"
             style={{
-              color: '#111827',
+              color: TEXT_PRIMARY,
               textDecoration: 'none',
               fontWeight: 700,
               fontSize: 18,
@@ -875,12 +878,12 @@ const supabase = createClient()
 
         <div
           style={{
-            background: '#234ea2',
-            border: '1px solid #234ea2',
+            background: PANEL_BG,
+            border: `1px solid ${INPUT_BORDER}`,
             borderRadius: 20,
             padding: 24,
             marginBottom: 22,
-            color: '#fff',
+            color: TEXT_PRIMARY,
             position: 'relative',
           }}
         >
@@ -896,11 +899,11 @@ const supabase = createClient()
             ✏️
           </button>
 
-          <h1 style={{ margin: 0, marginBottom: 18, fontSize: 32, color: '#fff' }}>
+          <h1 style={{ margin: 0, marginBottom: 18, fontSize: 32, color: TEXT_PRIMARY }}>
             {customer?.company_name ?? '고객 정보 없음'}
           </h1>
 
-          <div style={{ display: 'grid', gap: 10, fontSize: 16, color: '#fff' }}>
+          <div style={{ display: 'grid', gap: 10, fontSize: 16, color: TEXT_SECONDARY }}>
             <p style={{ margin: 0 }}>주소: {customer?.address ?? '-'}</p>
             <p style={{ margin: 0 }}>상태: {customer?.status ?? '-'}</p>
             <p style={{ margin: 0 }}>대리점: {customer?.agency ?? '-'}</p>
@@ -908,7 +911,7 @@ const supabase = createClient()
         </div>
 
         <div style={{ marginBottom: 22 }}>
-          <h2 style={{ color: '#111827', marginBottom: 12, fontSize: 30, fontWeight: 800 }}>담당자</h2>
+          <h2 style={{ color: TEXT_PRIMARY, marginBottom: 12, fontSize: 30, fontWeight: 800 }}>담당자</h2>
 
           <div
             style={{
@@ -928,11 +931,11 @@ const supabase = createClient()
                   style={{
                     minWidth: 320,
                     maxWidth: 320,
-                    background: '#234ea2',
+                    background: CARD_BG,
                     borderRadius: 18,
                     padding: 18,
-                    color: '#fff',
-                    border: '1px solid #234ea2',
+                    color: TEXT_PRIMARY,
+                    border: `1px solid ${INPUT_BORDER}`,
                     flex: '0 0 auto',
                     textAlign: 'center',
                     position: 'relative',
@@ -955,7 +958,7 @@ const supabase = createClient()
                       fontSize: 15,
                       fontWeight: 700,
                       marginBottom: 10,
-                      color: c.department?.trim() ? '#fff' : '#d1d5db',
+                      color: c.department?.trim() ? TEXT_SECONDARY : TEXT_MUTED,
                     }}
                   >
                     {departmentText}
@@ -966,41 +969,54 @@ const supabase = createClient()
                       fontSize: 17,
                       fontWeight: 800,
                       marginBottom: 10,
-                      color: '#fff',
+                      color: TEXT_PRIMARY,
                     }}
                   >
                     {c.name ?? '-'} {c.position ?? ''}
                   </div>
 
-                  <div style={{ fontSize: 15, color: '#fff' }}>{c.phone ?? '-'}</div>
+                  <div style={{ fontSize: 15, color: TEXT_SECONDARY }}>{c.phone ?? '-'}</div>
                 </div>
               )
             })}
 
-            <div style={addCardStyle} onClick={handleOpenAddContactModal}>
-              <div
+            <div
+              style={{
+                minWidth: 320,
+                maxWidth: 320,
+                minHeight: 156,
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <button
+                onClick={handleOpenAddContactModal}
                 style={{
                   width: 68,
                   height: 68,
                   borderRadius: '50%',
-                  background: '#fff',
-                  color: '#234ea2',
-                  border: '3px solid #234ea2',
+                  background: WHITE_BUTTON_BG,
+                  color: WHITE_BUTTON_TEXT,
+                  border: `1px solid ${INPUT_BORDER}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 40,
                   fontWeight: 700,
+                  cursor: 'pointer',
+                  flex: '0 0 auto',
                 }}
               >
                 +
-              </div>
+              </button>
             </div>
           </div>
         </div>
 
         <div style={{ marginBottom: 22 }}>
-          <h2 style={{ color: '#111827', marginBottom: 12, fontSize: 30, fontWeight: 800 }}>장비</h2>
+          <h2 style={{ color: TEXT_PRIMARY, marginBottom: 12, fontSize: 30, fontWeight: 800 }}>장비</h2>
 
           <div
             style={{
@@ -1023,11 +1039,11 @@ const supabase = createClient()
                   style={{
                     minWidth: 320,
                     maxWidth: 320,
-                    background: '#234ea2',
+                    background: CARD_BG,
                     borderRadius: 18,
                     padding: 16,
-                    color: '#fff',
-                    border: '1px solid #234ea2',
+                    color: TEXT_PRIMARY,
+                    border: `1px solid ${INPUT_BORDER}`,
                     flex: '0 0 auto',
                     position: 'relative',
                     alignSelf: 'flex-start',
@@ -1050,7 +1066,7 @@ const supabase = createClient()
                     style={{
                       height: 150,
                       borderRadius: 14,
-                      background: 'rgba(255,255,255,0.18)',
+                      background: 'rgba(255,255,255,0.08)',
                       marginBottom: 14,
                       display: 'flex',
                       alignItems: 'center',
@@ -1075,8 +1091,8 @@ const supabase = createClient()
                           width: 64,
                           height: 64,
                           borderRadius: '50%',
-                          background: '#fff',
-                          color: '#234ea2',
+                          background: WHITE_BUTTON_BG,
+                          color: WHITE_BUTTON_TEXT,
                           border: 'none',
                           fontSize: 38,
                           fontWeight: 700,
@@ -1105,7 +1121,7 @@ const supabase = createClient()
                       style={{
                         fontSize: 18,
                         fontWeight: 700,
-                        color: '#fff',
+                        color: TEXT_PRIMARY,
                         textAlign: 'center',
                         width: '100%',
                         padding: '0 8px',
@@ -1126,7 +1142,7 @@ const supabase = createClient()
                       textAlign: 'center',
                       fontSize: 14,
                       marginBottom: 6,
-                      color: '#fff',
+                      color: TEXT_SECONDARY,
                     }}
                   >
                     S/N : {d.serial_number ?? '-'} &nbsp; | &nbsp; 프로그램 : {d.program ?? '-'}
@@ -1137,7 +1153,7 @@ const supabase = createClient()
                       textAlign: 'center',
                       fontSize: 14,
                       marginBottom: 4,
-                      color: '#fff',
+                      color: TEXT_SECONDARY,
                     }}
                   >
                     설치 엔지니어 : {d.install_engineer ?? '-'}
@@ -1148,7 +1164,7 @@ const supabase = createClient()
                       textAlign: 'center',
                       fontSize: 14,
                       marginBottom: 12,
-                      color: '#fff',
+                      color: TEXT_SECONDARY,
                     }}
                   >
                     납입연월 : {getInstallDisplay(d)}
@@ -1159,8 +1175,8 @@ const supabase = createClient()
                     style={{
                       width: '100%',
                       padding: '10px 14px',
-                      background: '#ffffff',
-                      color: '#111827',
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
                       borderRadius: 10,
                       border: 'none',
                       cursor: 'pointer',
@@ -1176,17 +1192,17 @@ const supabase = createClient()
                       <div
                         style={{
                           width: '100%',
-                          background: '#ffffff',
-                          color: '#111827',
+                          background: INNER_CARD_BG,
+                          color: TEXT_PRIMARY,
                           borderRadius: 12,
                           padding: 14,
                           fontSize: 14,
-                          border: '1px solid #e5e7eb',
+                          border: `1px solid ${INPUT_BORDER}`,
                           boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ fontWeight: 800, marginBottom: 10 }}>서비스 노트</div>
-                        <div style={{ marginBottom: 18 }}>-</div>
+                        <div style={{ marginBottom: 18 }}>{'-'}</div>
                         <div
                           style={{
                             display: 'flex',
@@ -1194,7 +1210,7 @@ const supabase = createClient()
                             alignItems: 'flex-end',
                             gap: 10,
                             fontSize: 12,
-                            color: '#4b5563',
+                            color: TEXT_MUTED,
                           }}
                         >
                           <div>-</div>
@@ -1207,12 +1223,12 @@ const supabase = createClient()
                           key={`${d.device_id}-${h.service_id}`}
                           style={{
                             width: '100%',
-                            background: '#ffffff',
-                            color: '#111827',
+                            background: INNER_CARD_BG,
+                            color: TEXT_PRIMARY,
                             borderRadius: 12,
                             padding: 14,
                             fontSize: 14,
-                            border: '1px solid #e5e7eb',
+                            border: `1px solid ${INPUT_BORDER}`,
                             boxSizing: 'border-box',
                           }}
                         >
@@ -1231,8 +1247,8 @@ const supabase = createClient()
                               onClick={() => handleOpenEditServiceModal(h)}
                               style={{
                                 padding: '6px 10px',
-                                background: '#234ea2',
-                                color: '#fff',
+                                background: WHITE_BUTTON_BG,
+                                color: WHITE_BUTTON_TEXT,
                                 borderRadius: 8,
                                 border: 'none',
                                 cursor: 'pointer',
@@ -1250,6 +1266,7 @@ const supabase = createClient()
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
                               lineHeight: 1.5,
+                              color: TEXT_PRIMARY,
                             }}
                           >
                             {h.service_notes ?? '-'}
@@ -1262,7 +1279,7 @@ const supabase = createClient()
                               alignItems: 'flex-end',
                               gap: 10,
                               fontSize: 12,
-                              color: '#4b5563',
+                              color: TEXT_MUTED,
                             }}
                           >
                             <div>{h.visit_date ?? '-'}</div>
@@ -1276,24 +1293,38 @@ const supabase = createClient()
               )
             })}
 
-            <div style={addCardStyle} onClick={handleOpenAddDeviceModal}>
-              <div
+            <div
+              style={{
+                minWidth: 320,
+                maxWidth: 320,
+                minHeight: 520,
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                alignSelf: 'flex-start',
+              }}
+            >
+              <button
+                onClick={handleOpenAddDeviceModal}
                 style={{
                   width: 68,
                   height: 68,
                   borderRadius: '50%',
-                  background: '#fff',
-                  color: '#234ea2',
-                  border: '3px solid #234ea2',
+                  background: WHITE_BUTTON_BG,
+                  color: WHITE_BUTTON_TEXT,
+                  border: `1px solid ${INPUT_BORDER}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 40,
                   fontWeight: 700,
+                  cursor: 'pointer',
+                  flex: '0 0 auto',
                 }}
               >
                 +
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -1304,7 +1335,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1317,13 +1348,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 620,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 업체 정보 수정
               </div>
 
@@ -1373,9 +1405,9 @@ const supabase = createClient()
                   disabled={isDeletingCustomer}
                   style={{
                     padding: '10px 14px',
-                    background: '#dc2626',
+                    background: DANGER_BG,
                     color: '#fff',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -1390,10 +1422,10 @@ const supabase = createClient()
                     onClick={() => setIsEditCustomerModalOpen(false)}
                     style={{
                       padding: '10px 14px',
-                      background: '#e5e7eb',
-                      color: '#111827',
-                      borderRadius: 8,
-                      border: 'none',
+                      background: PANEL_BG,
+                      color: TEXT_PRIMARY,
+                      borderRadius: 10,
+                      border: `1px solid ${INPUT_BORDER}`,
                       cursor: 'pointer',
                       fontWeight: 600,
                     }}
@@ -1406,9 +1438,9 @@ const supabase = createClient()
                     disabled={isSavingCustomerEdit}
                     style={{
                       padding: '10px 14px',
-                      background: '#234ea2',
-                      color: '#fff',
-                      borderRadius: 8,
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
+                      borderRadius: 10,
                       border: 'none',
                       cursor: 'pointer',
                       fontWeight: 700,
@@ -1429,7 +1461,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1442,13 +1474,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 560,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 담당자 추가
               </div>
 
@@ -1484,10 +1517,10 @@ const supabase = createClient()
                   onClick={() => setIsAddContactModalOpen(false)}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: 'none',
+                    background: PANEL_BG,
+                    color: TEXT_PRIMARY,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -1500,9 +1533,9 @@ const supabase = createClient()
                   disabled={isSavingContact}
                   style={{
                     padding: '10px 14px',
-                    background: '#234ea2',
-                    color: '#fff',
-                    borderRadius: 8,
+                    background: WHITE_BUTTON_BG,
+                    color: WHITE_BUTTON_TEXT,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -1525,7 +1558,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1538,13 +1571,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 560,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 담당자 수정
               </div>
 
@@ -1588,9 +1622,9 @@ const supabase = createClient()
                   disabled={isSavingContactEdit}
                   style={{
                     padding: '10px 14px',
-                    background: '#dc2626',
+                    background: DANGER_BG,
                     color: '#fff',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -1608,10 +1642,10 @@ const supabase = createClient()
                     }}
                     style={{
                       padding: '10px 14px',
-                      background: '#e5e7eb',
-                      color: '#111827',
-                      borderRadius: 8,
-                      border: 'none',
+                      background: PANEL_BG,
+                      color: TEXT_PRIMARY,
+                      borderRadius: 10,
+                      border: `1px solid ${INPUT_BORDER}`,
                       cursor: 'pointer',
                       fontWeight: 600,
                     }}
@@ -1624,9 +1658,9 @@ const supabase = createClient()
                     disabled={isSavingContactEdit}
                     style={{
                       padding: '10px 14px',
-                      background: '#234ea2',
-                      color: '#fff',
-                      borderRadius: 8,
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
+                      borderRadius: 10,
                       border: 'none',
                       cursor: 'pointer',
                       fontWeight: 700,
@@ -1647,7 +1681,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1660,13 +1694,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 760,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 장비 추가
               </div>
 
@@ -1741,10 +1776,10 @@ const supabase = createClient()
                   onClick={() => setIsAddDeviceModalOpen(false)}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: 'none',
+                    background: PANEL_BG,
+                    color: TEXT_PRIMARY,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -1757,9 +1792,9 @@ const supabase = createClient()
                   disabled={isSavingDevice}
                   style={{
                     padding: '10px 14px',
-                    background: '#234ea2',
-                    color: '#fff',
-                    borderRadius: 8,
+                    background: WHITE_BUTTON_BG,
+                    color: WHITE_BUTTON_TEXT,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -1782,7 +1817,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1795,13 +1830,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 760,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 장비 수정
               </div>
 
@@ -1884,9 +1920,9 @@ const supabase = createClient()
                   disabled={isSavingDeviceEdit}
                   style={{
                     padding: '10px 14px',
-                    background: '#dc2626',
+                    background: DANGER_BG,
                     color: '#fff',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -1904,10 +1940,10 @@ const supabase = createClient()
                     }}
                     style={{
                       padding: '10px 14px',
-                      background: '#e5e7eb',
-                      color: '#111827',
-                      borderRadius: 8,
-                      border: 'none',
+                      background: PANEL_BG,
+                      color: TEXT_PRIMARY,
+                      borderRadius: 10,
+                      border: `1px solid ${INPUT_BORDER}`,
                       cursor: 'pointer',
                       fontWeight: 600,
                     }}
@@ -1920,9 +1956,9 @@ const supabase = createClient()
                     disabled={isSavingDeviceEdit}
                     style={{
                       padding: '10px 14px',
-                      background: '#234ea2',
-                      color: '#fff',
-                      borderRadius: 8,
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
+                      borderRadius: 10,
                       border: 'none',
                       cursor: 'pointer',
                       fontWeight: 700,
@@ -1946,7 +1982,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1959,13 +1995,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 620,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>
                 서비스 기록 추가
               </div>
 
@@ -2018,10 +2055,10 @@ const supabase = createClient()
                   }}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: 'none',
+                    background: PANEL_BG,
+                    color: TEXT_PRIMARY,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -2034,9 +2071,9 @@ const supabase = createClient()
                   disabled={isSavingService}
                   style={{
                     padding: '10px 14px',
-                    background: '#234ea2',
-                    color: '#fff',
-                    borderRadius: 8,
+                    background: WHITE_BUTTON_BG,
+                    color: WHITE_BUTTON_TEXT,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -2059,7 +2096,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2072,13 +2109,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 620,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>
                 서비스 기록 수정
               </div>
 
@@ -2136,9 +2174,9 @@ const supabase = createClient()
                   disabled={isSavingServiceEdit}
                   style={{
                     padding: '10px 14px',
-                    background: '#dc2626',
+                    background: DANGER_BG,
                     color: '#fff',
-                    borderRadius: 8,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
@@ -2156,10 +2194,10 @@ const supabase = createClient()
                     }}
                     style={{
                       padding: '10px 14px',
-                      background: '#e5e7eb',
-                      color: '#111827',
-                      borderRadius: 8,
-                      border: 'none',
+                      background: PANEL_BG,
+                      color: TEXT_PRIMARY,
+                      borderRadius: 10,
+                      border: `1px solid ${INPUT_BORDER}`,
                       cursor: 'pointer',
                       fontWeight: 600,
                     }}
@@ -2172,9 +2210,9 @@ const supabase = createClient()
                     disabled={isSavingServiceEdit}
                     style={{
                       padding: '10px 14px',
-                      background: '#234ea2',
-                      color: '#fff',
-                      borderRadius: 8,
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
+                      borderRadius: 10,
                       border: 'none',
                       cursor: 'pointer',
                       fontWeight: 700,
@@ -2199,7 +2237,7 @@ const supabase = createClient()
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(0,0,0,0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2212,13 +2250,14 @@ const supabase = createClient()
               style={{
                 width: '100%',
                 maxWidth: 520,
-                background: '#fff',
-                borderRadius: 16,
+                background: CARD_BG,
+                borderRadius: 18,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: '#111827' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
                 장비 사진 추가
               </div>
 
@@ -2241,10 +2280,10 @@ const supabase = createClient()
                   }}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: 'none',
+                    background: PANEL_BG,
+                    color: TEXT_PRIMARY,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 600,
                   }}
@@ -2257,9 +2296,9 @@ const supabase = createClient()
                   disabled={isSavingDeviceImage}
                   style={{
                     padding: '10px 14px',
-                    background: '#234ea2',
-                    color: '#fff',
-                    borderRadius: 8,
+                    background: WHITE_BUTTON_BG,
+                    color: WHITE_BUTTON_TEXT,
+                    borderRadius: 10,
                     border: 'none',
                     cursor: 'pointer',
                     fontWeight: 700,
