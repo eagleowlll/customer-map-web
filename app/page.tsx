@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-
 
 type Customer = {
   customer_id: number
@@ -39,6 +37,11 @@ type Contact = {
   phone: string
 }
 
+type ServiceHistory = {
+  customer_id: number
+  visit_date: string | null
+}
+
 type NewDeviceForm = {
   device_name: string
   device_name2: string
@@ -51,9 +54,22 @@ type NewDeviceForm = {
   packing_file: File | null
 }
 
-const BORDER_COLOR = '#234ea2'
-const BORDER_WIDTH = '2px'
+const HOME_STATE_KEY = 'customer-map-home-state-v2'
+
+const PAGE_BG = '#06070a'
+const PANEL_BG = '#17181d'
+const CARD_BG = '#1c1d22'
+const INPUT_BG = '#0d0e12'
+const INPUT_BORDER = '#2c2f36'
+const TEXT_PRIMARY = '#f5f5f5'
+const TEXT_SECONDARY = '#b5b7be'
+const TEXT_MUTED = '#7d818c'
+const WHITE_BUTTON_BG = '#f4f4f5'
+const WHITE_BUTTON_TEXT = '#111113'
 const RADIUS = 12
+
+const BORDER_COLOR = INPUT_BORDER
+const BORDER_WIDTH = '1px'
 const BASE_LAT = 35.55424
 const BASE_LNG = 129.35841
 const BASE_NAME = '울산광역시 북구 명촌 7길 30'
@@ -61,18 +77,19 @@ const BASE_NAME = '울산광역시 북구 명촌 7길 30'
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: 12,
-  border: '2px solid #111827',
-  borderRadius: 8,
-  background: '#fff',
-  color: '#111827',
+  border: `1px solid ${INPUT_BORDER}`,
+  borderRadius: 10,
+  background: INPUT_BG,
+  color: TEXT_PRIMARY,
   boxSizing: 'border-box',
+  outline: 'none',
 }
 
 const sectionCardStyle: CSSProperties = {
-  border: '2px solid #111827',
+  border: `1px solid ${INPUT_BORDER}`,
   borderRadius: 16,
   padding: 16,
-  background: '#fff',
+  background: PANEL_BG,
 }
 
 function createEmptyDeviceForm(): NewDeviceForm {
@@ -89,8 +106,8 @@ function createEmptyDeviceForm(): NewDeviceForm {
   }
 }
 
-function getDeviceLine(devices: Device[]): string {
-  if (!devices || devices.length === 0) return '-'
+function getDeviceLines(devices: Device[]): string[] {
+  if (!devices || devices.length === 0) return ['-']
 
   return devices
     .map((d) => {
@@ -100,24 +117,38 @@ function getDeviceLine(devices: Device[]): string {
       return combined
     })
     .filter(Boolean)
-    .join(' / ')
+}
+
+function getDeviceLine(devices: Device[]): string {
+  return getDeviceLines(devices).join(' / ')
+}
+
+function toTimeValue(value: string | null | undefined): number {
+  if (!value) return 0
+  const time = Date.parse(value)
+  return Number.isNaN(time) ? 0 : time
 }
 
 export default function HomePage() {
-const router = useRouter()
-const supabase = createClient()
+  const supabase = createClient()
+
   const mapRef = useRef<HTMLDivElement | null>(null)
+  const listScrollRef = useRef<HTMLDivElement | null>(null)
   const kakaoMapRef = useRef<any>(null)
   const markerMapRef = useRef<Map<number, any>>(new Map())
   const infoWindowMapRef = useRef<Map<number, any>>(new Map())
   const openInfoWindowRef = useRef<{ id: number; iw: any } | null>(null)
   const clustererRef = useRef<any>(null)
+  const restoredHomeStateRef = useRef(false)
+  const pendingMapStateRef = useRef<{ lat: number; lng: number; level: number } | null>(null)
+  const pendingListScrollTopRef = useRef<number | null>(null)
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [deviceMap, setDeviceMap] = useState<Map<number, Device[]>>(new Map())
+  const [latestServiceDateMap, setLatestServiceDateMap] = useState<Map<number, number>>(new Map())
 
   const [query, setQuery] = useState('')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성'])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재', '이탈'])
 
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false)
   const [isSavingCustomer, setIsSavingCustomer] = useState(false)
@@ -137,6 +168,77 @@ const supabase = createClient()
   })
 
   const [deviceForms, setDeviceForms] = useState<NewDeviceForm[]>([createEmptyDeviceForm()])
+
+  const saveHomeState = () => {
+    if (typeof window === 'undefined') return
+
+    let mapState: { lat: number; lng: number; level: number } | null = null
+
+    if (kakaoMapRef.current) {
+      const center = kakaoMapRef.current.getCenter()
+      mapState = {
+        lat: center.getLat(),
+        lng: center.getLng(),
+        level: kakaoMapRef.current.getLevel(),
+      }
+    }
+
+    const payload = {
+      query,
+      selectedStatuses,
+      listScrollTop: listScrollRef.current?.scrollTop ?? 0,
+      mapState,
+    }
+
+    sessionStorage.setItem(HOME_STATE_KEY, JSON.stringify(payload))
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const raw = sessionStorage.getItem(HOME_STATE_KEY)
+    if (!raw) {
+      restoredHomeStateRef.current = true
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(raw)
+
+      if (typeof parsed.query === 'string') {
+        setQuery(parsed.query)
+      }
+
+      if (
+        Array.isArray(parsed.selectedStatuses) &&
+        parsed.selectedStatuses.every((item: unknown) => typeof item === 'string')
+      ) {
+        setSelectedStatuses(parsed.selectedStatuses)
+      }
+
+      if (
+        parsed.mapState &&
+        typeof parsed.mapState.lat === 'number' &&
+        typeof parsed.mapState.lng === 'number' &&
+        typeof parsed.mapState.level === 'number'
+      ) {
+        pendingMapStateRef.current = parsed.mapState
+      }
+
+      if (typeof parsed.listScrollTop === 'number') {
+        pendingListScrollTopRef.current = parsed.listScrollTop
+      }
+    } catch (error) {
+      console.warn('홈 상태 복원 실패:', error)
+    } finally {
+      restoredHomeStateRef.current = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!restoredHomeStateRef.current) return
+    saveHomeState()
+  }, [query, selectedStatuses])
 
   const resetForms = () => {
     setCustomerForm({
@@ -193,7 +295,7 @@ const supabase = createClient()
   }
 
   const fetchData = async () => {
-    const [customerRes, deviceRes] = await Promise.all([
+    const [customerRes, deviceRes, historyRes] = await Promise.all([
       supabase
         .from('customers')
         .select('customer_id, company_name, address, latitude, longitude, status, agency')
@@ -206,6 +308,8 @@ const supabase = createClient()
           'device_id, customer_id, device_name, device_name2, option, serial_number, program, install_date, install_engineer, category, packing_list_url'
         )
         .range(0, 5000),
+
+      supabase.from('service_history').select('customer_id, visit_date').range(0, 5000),
     ])
 
     if (customerRes.error) {
@@ -253,6 +357,26 @@ const supabase = createClient()
 
       setDeviceMap(map)
     }
+
+    if (historyRes.error) {
+      console.warn('service_history 조회 오류:', historyRes.error)
+    } else {
+      const map = new Map<number, number>()
+
+      ;(historyRes.data as ServiceHistory[] | null)?.forEach((item) => {
+        const customerId = Number(item.customer_id)
+        if (Number.isNaN(customerId)) return
+
+        const current = map.get(customerId) ?? 0
+        const nextValue = toTimeValue(item.visit_date)
+
+        if (nextValue > current) {
+          map.set(customerId, nextValue)
+        }
+      })
+
+      setLatestServiceDateMap(map)
+    }
   }
 
   useEffect(() => {
@@ -262,7 +386,7 @@ const supabase = createClient()
   const filteredCustomers = useMemo(() => {
     const q = query.trim().toLowerCase()
 
-    return customers.filter((c) => {
+    const filtered = customers.filter((c) => {
       const statusMatched =
         selectedStatuses.length === 0 ? false : selectedStatuses.includes(c.status ?? '')
 
@@ -281,7 +405,34 @@ const supabase = createClient()
         deviceLine.includes(q)
       )
     })
-  }, [customers, query, selectedStatuses, deviceMap])
+
+    return [...filtered].sort((a, b) => {
+      const aDevices = deviceMap.get(a.customer_id) || []
+      const bDevices = deviceMap.get(b.customer_id) || []
+
+      const aLatestDevice = Math.max(0, ...aDevices.map((d) => toTimeValue(d.install_date)))
+      const bLatestDevice = Math.max(0, ...bDevices.map((d) => toTimeValue(d.install_date)))
+
+      const aLatestService = latestServiceDateMap.get(a.customer_id) ?? 0
+      const bLatestService = latestServiceDateMap.get(b.customer_id) ?? 0
+
+      const aLatest = Math.max(aLatestDevice, aLatestService, a.customer_id)
+      const bLatest = Math.max(bLatestDevice, bLatestService, b.customer_id)
+
+      return bLatest - aLatest
+    })
+  }, [customers, query, selectedStatuses, deviceMap, latestServiceDateMap])
+
+  useEffect(() => {
+    if (pendingListScrollTopRef.current == null) return
+    if (!listScrollRef.current) return
+
+    requestAnimationFrame(() => {
+      if (!listScrollRef.current) return
+      listScrollRef.current.scrollTop = pendingListScrollTopRef.current ?? 0
+      pendingListScrollTopRef.current = null
+    })
+  }, [filteredCustomers])
 
   useEffect(() => {
     async function initMap() {
@@ -290,9 +441,13 @@ const supabase = createClient()
       const kakao = await loadKakaoMap()
 
       if (!kakaoMapRef.current) {
+        const initialMapState = pendingMapStateRef.current
+
         kakaoMapRef.current = new kakao.maps.Map(mapRef.current, {
-          center: new kakao.maps.LatLng(36.5, 127.8),
-          level: 13,
+          center: initialMapState
+            ? new kakao.maps.LatLng(initialMapState.lat, initialMapState.lng)
+            : new kakao.maps.LatLng(36.5, 127.8),
+          level: initialMapState?.level ?? 13,
         })
       }
 
@@ -323,7 +478,7 @@ const supabase = createClient()
         })
 
         const devices = deviceMap.get(Number(c.customer_id)) || []
-        const deviceLine = getDeviceLine(devices)
+        const deviceLines = getDeviceLines(devices)
 
         const navUrl = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${lng},${lat},${encodeURIComponent(c.company_name)}/-/car`
 
@@ -332,28 +487,28 @@ const supabase = createClient()
             <div style="
               width:320px;
               padding:16px;
-              background:#ffffff;
-              color:#111111;
+              background:${CARD_BG};
+              color:${TEXT_PRIMARY};
               border-radius:14px;
-              border:${BORDER_WIDTH} solid ${BORDER_COLOR};
+              border:1px solid ${INPUT_BORDER};
               font-size:13px;
-              line-height:1.55;
+              line-height:1.6;
               box-sizing:border-box;
               word-break:break-word;
-              box-shadow:0 8px 24px rgba(0,0,0,0.14);
+              box-shadow:0 12px 30px rgba(0,0,0,0.4);
               text-align:center;
             ">
-              <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center;">
-                ${c.company_name} <span style="font-weight:400; font-size:12px; color:#555;">(${c.status ?? '-'})</span>
+              <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center; color:${TEXT_PRIMARY};">
+                ${c.company_name} <span style="font-weight:400; font-size:12px; color:${TEXT_SECONDARY};">(${c.status ?? '-'})</span>
               </div>
-              <div style="font-size:12px; color:#555; margin-bottom:6px; text-align:center;">
+              <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
                 📍 ${c.address ?? '-'}
               </div>
-              <div style="font-size:12px; color:#333; margin-bottom:6px; text-align:center;">
+              <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
                 대리점: ${c.agency ?? '-'}
               </div>
-              <div style="font-size:12px; color:#333; margin-bottom:14px; text-align:center;">
-                ${deviceLine}
+              <div style="font-size:12px; color:${TEXT_PRIMARY}; margin-bottom:14px; text-align:center;">
+                ${deviceLines.join('<br/>')}
               </div>
               <div style="display:flex; gap:10px;">
                 <a href="/customer/${c.customer_id}"
@@ -361,8 +516,8 @@ const supabase = createClient()
                      flex:1;
                      text-align:center;
                      padding:9px 10px;
-                     background:${BORDER_COLOR};
-                     color:#fff;
+                     background:${WHITE_BUTTON_BG};
+                     color:${WHITE_BUTTON_TEXT};
                      border-radius:10px;
                      font-size:13px;
                      text-decoration:none;
@@ -377,12 +532,13 @@ const supabase = createClient()
                      flex:1;
                      text-align:center;
                      padding:9px 10px;
-                     background:#03C75A;
-                     color:#fff;
+                     background:#2a2d34;
+                     color:${TEXT_PRIMARY};
                      border-radius:10px;
                      font-size:13px;
                      text-decoration:none;
                      font-weight:700;
+                     border:1px solid ${INPUT_BORDER};
                    ">
                   네이버 길 안내
                 </a>
@@ -424,41 +580,41 @@ const supabase = createClient()
             {
               width: '48px',
               height: '48px',
-              background: 'rgba(37,99,235,0.85)',
-              color: '#fff',
+              background: 'rgba(255,255,255,0.82)',
+              color: '#111113',
               textAlign: 'center',
               lineHeight: '48px',
               borderRadius: '50%',
               fontSize: '14px',
               fontWeight: '700',
-              border: '2px solid #fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
             },
             {
               width: '56px',
               height: '56px',
-              background: 'rgba(16,185,129,0.85)',
-              color: '#fff',
+              background: 'rgba(245,245,245,0.88)',
+              color: '#111113',
               textAlign: 'center',
               lineHeight: '56px',
               borderRadius: '50%',
               fontSize: '15px',
               fontWeight: '700',
-              border: '2px solid #fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
             },
             {
               width: '64px',
               height: '64px',
-              background: 'rgba(239,68,68,0.85)',
-              color: '#fff',
+              background: 'rgba(230,230,230,0.9)',
+              color: '#111113',
               textAlign: 'center',
               lineHeight: '64px',
               borderRadius: '50%',
               fontSize: '16px',
               fontWeight: '700',
-              border: '2px solid #fff',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
             },
           ],
         })
@@ -613,7 +769,7 @@ const supabase = createClient()
 
     setIsSavingCustomer(true)
 
-let insertedCustomerId = 0
+    let insertedCustomerId = 0
 
     try {
       const coords = await geocodeAddress(customerForm.address.trim())
@@ -702,13 +858,14 @@ let insertedCustomerId = 0
   const controlButtonStyle = (active: boolean): CSSProperties => ({
     padding: '10px 14px',
     borderRadius: RADIUS,
-    border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
-    background: active ? '#234ea2' : '#fff',
-    color: active ? '#fff' : '#111827',
+    border: `1px solid ${INPUT_BORDER}`,
+    background: active ? WHITE_BUTTON_BG : PANEL_BG,
+    color: active ? WHITE_BUTTON_TEXT : TEXT_PRIMARY,
     fontSize: 14,
     fontWeight: 700,
     cursor: 'pointer',
     boxSizing: 'border-box',
+    minWidth: 70,
   })
 
   return (
@@ -716,8 +873,18 @@ let insertedCustomerId = 0
       <style jsx global>{`
         input::placeholder,
         textarea::placeholder {
-          color: #6b7280;
+          color: ${TEXT_MUTED};
           opacity: 1;
+        }
+
+        select {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+        }
+
+        * {
+          scrollbar-color: #5b606b ${PANEL_BG};
         }
       `}</style>
 
@@ -728,7 +895,7 @@ let insertedCustomerId = 0
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
-          background: '#fff',
+          background: PAGE_BG,
           overflow: 'hidden',
         }}
       >
@@ -737,7 +904,7 @@ let insertedCustomerId = 0
             fontSize: 28,
             fontWeight: 800,
             marginBottom: 16,
-            color: '#111827',
+            color: TEXT_PRIMARY,
             flex: '0 0 auto',
           }}
         >
@@ -761,12 +928,12 @@ let insertedCustomerId = 0
               placeholder="회사명 / 주소 / 상태 / 대리점 검색"
               style={{
                 width: '100%',
-                padding: 12,
-                border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
-                borderRadius: RADIUS,
+                padding: 14,
+                border: `1px solid ${INPUT_BORDER}`,
+                borderRadius: 16,
                 marginBottom: 12,
-                background: '#234ea2',
-                color: '#d1d5db',
+                background: PANEL_BG,
+                color: TEXT_PRIMARY,
                 fontSize: 15,
                 boxSizing: 'border-box',
                 outline: 'none',
@@ -809,9 +976,9 @@ let insertedCustomerId = 0
                 onClick={() => setIsAddCustomerModalOpen(true)}
                 style={{
                   padding: '10px 14px',
-                  background: '#234ea2',
-                  color: '#fff',
-                  border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
+                  background: WHITE_BUTTON_BG,
+                  color: WHITE_BUTTON_TEXT,
+                  border: `1px solid ${INPUT_BORDER}`,
                   borderRadius: RADIUS,
                   fontSize: 14,
                   fontWeight: 700,
@@ -826,10 +993,10 @@ let insertedCustomerId = 0
 
             <div
               style={{
-                border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
-                borderRadius: RADIUS,
+                border: `1px solid ${INPUT_BORDER}`,
+                borderRadius: 20,
                 padding: 8,
-                background: '#234ea2',
+                background: PANEL_BG,
                 flex: 1,
                 minHeight: 0,
                 boxSizing: 'border-box',
@@ -837,6 +1004,8 @@ let insertedCustomerId = 0
               }}
             >
               <div
+                ref={listScrollRef}
+                onScroll={saveHomeState}
                 style={{
                   height: '100%',
                   overflowY: 'auto',
@@ -844,11 +1013,11 @@ let insertedCustomerId = 0
                 }}
               >
                 {filteredCustomers.length === 0 ? (
-                  <div style={{ padding: 12, color: '#fff' }}>검색 결과가 없습니다.</div>
+                  <div style={{ padding: 12, color: TEXT_SECONDARY }}>검색 결과가 없습니다.</div>
                 ) : (
                   filteredCustomers.map((c) => {
                     const devices = deviceMap.get(Number(c.customer_id)) || []
-                    const deviceLine = getDeviceLine(devices)
+                    const deviceLines = getDeviceLines(devices)
 
                     return (
                       <button
@@ -858,19 +1027,19 @@ let insertedCustomerId = 0
                           display: 'block',
                           width: '100%',
                           textAlign: 'left',
-                          padding: 12,
-                          border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
-                          borderRadius: RADIUS,
-                          marginBottom: 8,
-                          background: '#ffffff',
-                          color: '#111',
+                          padding: 14,
+                          border: `1px solid ${INPUT_BORDER}`,
+                          borderRadius: 18,
+                          marginBottom: 10,
+                          background: CARD_BG,
+                          color: TEXT_PRIMARY,
                           cursor: 'pointer',
                           boxSizing: 'border-box',
                         }}
                       >
-                        <div style={{ fontWeight: 800, color: '#111' }}>
+                        <div style={{ fontWeight: 800, color: TEXT_PRIMARY, fontSize: 18 }}>
                           {c.company_name}{' '}
-                          <span style={{ fontWeight: 500, fontSize: 11, color: '#555' }}>
+                          <span style={{ fontWeight: 500, fontSize: 12, color: TEXT_SECONDARY }}>
                             ({c.status ?? '-'})
                           </span>
                         </div>
@@ -878,49 +1047,55 @@ let insertedCustomerId = 0
                         <div
                           style={{
                             fontSize: 12,
-                            marginTop: 2,
-                            color: c.address ? '#333' : '#ef4444',
+                            marginTop: 4,
+                            color: c.address ? TEXT_SECONDARY : '#ef4444',
                             fontWeight: c.address ? 400 : 700,
+                            lineHeight: 1.45,
                           }}
                         >
                           {c.address ? c.address : '주소 정보 없음 등록 필요'}
                         </div>
 
-                        <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 6 }}>
                           대리점: {c.agency ?? '-'}
                         </div>
 
                         <div
                           style={{
-                            fontSize: 11,
-                            color: '#555',
-                            marginTop: 2,
+                            fontSize: 12,
+                            color: TEXT_SECONDARY,
+                            marginTop: 8,
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: 8,
+                            alignItems: 'flex-start',
+                            gap: 10,
                           }}
                         >
                           <span
                             style={{
                               minWidth: 0,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              whiteSpace: 'pre-line',
+                              lineHeight: 1.5,
+                              wordBreak: 'break-word',
+                              flex: 1,
                             }}
                           >
-                            {deviceLine}
+                            {deviceLines.join('\n')}
                           </span>
 
                           <a
                             href={`/customer/${c.customer_id}`}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              saveHomeState()
+                            }}
                             style={{
-                              color: '#234ea2',
+                              color: TEXT_PRIMARY,
                               fontWeight: 700,
                               textDecoration: 'none',
                               whiteSpace: 'nowrap',
                               flexShrink: 0,
+                              alignSelf: 'flex-end',
                             }}
                           >
                             상세보기
@@ -940,10 +1115,11 @@ let insertedCustomerId = 0
               width: '100%',
               height: '100%',
               minHeight: 0,
-              borderRadius: RADIUS,
+              borderRadius: 20,
               overflow: 'hidden',
-              border: `${BORDER_WIDTH} solid ${BORDER_COLOR}`,
+              border: `1px solid ${INPUT_BORDER}`,
               boxSizing: 'border-box',
+              background: PANEL_BG,
             }}
           />
         </div>
@@ -954,7 +1130,7 @@ let insertedCustomerId = 0
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.4)',
+              background: 'rgba(0, 0, 0, 0.65)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -969,20 +1145,34 @@ let insertedCustomerId = 0
                 maxWidth: 780,
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                background: '#fff',
-                color: '#111827',
-                borderRadius: 16,
+                background: CARD_BG,
+                color: TEXT_PRIMARY,
+                borderRadius: 20,
                 padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-                border: '2px solid #111827',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+                border: `1px solid ${INPUT_BORDER}`,
               }}
             >
-              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, color: '#111827' }}>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  marginBottom: 20,
+                  color: TEXT_PRIMARY,
+                }}
+              >
                 업체 등록
               </div>
 
               <div style={{ ...sectionCardStyle, marginBottom: 16 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 14, color: '#111827' }}>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    marginBottom: 14,
+                    color: TEXT_PRIMARY,
+                  }}
+                >
                   업체 정보
                 </div>
 
@@ -1057,7 +1247,7 @@ let insertedCustomerId = 0
                     marginBottom: 14,
                   }}
                 >
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#111827' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>
                     장비 정보
                   </div>
 
@@ -1068,8 +1258,8 @@ let insertedCustomerId = 0
                       width: 34,
                       height: 34,
                       borderRadius: '50%',
-                      background: '#234ea2',
-                      color: '#fff',
+                      background: WHITE_BUTTON_BG,
+                      color: WHITE_BUTTON_TEXT,
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: 24,
@@ -1089,10 +1279,10 @@ let insertedCustomerId = 0
                     <div
                       key={index}
                       style={{
-                        border: '2px solid #d1d5db',
+                        border: `1px solid ${INPUT_BORDER}`,
                         borderRadius: 14,
                         padding: 14,
-                        background: '#fff',
+                        background: '#111216',
                       }}
                     >
                       <div
@@ -1103,7 +1293,7 @@ let insertedCustomerId = 0
                           marginBottom: 12,
                         }}
                       >
-                        <div style={{ fontWeight: 700, color: '#111827' }}>
+                        <div style={{ fontWeight: 700, color: TEXT_PRIMARY }}>
                           장비 {index + 1}
                         </div>
 
@@ -1114,9 +1304,9 @@ let insertedCustomerId = 0
                             style={{
                               padding: '6px 10px',
                               borderRadius: 8,
-                              border: '2px solid #111827',
-                              background: '#fff',
-                              color: '#111827',
+                              border: `1px solid ${INPUT_BORDER}`,
+                              background: PANEL_BG,
+                              color: TEXT_PRIMARY,
                               cursor: 'pointer',
                               fontWeight: 700,
                             }}
@@ -1256,7 +1446,14 @@ let insertedCustomerId = 0
               </div>
 
               <div style={{ ...sectionCardStyle, marginBottom: 16 }}>
-                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 14, color: '#111827' }}>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    marginBottom: 14,
+                    color: TEXT_PRIMARY,
+                  }}
+                >
                   담당자 정보
                 </div>
 
@@ -1331,10 +1528,10 @@ let insertedCustomerId = 0
                   onClick={() => setIsAddCustomerModalOpen(false)}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: '2px solid #111827',
+                    background: PANEL_BG,
+                    color: TEXT_PRIMARY,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 700,
                   }}
@@ -1347,10 +1544,10 @@ let insertedCustomerId = 0
                   disabled={isSavingCustomer}
                   style={{
                     padding: '10px 14px',
-                    background: '#e5e7eb',
-                    color: '#111827',
-                    borderRadius: 8,
-                    border: '2px solid #111827',
+                    background: WHITE_BUTTON_BG,
+                    color: WHITE_BUTTON_TEXT,
+                    borderRadius: 10,
+                    border: `1px solid ${INPUT_BORDER}`,
                     cursor: 'pointer',
                     fontWeight: 700,
                     opacity: isSavingCustomer ? 0.7 : 1,
