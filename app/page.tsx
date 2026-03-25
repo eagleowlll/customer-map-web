@@ -611,7 +611,7 @@ const supabase = createClient()
 
     setIsSavingCustomer(true)
 
-    let insertedCustomerId: number | null = null
+let insertedCustomerId = 0
 
     try {
       const coords = await geocodeAddress(customerForm.address.trim())

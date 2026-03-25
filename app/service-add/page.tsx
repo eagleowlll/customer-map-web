@@ -1,8 +1,9 @@
 'use client'
-
+import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
 
 export default function AddCustomerPage() {
+const supabase = createClient()
   const [company, setCompany] = useState('')
   const [address, setAddress] = useState('')
   const [lat, setLat] = useState('')
