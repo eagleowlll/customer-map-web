@@ -503,6 +503,10 @@ export default function HomePage() {
 overlayContent.addEventListener('click', (e) => {
   e.stopPropagation()
 })
+
+overlayContent.addEventListener('mousedown', (e) => {
+  e.stopPropagation()
+})
         overlayContent.innerHTML = `
           <div style="
             width:320px;
