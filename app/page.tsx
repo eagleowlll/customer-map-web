@@ -68,8 +68,7 @@ const WHITE_BUTTON_BG = '#f4f4f5'
 const WHITE_BUTTON_TEXT = '#111113'
 const RADIUS = 12
 
-const BORDER_COLOR = INPUT_BORDER
-const BORDER_WIDTH = '1px'
+
 const BASE_LAT = 35.55424
 const BASE_LNG = 129.35841
 const BASE_NAME = '울산광역시 북구 명촌 7길 30'
@@ -142,6 +141,7 @@ export default function HomePage() {
 
   const mapRef = useRef<HTMLDivElement | null>(null)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
+const clustererRef = useRef<any>(null)
   const kakaoMapRef = useRef<any>(null)
   const markerMapRef = useRef<Map<number, any>>(new Map())
   const infoWindowMapRef = useRef<Map<number, any>>(new Map())
@@ -490,13 +490,26 @@ useEffect(() => {
     const map = kakaoMapRef.current
     if (!map) return
 
+    // 기존 열린 오버레이 닫기
+    if (openInfoWindowRef.current) {
+      openInfoWindowRef.current.iw.setMap(null)
+      openInfoWindowRef.current = null
+    }
+
+    // 기존 마커 제거
     markerMapRef.current.forEach((marker) => marker.setMap(null))
     markerMapRef.current.clear()
 
+    // 기존 오버레이 제거
     infoWindowMapRef.current.forEach((iw) => iw.setMap(null))
     infoWindowMapRef.current.clear()
 
-    openInfoWindowRef.current = null
+    // 기존 클러스터 제거
+    if (clustererRef.current) {
+      clustererRef.current.clear()
+    }
+
+    const markers: any[] = []
 
     filteredCustomers.forEach((c) => {
       if (c.latitude == null || c.longitude == null) return
@@ -506,15 +519,14 @@ useEffect(() => {
 
       if (Number.isNaN(lat) || Number.isNaN(lng)) return
 
+      const marker = new kakao.maps.Marker({
+        position: new kakao.maps.LatLng(lat, lng),
+      })
+
       const devices = deviceMap.get(Number(c.customer_id)) || []
       const deviceLines = getDeviceLines(devices)
 
       const navUrl = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${lng},${lat},${encodeURIComponent(c.company_name)}/-/car`
-
-      const marker = new kakao.maps.Marker({
-        position: new kakao.maps.LatLng(lat, lng),
-        map,
-      })
 
       const overlayContent = document.createElement('div')
       overlayContent.addEventListener('click', (e) => e.stopPropagation())
@@ -584,7 +596,7 @@ useEffect(() => {
         </div>
       `
 
-      const overlay = new kakao.maps.CustomOverlay({
+      const customOverlay = new kakao.maps.CustomOverlay({
         content: overlayContent,
         position: new kakao.maps.LatLng(lat, lng),
         yAnchor: 1.25,
@@ -602,13 +614,72 @@ useEffect(() => {
           openInfoWindowRef.current.iw.setMap(null)
         }
 
-        overlay.setMap(map)
-        openInfoWindowRef.current = { id: c.customer_id, iw: overlay }
+        customOverlay.setMap(map)
+        openInfoWindowRef.current = { id: c.customer_id, iw: customOverlay }
       })
 
       markerMapRef.current.set(c.customer_id, marker)
-      infoWindowMapRef.current.set(c.customer_id, overlay)
+      infoWindowMapRef.current.set(c.customer_id, customOverlay)
+      markers.push(marker)
     })
+
+    if ((window as any).kakao?.maps?.MarkerClusterer) {
+      if (!clustererRef.current) {
+        clustererRef.current = new kakao.maps.MarkerClusterer({
+          map,
+          averageCenter: true,
+          minLevel: 7,
+          disableClickZoom: false,
+          markers: [],
+          styles: [
+            {
+              width: '48px',
+              height: '48px',
+              background: 'rgba(255,255,255,0.82)',
+              color: '#111113',
+              textAlign: 'center',
+              lineHeight: '48px',
+              borderRadius: '50%',
+              fontSize: '14px',
+              fontWeight: '700',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
+            },
+            {
+              width: '56px',
+              height: '56px',
+              background: 'rgba(245,245,245,0.88)',
+              color: '#111113',
+              textAlign: 'center',
+              lineHeight: '56px',
+              borderRadius: '50%',
+              fontSize: '15px',
+              fontWeight: '700',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
+            },
+            {
+              width: '64px',
+              height: '64px',
+              background: 'rgba(230,230,230,0.9)',
+              color: '#111113',
+              textAlign: 'center',
+              lineHeight: '64px',
+              borderRadius: '50%',
+              fontSize: '16px',
+              fontWeight: '700',
+              border: '1px solid rgba(255,255,255,0.95)',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.35)',
+            },
+          ],
+        })
+      }
+
+      clustererRef.current.clear()
+      clustererRef.current.addMarkers(markers)
+    } else {
+      markers.forEach((marker) => marker.setMap(map))
+    }
   }
 
   renderMarkers()
@@ -866,11 +937,7 @@ input[type="date"].white-date::-webkit-calendar-picker-indicator {
           scrollbar-color: #5b606b ${PANEL_BG};
         }
 
-        input[type="date"].white-date::-webkit-calendar-picker-indicator {
-          filter: none;
-          cursor: pointer;
-        }
-      `}</style>
+              `}</style>
 
       <div
         style={{
