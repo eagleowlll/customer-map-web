@@ -85,6 +85,14 @@ const inputStyle: CSSProperties = {
   outline: 'none',
 }
 
+// date input with white calendar icon
+const dateInputStyle: CSSProperties = {
+  ...inputStyle,
+  colorScheme: 'light',
+  background: '#ffffff',
+  color: '#111113',
+}
+
 const sectionCardStyle: CSSProperties = {
   border: `1px solid ${INPUT_BORDER}`,
   borderRadius: 16,
@@ -449,6 +457,14 @@ export default function HomePage() {
             : new kakao.maps.LatLng(36.5, 127.8),
           level: initialMapState?.level ?? 13,
         })
+
+        // 지도 클릭 시 열린 정보창 닫기
+        kakao.maps.event.addListener(kakaoMapRef.current, 'click', () => {
+          if (openInfoWindowRef.current) {
+            openInfoWindowRef.current.iw.close()
+            openInfoWindowRef.current = null
+          }
+        })
       }
 
       const map = kakaoMapRef.current
@@ -482,70 +498,77 @@ export default function HomePage() {
 
         const navUrl = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${lng},${lat},${encodeURIComponent(c.company_name)}/-/car`
 
-        const infoWindow = new kakao.maps.InfoWindow({
-          content: `
-            <div style="
-              width:320px;
-              padding:16px;
-              background:${CARD_BG};
-              color:${TEXT_PRIMARY};
-              border-radius:14px;
-              border:1px solid ${INPUT_BORDER};
-              font-size:13px;
-              line-height:1.6;
-              box-sizing:border-box;
-              word-break:break-word;
-              box-shadow:0 12px 30px rgba(0,0,0,0.4);
-              text-align:center;
-            ">
-              <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center; color:${TEXT_PRIMARY};">
-                ${c.company_name} <span style="font-weight:400; font-size:12px; color:${TEXT_SECONDARY};">(${c.status ?? '-'})</span>
-              </div>
-              <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
-                📍 ${c.address ?? '-'}
-              </div>
-              <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
-                대리점: ${c.agency ?? '-'}
-              </div>
-              <div style="font-size:12px; color:${TEXT_PRIMARY}; margin-bottom:14px; text-align:center;">
-                ${deviceLines.join('<br/>')}
-              </div>
-              <div style="display:flex; gap:10px;">
-                <a href="/customer/${c.customer_id}"
-                   style="
-                     flex:1;
-                     text-align:center;
-                     padding:9px 10px;
-                     background:${WHITE_BUTTON_BG};
-                     color:${WHITE_BUTTON_TEXT};
-                     border-radius:10px;
-                     font-size:13px;
-                     text-decoration:none;
-                     font-weight:700;
-                   ">
-                  상세보기
-                </a>
-                <a href="${navUrl}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   style="
-                     flex:1;
-                     text-align:center;
-                     padding:9px 10px;
-                     background:#2a2d34;
-                     color:${TEXT_PRIMARY};
-                     border-radius:10px;
-                     font-size:13px;
-                     text-decoration:none;
-                     font-weight:700;
-                     border:1px solid ${INPUT_BORDER};
-                   ">
-                  네이버 길 안내
-                </a>
-              </div>
+        // 카카오 기본 말풍선(흰 사각형 꼬리) 숨기기 위해 CustomOverlay 사용
+        const overlayContent = document.createElement('div')
+        overlayContent.innerHTML = `
+          <div style="
+            width:320px;
+            padding:16px;
+            background:${CARD_BG};
+            color:${TEXT_PRIMARY};
+            border-radius:14px;
+            border:1px solid ${INPUT_BORDER};
+            font-size:13px;
+            line-height:1.6;
+            box-sizing:border-box;
+            word-break:break-word;
+            box-shadow:0 12px 30px rgba(0,0,0,0.5);
+            text-align:center;
+            position:relative;
+          ">
+            <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center; color:${TEXT_PRIMARY};">
+              ${c.company_name} <span style="font-weight:400; font-size:12px; color:${TEXT_SECONDARY};">(${c.status ?? '-'})</span>
             </div>
-          `,
-          removable: false,
+            <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
+              📍 ${c.address ?? '-'}
+            </div>
+            <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
+              대리점: ${c.agency ?? '-'}
+            </div>
+            <div style="font-size:12px; color:${TEXT_PRIMARY}; margin-bottom:14px; text-align:center;">
+              ${deviceLines.join('<br/>')}
+            </div>
+            <div style="display:flex; gap:10px;">
+              <a href="/customer/${c.customer_id}"
+                 style="
+                   flex:1;
+                   text-align:center;
+                   padding:9px 10px;
+                   background:${WHITE_BUTTON_BG};
+                   color:${WHITE_BUTTON_TEXT};
+                   border-radius:10px;
+                   font-size:13px;
+                   text-decoration:none;
+                   font-weight:700;
+                 ">
+                상세보기
+              </a>
+              <a href="${navUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 style="
+                   flex:1;
+                   text-align:center;
+                   padding:9px 10px;
+                   background:#2a2d34;
+                   color:${TEXT_PRIMARY};
+                   border-radius:10px;
+                   font-size:13px;
+                   text-decoration:none;
+                   font-weight:700;
+                   border:1px solid ${INPUT_BORDER};
+                 ">
+                네이버 길 안내
+              </a>
+            </div>
+          </div>
+        `
+
+        const customOverlay = new kakao.maps.CustomOverlay({
+          content: overlayContent,
+          position: new kakao.maps.LatLng(lat, lng),
+          yAnchor: 1.15,
+          zIndex: 3,
         })
 
         kakao.maps.event.addListener(marker, 'click', () => {
@@ -553,19 +576,19 @@ export default function HomePage() {
             openInfoWindowRef.current &&
             openInfoWindowRef.current.id === c.customer_id
           ) {
-            openInfoWindowRef.current.iw.close()
+            openInfoWindowRef.current.iw.setMap(null)
             openInfoWindowRef.current = null
           } else {
             if (openInfoWindowRef.current) {
-              openInfoWindowRef.current.iw.close()
+              openInfoWindowRef.current.iw.setMap(null)
             }
-            infoWindow.open(map, marker)
-            openInfoWindowRef.current = { id: c.customer_id, iw: infoWindow }
+            customOverlay.setMap(map)
+            openInfoWindowRef.current = { id: c.customer_id, iw: customOverlay }
           }
         })
 
         markerMapRef.current.set(c.customer_id, marker)
-        infoWindowMapRef.current.set(c.customer_id, infoWindow)
+        infoWindowMapRef.current.set(c.customer_id, customOverlay)
         markers.push(marker)
       })
 
@@ -661,7 +684,7 @@ export default function HomePage() {
     const position = new kakao.maps.LatLng(lat, lng)
 
     if (openInfoWindowRef.current) {
-      openInfoWindowRef.current.iw.close()
+      openInfoWindowRef.current.iw.setMap(null)
       openInfoWindowRef.current = null
     }
 
@@ -675,7 +698,7 @@ export default function HomePage() {
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 
     const marker = markerMapRef.current.get(customer.customer_id)
-    const infoWindow = infoWindowMapRef.current.get(customer.customer_id)
+    const customOverlay = infoWindowMapRef.current.get(customer.customer_id)
 
     const animateZoom = (now: number) => {
       const elapsed = now - startTime
@@ -688,9 +711,9 @@ export default function HomePage() {
       if (progress < 1) {
         requestAnimationFrame(animateZoom)
       } else {
-        if (marker && infoWindow) {
-          infoWindow.open(map, marker)
-          openInfoWindowRef.current = { id: customer.customer_id, iw: infoWindow }
+        if (marker && customOverlay) {
+          customOverlay.setMap(map)
+          openInfoWindowRef.current = { id: customer.customer_id, iw: customOverlay }
         }
       }
     }
@@ -886,6 +909,11 @@ export default function HomePage() {
         * {
           scrollbar-color: #5b606b ${PANEL_BG};
         }
+
+        input[type="date"].white-date::-webkit-calendar-picker-indicator {
+          filter: none;
+          cursor: pointer;
+        }
       `}</style>
 
       <div
@@ -922,24 +950,52 @@ export default function HomePage() {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="회사명 / 주소 / 상태 / 대리점 검색"
-              style={{
-                width: '100%',
-                padding: 14,
-                border: `1px solid ${INPUT_BORDER}`,
-                borderRadius: 16,
-                marginBottom: 12,
-                background: PANEL_BG,
-                color: TEXT_PRIMARY,
-                fontSize: 15,
-                boxSizing: 'border-box',
-                outline: 'none',
-                flex: '0 0 auto',
-              }}
-            />
+            {/* 검색창 + X 버튼 */}
+            <div style={{ position: 'relative', marginBottom: 12, flex: '0 0 auto' }}>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="회사명 / 주소 / 상태 / 대리점 검색"
+                style={{
+                  width: '100%',
+                  padding: '14px 42px 14px 14px',
+                  border: `1px solid ${INPUT_BORDER}`,
+                  borderRadius: 16,
+                  background: PANEL_BG,
+                  color: TEXT_PRIMARY,
+                  fontSize: 15,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: TEXT_MUTED,
+                    color: PAGE_BG,
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
             <div
               style={{
@@ -1220,7 +1276,7 @@ export default function HomePage() {
                         address: e.target.value,
                       }))
                     }
-                    placeholder="주소(address)"
+                    placeholder="주소(전체 주소를 입력 ex. 울산광역시 북구 명촌 7길 30)"
                     style={inputStyle}
                   />
 
@@ -1377,6 +1433,8 @@ export default function HomePage() {
                           >
                             <option value="ACCTee">ACCTee</option>
                             <option value="Tims">Tims</option>
+                            <option value="CALYPSO">CALYPSO</option>
+                            <option value="없음">없음</option>
                           </select>
                         </div>
 
@@ -1389,11 +1447,12 @@ export default function HomePage() {
                         >
                           <input
                             type="date"
+                            className="white-date"
                             value={device.install_date}
                             onChange={(e) =>
                               updateDeviceForm(index, 'install_date', e.target.value)
                             }
-                            style={inputStyle}
+                            style={dateInputStyle}
                           />
 
                           <select

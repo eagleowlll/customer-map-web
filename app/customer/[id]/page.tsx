@@ -73,6 +73,19 @@ const inputStyle: CSSProperties = {
   outline: 'none',
 }
 
+// date input with white background so calendar icon is visible
+const dateInputStyle: CSSProperties = {
+  width: '100%',
+  padding: 12,
+  border: `1px solid ${INPUT_BORDER}`,
+  borderRadius: 10,
+  boxSizing: 'border-box',
+  color: '#111113',
+  background: '#ffffff',
+  outline: 'none',
+  colorScheme: 'light',
+}
+
 const textareaStyle: CSSProperties = {
   width: '100%',
   padding: 12,
@@ -823,9 +836,20 @@ export default function CustomerDetailPage() {
         `}</style>
 
         <main style={{ padding: 20, background: PAGE_BG, minHeight: '100vh', color: TEXT_PRIMARY }}>
-          <a href="/" style={{ color: TEXT_PRIMARY, textDecoration: 'none', fontWeight: 700 }}>
+          <button
+            onClick={() => router.back()}
+            style={{
+              color: TEXT_PRIMARY,
+              background: 'none',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: 18,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
             ← 지도로 돌아가기
-          </a>
+          </button>
           <p style={{ marginTop: 16 }}>불러오는 중...</p>
         </main>
       </>
@@ -851,6 +875,10 @@ export default function CustomerDetailPage() {
           -webkit-appearance: none;
           -moz-appearance: none;
         }
+
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          cursor: pointer;
+        }
       `}</style>
 
       <main
@@ -863,17 +891,21 @@ export default function CustomerDetailPage() {
         }}
       >
         <div style={{ marginBottom: 16 }}>
-          <a
-            href="/"
+          {/* 뒤로가기: router.back() 으로 이전 스크롤/위치 유지 */}
+          <button
+            onClick={() => router.back()}
             style={{
               color: TEXT_PRIMARY,
-              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
               fontWeight: 700,
               fontSize: 18,
+              cursor: 'pointer',
+              padding: 0,
             }}
           >
             ← 지도로 돌아가기
-          </a>
+          </button>
         </div>
 
         <div
@@ -1741,6 +1773,8 @@ export default function CustomerDetailPage() {
                   >
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
+                    <option value="CALYPSO">프로그램: CALYPSO</option>
+                    <option value="없음">프로그램: 없음</option>
                   </select>
                 </div>
 
@@ -1749,7 +1783,7 @@ export default function CustomerDetailPage() {
                     type="date"
                     value={deviceForm.install_date}
                     onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_date: e.target.value }))}
-                    style={inputStyle}
+                    style={dateInputStyle}
                   />
                   <select
                     value={deviceForm.category}
@@ -1877,6 +1911,8 @@ export default function CustomerDetailPage() {
                   >
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
+                    <option value="CALYPSO">프로그램: CALYPSO</option>
+                    <option value="없음">프로그램: 없음</option>
                   </select>
                 </div>
 
@@ -1885,7 +1921,7 @@ export default function CustomerDetailPage() {
                     type="date"
                     value={deviceEditForm.install_date}
                     onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_date: e.target.value }))}
-                    style={inputStyle}
+                    style={dateInputStyle}
                   />
                   <select
                     value={deviceEditForm.category}
@@ -2030,7 +2066,7 @@ export default function CustomerDetailPage() {
                         visit_date: e.target.value,
                       }))
                     }
-                    style={inputStyle}
+                    style={dateInputStyle}
                   />
 
                   <input
@@ -2144,7 +2180,7 @@ export default function CustomerDetailPage() {
                         visit_date: e.target.value,
                       }))
                     }
-                    style={inputStyle}
+                    style={dateInputStyle}
                   />
 
                   <input
