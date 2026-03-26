@@ -146,11 +146,11 @@ export default function HomePage() {
   const markerMapRef = useRef<Map<number, any>>(new Map())
   const infoWindowMapRef = useRef<Map<number, any>>(new Map())
   const openInfoWindowRef = useRef<{ id: number; iw: any } | null>(null)
-  const clustererRef = useRef<any>(null)
+ 
   const restoredHomeStateRef = useRef(false)
   const pendingMapStateRef = useRef<{ lat: number; lng: number; level: number } | null>(null)
   const pendingListScrollTopRef = useRef<number | null>(null)
-
+const [isMapReady, setIsMapReady] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [deviceMap, setDeviceMap] = useState<Map<number, Device[]>>(new Map())
   const [latestServiceDateMap, setLatestServiceDateMap] = useState<Map<number, number>>(new Map())
@@ -442,16 +442,23 @@ export default function HomePage() {
     })
   }, [filteredCustomers])
 
- useEffect(() => {
+useEffect(() => {
+  let mounted = true
+
   async function initMap() {
     if (!mapRef.current) return
 
     const kakao = await loadKakaoMap()
+    if (!mounted) return
 
     if (!kakaoMapRef.current) {
+      const initialMapState = pendingMapStateRef.current
+
       kakaoMapRef.current = new kakao.maps.Map(mapRef.current, {
-        center: new kakao.maps.LatLng(36.5, 127.8),
-        level: 13,
+        center: initialMapState
+          ? new kakao.maps.LatLng(initialMapState.lat, initialMapState.lng)
+          : new kakao.maps.LatLng(36.5, 127.8),
+        level: initialMapState?.level ?? 13,
       })
 
       kakao.maps.event.addListener(kakaoMapRef.current, 'click', () => {
@@ -461,84 +468,155 @@ export default function HomePage() {
         }
       })
     }
+
+    setIsMapReady(true)
   }
 
   initMap()
+
+  return () => {
+    mounted = false
+  }
 }, [])
-
 useEffect(() => {
-  if (!kakaoMapRef.current) return
+  if (!isMapReady || !kakaoMapRef.current) return
 
-  const map = kakaoMapRef.current
-  const kakao = window.kakao
+  let cancelled = false
 
-  // 기존 마커 제거
-  markerMapRef.current.forEach((marker) => marker.setMap(null))
-  markerMapRef.current.clear()
+  async function renderMarkers() {
+    const kakao = await loadKakaoMap()
+    if (cancelled) return
 
-  // 기존 overlay 제거
-  infoWindowMapRef.current.forEach((iw) => iw.setMap(null))
-  infoWindowMapRef.current.clear()
+    const map = kakaoMapRef.current
+    if (!map) return
 
-  openInfoWindowRef.current = null
+    markerMapRef.current.forEach((marker) => marker.setMap(null))
+    markerMapRef.current.clear()
 
-  filteredCustomers.forEach((c) => {
-    if (!c.latitude || !c.longitude) return
+    infoWindowMapRef.current.forEach((iw) => iw.setMap(null))
+    infoWindowMapRef.current.clear()
 
-    const lat = Number(c.latitude)
-    const lng = Number(c.longitude)
+    openInfoWindowRef.current = null
 
-    const marker = new kakao.maps.Marker({
-      position: new kakao.maps.LatLng(lat, lng),
-      map,
-    })
+    filteredCustomers.forEach((c) => {
+      if (c.latitude == null || c.longitude == null) return
 
-    const overlayContent = document.createElement('div')
+      const lat = Number(c.latitude)
+      const lng = Number(c.longitude)
 
-    overlayContent.addEventListener('click', (e) => e.stopPropagation())
-    overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
+      if (Number.isNaN(lat) || Number.isNaN(lng)) return
 
-    overlayContent.innerHTML = `
-      <div style="
-        width:320px;
-        padding:16px;
-        background:${CARD_BG};
-        color:${TEXT_PRIMARY};
-        border-radius:14px;
-        border:1px solid ${INPUT_BORDER};
-        font-size:13px;
-        text-align:center;
-      ">
-        <div style="font-weight:700; margin-bottom:8px;">
-          ${c.company_name}
+      const devices = deviceMap.get(Number(c.customer_id)) || []
+      const deviceLines = getDeviceLines(devices)
+
+      const navUrl = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${lng},${lat},${encodeURIComponent(c.company_name)}/-/car`
+
+      const marker = new kakao.maps.Marker({
+        position: new kakao.maps.LatLng(lat, lng),
+        map,
+      })
+
+      const overlayContent = document.createElement('div')
+      overlayContent.addEventListener('click', (e) => e.stopPropagation())
+      overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
+
+      overlayContent.innerHTML = `
+        <div style="
+          width:320px;
+          padding:16px;
+          background:${CARD_BG};
+          color:${TEXT_PRIMARY};
+          border-radius:14px;
+          border:1px solid ${INPUT_BORDER};
+          font-size:13px;
+          line-height:1.6;
+          box-sizing:border-box;
+          word-break:break-word;
+          box-shadow:0 12px 30px rgba(0,0,0,0.5);
+          text-align:center;
+          position:relative;
+        ">
+          <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center; color:${TEXT_PRIMARY};">
+            ${c.company_name} <span style="font-weight:400; font-size:12px; color:${TEXT_SECONDARY};">(${c.status ?? '-'})</span>
+          </div>
+          <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
+            📍 ${c.address ?? '-'}
+          </div>
+          <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
+            대리점: ${c.agency ?? '-'}
+          </div>
+          <div style="font-size:12px; color:${TEXT_PRIMARY}; margin-bottom:14px; text-align:center;">
+            ${deviceLines.join('<br/>')}
+          </div>
+          <div style="display:flex; gap:10px;">
+            <a href="/customer/${c.customer_id}"
+               style="
+                 flex:1;
+                 text-align:center;
+                 padding:9px 10px;
+                 background:${WHITE_BUTTON_BG};
+                 color:${WHITE_BUTTON_TEXT};
+                 border-radius:10px;
+                 font-size:13px;
+                 text-decoration:none;
+                 font-weight:700;
+               ">
+              상세보기
+            </a>
+            <a href="${navUrl}"
+               target="_blank"
+               rel="noopener noreferrer"
+               style="
+                 flex:1;
+                 text-align:center;
+                 padding:9px 10px;
+                 background:#2a2d34;
+                 color:${TEXT_PRIMARY};
+                 border-radius:10px;
+                 font-size:13px;
+                 text-decoration:none;
+                 font-weight:700;
+                 border:1px solid ${INPUT_BORDER};
+               ">
+              네이버 길 안내
+            </a>
+          </div>
         </div>
-        <a href="/customer/${c.customer_id}"
-           style="display:block; margin-top:8px;">
-          상세보기
-        </a>
-      </div>
-    `
+      `
 
-    const overlay = new kakao.maps.CustomOverlay({
-      content: overlayContent,
-      position: new kakao.maps.LatLng(lat, lng),
-      yAnchor: 1.6,
+      const overlay = new kakao.maps.CustomOverlay({
+        content: overlayContent,
+        position: new kakao.maps.LatLng(lat, lng),
+        yAnchor: 1.25,
+        zIndex: 3,
+      })
+
+      kakao.maps.event.addListener(marker, 'click', () => {
+        if (openInfoWindowRef.current?.id === c.customer_id) {
+          openInfoWindowRef.current.iw.setMap(null)
+          openInfoWindowRef.current = null
+          return
+        }
+
+        if (openInfoWindowRef.current) {
+          openInfoWindowRef.current.iw.setMap(null)
+        }
+
+        overlay.setMap(map)
+        openInfoWindowRef.current = { id: c.customer_id, iw: overlay }
+      })
+
+      markerMapRef.current.set(c.customer_id, marker)
+      infoWindowMapRef.current.set(c.customer_id, overlay)
     })
+  }
 
-    kakao.maps.event.addListener(marker, 'click', () => {
-      if (openInfoWindowRef.current) {
-        openInfoWindowRef.current.iw.setMap(null)
-      }
+  renderMarkers()
 
-      overlay.setMap(map)
-      openInfoWindowRef.current = { id: c.customer_id, iw: overlay }
-    })
-
-    markerMapRef.current.set(c.customer_id, marker)
-    infoWindowMapRef.current.set(c.customer_id, overlay)
-  })
-}, [filteredCustomers])
-
+  return () => {
+    cancelled = true
+  }
+}, [isMapReady, filteredCustomers, deviceMap])
   const moveToCustomer = async (customer: Customer) => {
     if (
       customer.latitude == null ||
