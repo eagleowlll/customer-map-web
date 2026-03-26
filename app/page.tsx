@@ -570,7 +570,7 @@ overlayContent.addEventListener('click', (e) => {
         const customOverlay = new kakao.maps.CustomOverlay({
           content: overlayContent,
           position: new kakao.maps.LatLng(lat, lng),
-          yAnchor: 1.6,
+          yAnchor: 1.2,
           zIndex: 3,
         })
 
