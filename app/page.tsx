@@ -461,7 +461,7 @@ export default function HomePage() {
         // 지도 클릭 시 열린 정보창 닫기
         kakao.maps.event.addListener(kakaoMapRef.current, 'click', () => {
           if (openInfoWindowRef.current) {
-            openInfoWindowRef.current.iw.close()
+            openInfoWindowRef.current.iw.setMap(null)
             openInfoWindowRef.current = null
           }
         })
@@ -500,6 +500,9 @@ export default function HomePage() {
 
         // 카카오 기본 말풍선(흰 사각형 꼬리) 숨기기 위해 CustomOverlay 사용
         const overlayContent = document.createElement('div')
+overlayContent.addEventListener('click', (e) => {
+  e.stopPropagation()
+})
         overlayContent.innerHTML = `
           <div style="
             width:320px;
@@ -567,7 +570,7 @@ export default function HomePage() {
         const customOverlay = new kakao.maps.CustomOverlay({
           content: overlayContent,
           position: new kakao.maps.LatLng(lat, lng),
-          yAnchor: 1.15,
+          yAnchor: 1.6,
           zIndex: 3,
         })
 
