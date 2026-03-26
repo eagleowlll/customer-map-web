@@ -88,9 +88,9 @@ const inputStyle: CSSProperties = {
 // date input with white calendar icon
 const dateInputStyle: CSSProperties = {
   ...inputStyle,
-  colorScheme: 'light',
-  background: '#ffffff',
-  color: '#111113',
+  background: INPUT_BG,     // ← 테마 맞춤
+  color: TEXT_PRIMARY,
+  colorScheme: 'dark',      // ← 핵심 (아이콘 흰색됨)
 }
 
 const sectionCardStyle: CSSProperties = {
@@ -570,7 +570,7 @@ overlayContent.addEventListener('click', (e) => {
         const customOverlay = new kakao.maps.CustomOverlay({
           content: overlayContent,
           position: new kakao.maps.LatLng(lat, lng),
-          yAnchor: 1.2,
+          yAnchor: 1.25,
           zIndex: 3,
         })
 
@@ -897,6 +897,10 @@ overlayContent.addEventListener('click', (e) => {
   return (
     <>
       <style jsx global>{`
+input[type="date"].white-date::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
         input::placeholder,
         textarea::placeholder {
           color: ${TEXT_MUTED};
