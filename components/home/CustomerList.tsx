@@ -1,3 +1,5 @@
+//customer list 컴포넌트
+
 'use client'
 
 import {

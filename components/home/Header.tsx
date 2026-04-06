@@ -1,8 +1,11 @@
+//header 컴포넌트
 'use client'
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { HOME_STATE_KEY } from '@/lib/home'  // 상단에 추가
+
 
 export default function Header() {
   const router = useRouter()
@@ -60,7 +63,10 @@ export default function Header() {
 
         <div style={{ display: 'flex', gap: 20 }}>
           <span
-  onClick={() => router.push('/')}
+  onClick={() =>{ 
+    sessionStorage.removeItem(HOME_STATE_KEY)
+     window.location.href = '/' 
+  }}
   style={{
     fontSize: 16,
     fontWeight: 700,

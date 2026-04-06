@@ -1,3 +1,4 @@
+//고객 상세 페이지
 'use client'
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
@@ -49,17 +50,17 @@ type ServiceHistory = {
   visitor: string | null
 }
 
-const PAGE_BG = '#06070a'
-const PANEL_BG = '#17181d'
-const CARD_BG = '#1c1d22'
-const INNER_CARD_BG = '#111216'
-const INPUT_BG = '#0d0e12'
-const INPUT_BORDER = '#2c2f36'
-const TEXT_PRIMARY = '#f5f5f5'
-const TEXT_SECONDARY = '#b5b7be'
-const TEXT_MUTED = '#7d818c'
-const WHITE_BUTTON_BG = '#f4f4f5'
-const WHITE_BUTTON_TEXT = '#111113'
+const PAGE_BG = '#f4f5f7'
+const PANEL_BG = '#ffffff'
+const CARD_BG = '#f9fafb'
+const INNER_CARD_BG = '#f1f3f5'
+const INPUT_BG = '#ffffff'
+const INPUT_BORDER = '#e2e4e9'
+const TEXT_PRIMARY = '#111113'
+const TEXT_SECONDARY = '#4b5563'
+const TEXT_MUTED = '#9ca3af'
+const WHITE_BUTTON_BG = '#234ea2'
+const WHITE_BUTTON_TEXT = '#ffffff'
 const DANGER_BG = '#dc2626'
 
 const inputStyle: CSSProperties = {
@@ -877,23 +878,7 @@ export default function CustomerDetailPage() {
           minHeight: '100vh',
         }}
       >
-        <div style={{ marginBottom: 16 }}>
-          {/* 뒤로가기: router.back() 으로 이전 스크롤/위치 유지 */}
-          <button
-            onClick={() => router.back()}
-            style={{
-              color: TEXT_PRIMARY,
-              background: 'none',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: 18,
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            ← 지도로 돌아가기
-          </button>
-        </div>
+     
 
         <div
           style={{

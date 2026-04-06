@@ -25,6 +25,14 @@ type Props = {
   selectedStatuses: string[]
   toggleStatus: (status: string) => void
   onAddClick: () => void
+  restoredMapCenter: { lat: number; lng: number } | null
+  restoredMapLevel: number | null
+  restoredOpenOverlayCustomerId: number | null
+  onMapStateChange: (
+    center: { lat: number; lng: number },
+    level: number
+  ) => void
+  onOpenOverlayChange: (customerId: number | null) => void
 }
 
 export default function MapView({
@@ -34,6 +42,11 @@ export default function MapView({
   selectedStatuses,
   toggleStatus,
   onAddClick,
+  restoredMapCenter,
+  restoredMapLevel,
+  restoredOpenOverlayCustomerId,
+  onMapStateChange,
+  onOpenOverlayChange,
 }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const kakaoMapRef = useRef<any>(null)
@@ -42,7 +55,7 @@ export default function MapView({
   const openInfoWindowRef = useRef<{ id: number; iw: any } | null>(null)
   const clustererRef = useRef<any>(null)
   const [isMapReady, setIsMapReady] = useState(false)
-
+const restoredMapStateAppliedRef = useRef(false)
   useEffect(() => {
     let mounted = true
 
@@ -59,11 +72,24 @@ export default function MapView({
         })
 
         kakao.maps.event.addListener(kakaoMapRef.current, 'click', () => {
-          if (openInfoWindowRef.current) {
-            openInfoWindowRef.current.iw.setMap(null)
-            openInfoWindowRef.current = null
-          }
-        })
+  if (openInfoWindowRef.current) {
+    openInfoWindowRef.current.iw.setMap(null)
+    openInfoWindowRef.current = null
+    onOpenOverlayChange(null)
+  }
+})
+kakao.maps.event.addListener(kakaoMapRef.current, 'idle', () => {
+    const center = kakaoMapRef.current.getCenter()
+    const level = kakaoMapRef.current.getLevel()
+
+    onMapStateChange(
+      {
+        lat: center.getLat(),
+        lng: center.getLng(),
+      },
+      level
+    )
+  })
       }
 
       setIsMapReady(true)
@@ -200,19 +226,21 @@ border:1px solid #e5e7eb;
         })
 
         kakao.maps.event.addListener(marker, 'click', () => {
-          if (openInfoWindowRef.current?.id === c.customer_id) {
-            openInfoWindowRef.current.iw.setMap(null)
-            openInfoWindowRef.current = null
-            return
-          }
+  if (openInfoWindowRef.current?.id === c.customer_id) {
+    openInfoWindowRef.current.iw.setMap(null)
+    openInfoWindowRef.current = null
+    onOpenOverlayChange(null)
+    return
+  }
 
-          if (openInfoWindowRef.current) {
-            openInfoWindowRef.current.iw.setMap(null)
-          }
+  if (openInfoWindowRef.current) {
+    openInfoWindowRef.current.iw.setMap(null)
+  }
 
-          customOverlay.setMap(map)
-          openInfoWindowRef.current = { id: c.customer_id, iw: customOverlay }
-        })
+  customOverlay.setMap(map)
+  openInfoWindowRef.current = { id: c.customer_id, iw: customOverlay }
+  onOpenOverlayChange(c.customer_id)
+})
 
         markerMapRef.current.set(c.customer_id, marker)
         infoWindowMapRef.current.set(c.customer_id, customOverlay)
@@ -284,6 +312,59 @@ border:1px solid #e5e7eb;
       cancelled = true
     }
   }, [isMapReady, customers, deviceMap])
+  useEffect(() => {
+  if (!isMapReady || !kakaoMapRef.current) return
+  if (restoredMapStateAppliedRef.current) return
+  if (customers.length === 0) return
+
+  const kakao = (window as any).kakao
+  if (!kakao?.maps) return
+
+  const map = kakaoMapRef.current
+
+  if (restoredMapCenter && restoredMapLevel !== null) {
+    map.setLevel(restoredMapLevel)
+    map.setCenter(
+      new kakao.maps.LatLng(restoredMapCenter.lat, restoredMapCenter.lng)
+    )
+  }
+
+ if (restoredOpenOverlayCustomerId != null) {
+  const tryRestore = () => {
+    const overlay = infoWindowMapRef.current.get(restoredOpenOverlayCustomerId)
+
+    if (overlay) {
+      overlay.setMap(map)
+      openInfoWindowRef.current = {
+        id: restoredOpenOverlayCustomerId,
+        iw: overlay,
+      }
+      return true
+    }
+    return false
+  }
+
+  // 🔥 바로 시도
+  if (!tryRestore()) {
+    // 🔥 안되면 재시도 (핵심)
+    let retryCount = 0
+    const interval = setInterval(() => {
+      if (tryRestore() || retryCount > 10) {
+        clearInterval(interval)
+      }
+      retryCount++
+    }, 100)
+  }
+}
+
+  restoredMapStateAppliedRef.current = true
+}, [
+  isMapReady,
+  customers,
+  restoredMapCenter,
+  restoredMapLevel,
+  restoredOpenOverlayCustomerId,
+])
 useEffect(() => {
   if (!focusedCustomerId || !kakaoMapRef.current) return
   if (!isMapReady) return  // markerMapRef.size 체크 대신 isMapReady 사용
@@ -313,15 +394,16 @@ useEffect(() => {
 
   const customOverlay = infoWindowMapRef.current.get(Number(targetCustomer.customer_id))
 
-  if (customOverlay) {
-    setTimeout(() => {
-      customOverlay.setMap(kakaoMap)
-      openInfoWindowRef.current = {
-        id: targetCustomer.customer_id,
-        iw: customOverlay,
-      }
-    }, 350)  // panTo 애니메이션 끝날 때까지 대기
-  }
+ if (customOverlay) {
+  setTimeout(() => {
+    customOverlay.setMap(kakaoMap)
+    openInfoWindowRef.current = {
+      id: targetCustomer.customer_id,
+      iw: customOverlay,
+    }
+    onOpenOverlayChange(targetCustomer.customer_id)
+  }, 350)
+}
 }, [focusedCustomerId, isMapReady, customers])  // isMapReady 의존성 추가
 
   return (

@@ -1,4 +1,4 @@
-//홈화면
+//app/page.tsx
 
 'use client'
 
@@ -43,6 +43,10 @@ export default function HomePage() {
   const [deviceMap, setDeviceMap] = useState<Map<number, Device[]>>(new Map())
   const [focusedCustomerId, setFocusedCustomerId] = useState<number | null>(null)
   const [latestServiceDateMap, setLatestServiceDateMap] = useState<Map<number, number>>(new Map())
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
+const [mapLevel, setMapLevel] = useState<number | null>(null)
+const [openOverlayCustomerId, setOpenOverlayCustomerId] = useState<number | null>(null)
+
 
   const [query, setQuery] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재', '이탈'])
@@ -76,16 +80,27 @@ export default function HomePage() {
     if (typeof window === 'undefined') return
 
     const payload = {
-      query,
-      selectedStatuses,
-      listScrollTop: listScrollRef.current?.scrollTop ?? 0,
-    }
+  query,
+  selectedStatuses,
+  listScrollTop: listScrollRef.current?.scrollTop ?? 0,
+  mapCenter,
+  mapLevel,
+  openOverlayCustomerId,
+}
 
     sessionStorage.setItem(HOME_STATE_KEY, JSON.stringify(payload))
   }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    const navType = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
+
+if (navType.type !== 'back_forward') {
+  sessionStorage.removeItem(HOME_STATE_KEY)
+  restoredHomeStateRef.current = true
+  return
+}
 
     const raw = sessionStorage.getItem(HOME_STATE_KEY)
     if (!raw) {
@@ -110,6 +125,25 @@ export default function HomePage() {
       if (typeof parsed.listScrollTop === 'number') {
         pendingListScrollTopRef.current = parsed.listScrollTop
       }
+      if (
+  parsed.mapCenter &&
+  typeof parsed.mapCenter.lat === 'number' &&
+  typeof parsed.mapCenter.lng === 'number'
+) {
+  setMapCenter({
+    lat: parsed.mapCenter.lat,
+    lng: parsed.mapCenter.lng,
+  })
+}
+
+if (typeof parsed.mapLevel === 'number') {
+  setMapLevel(parsed.mapLevel)
+}
+
+if (typeof parsed.openOverlayCustomerId === 'number') {
+  setOpenOverlayCustomerId(parsed.openOverlayCustomerId)
+}
+      
     } catch (error) {
       console.warn('홈 상태 복원 실패:', error)
     } finally {
@@ -118,9 +152,9 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    if (!restoredHomeStateRef.current) return
-    saveHomeState()
-  }, [query, selectedStatuses])
+  if (!restoredHomeStateRef.current) return
+  saveHomeState()
+}, [query, selectedStatuses, mapCenter, mapLevel, openOverlayCustomerId])
 
   const resetForms = () => {
     setCustomerForm({
@@ -221,16 +255,37 @@ export default function HomePage() {
     })
   }, [customers, query, selectedStatuses, deviceMap, latestServiceDateMap])
 
-  useEffect(() => {
-    if (pendingListScrollTopRef.current == null) return
-    if (!listScrollRef.current) return
+useEffect(() => {
+  if (pendingListScrollTopRef.current == null) return
+  if (!listScrollRef.current) return
+  if (filteredCustomers.length === 0) return  // 데이터 아직 없으면 대기
 
-    requestAnimationFrame(() => {
-      if (!listScrollRef.current) return
-      listScrollRef.current.scrollTop = pendingListScrollTopRef.current ?? 0
-      pendingListScrollTopRef.current = null
-    })
-  }, [filteredCustomers])
+  const targetScrollTop = pendingListScrollTopRef.current
+  pendingListScrollTopRef.current = null  // 중복 실행 방지를 위해 즉시 초기화
+
+  let retry = 0
+
+  const interval = setInterval(() => {
+    if (!listScrollRef.current) {
+      clearInterval(interval)
+      return
+    }
+
+    listScrollRef.current.scrollTop = targetScrollTop
+
+    // 실제로 적용됐는지 확인
+    if (
+      Math.abs(listScrollRef.current.scrollTop - targetScrollTop) < 5 ||
+      retry > 15
+    ) {
+      clearInterval(interval)
+    }
+
+    retry++
+  }, 50)
+
+  return () => clearInterval(interval)
+}, [filteredCustomers])
 
   const geocodeAddress = async (address: string) => {
     const { loadKakaoMap } = await import('@/lib/loadKakaoMap')
@@ -344,6 +399,14 @@ export default function HomePage() {
   selectedStatuses={selectedStatuses}
   toggleStatus={toggleStatus}
   onAddClick={() => setIsAddCustomerModalOpen(true)}
+  restoredMapCenter={mapCenter}
+  restoredMapLevel={mapLevel}
+  restoredOpenOverlayCustomerId={openOverlayCustomerId}
+  onMapStateChange={(center, level) => {
+    setMapCenter(center)
+    setMapLevel(level)
+  }}
+  onOpenOverlayChange={setOpenOverlayCustomerId}
 />
         </div>
 
