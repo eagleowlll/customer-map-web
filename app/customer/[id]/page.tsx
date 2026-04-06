@@ -836,20 +836,7 @@ export default function CustomerDetailPage() {
         `}</style>
 
         <main style={{ padding: 20, background: PAGE_BG, minHeight: '100vh', color: TEXT_PRIMARY }}>
-          <button
-            onClick={() => router.back()}
-            style={{
-              color: TEXT_PRIMARY,
-              background: 'none',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: 18,
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            ← 지도로 돌아가기
-          </button>
+
           <p style={{ marginTop: 16 }}>불러오는 중...</p>
         </main>
       </>
