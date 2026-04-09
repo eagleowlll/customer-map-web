@@ -48,6 +48,14 @@ type ServiceHistory = {
   visit_date: string | null
   service_notes: string | null
   visitor: string | null
+  service_type: string | null
+  service_engineers?: { engineer_id: number; engineers: { name: string; position: string | null } }[]
+}
+
+type Engineer = {
+  engineer_id: number
+  name: string
+  position: string | null
 }
 
 const PAGE_BG = '#f4f5f7'
@@ -156,17 +164,20 @@ export default function CustomerDetailPage() {
   const [selectedImageDevice, setSelectedImageDevice] = useState<Device | null>(null)
 
   const [deviceImageFile, setDeviceImageFile] = useState<File | null>(null)
-
+  const [engineers, setEngineers] = useState<Engineer[]>([])
+const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>([])
   const [serviceForm, setServiceForm] = useState({
     visit_date: '',
     service_notes: '',
     visitor: '',
+    service_type: '신규SETUP',
   })
 
   const [serviceEditForm, setServiceEditForm] = useState({
     visit_date: '',
     service_notes: '',
     visitor: '',
+    service_type: '신규SETUP',
   })
 
   const [customerEditForm, setCustomerEditForm] = useState({
@@ -215,22 +226,24 @@ export default function CustomerDetailPage() {
   const fetchDetail = async () => {
     setLoading(true)
 
-    const [{ data: customerData }, { data: devicesData }, { data: contactsData }, { data: historyData }] =
+    const [{ data: customerData }, { data: devicesData }, { data: contactsData }, { data: historyData }, { data: engineersData }] =
       await Promise.all([
         supabase.from('customers').select('*').eq('customer_id', customerId).single(),
         supabase.from('devices').select('*').eq('customer_id', customerId).order('device_id', { ascending: true }),
         supabase.from('contacts').select('*').eq('customer_id', customerId).order('contact_id', { ascending: true }),
-        supabase
+         supabase
           .from('service_history')
-          .select('*')
+          .select('*, service_engineers(engineer_id, engineers(name, position))')
           .eq('customer_id', customerId)
           .order('service_id', { ascending: false }),
+        supabase.from('engineers').select('*').order('engineer_id', { ascending: true }),
       ])
 
     setCustomer(customerData ?? null)
     setDevices(devicesData ?? [])
     setContacts(contactsData ?? [])
     setHistory(historyData ?? [])
+    setEngineers(engineersData ?? [])
     setLoading(false)
   }
 
@@ -264,13 +277,15 @@ export default function CustomerDetailPage() {
     })
   }
 
-  const handleOpenServiceModal = (deviceId: number) => {
+const handleOpenServiceModal = (deviceId: number) => {
     setSelectedDeviceId(deviceId)
     setServiceForm({
       visit_date: '',
       service_notes: '',
       visitor: '',
+      service_type: '신규SETUP',
     })
+    setSelectedEngineerIds([])
     setIsServiceModalOpen(true)
   }
 
@@ -290,38 +305,60 @@ export default function CustomerDetailPage() {
       return
     }
 
-    const visitYear = serviceForm.visit_date.slice(0, 4)
+    if (selectedEngineerIds.length === 0) {
+      alert('방문 엔지니어를 선택해주세요.')
+      return
+    }
 
+    const visitYear = serviceForm.visit_date.slice(0, 4)
     setIsSavingService(true)
 
-    const { error } = await supabase.from('service_history').insert([
-      {
+    const { data: newService, error } = await supabase
+      .from('service_history')
+      .insert([{
         customer_id: customerId,
         device_id: selectedDeviceId,
         visit_year: visitYear,
         visit_date: serviceForm.visit_date.trim(),
         service_notes: serviceForm.service_notes.trim(),
         visitor: serviceForm.visitor.trim() || null,
-      },
-    ])
-
-    setIsSavingService(false)
+        service_type: serviceForm.service_type,
+      }])
+      .select()
+      .single()
 
     if (error) {
+      setIsSavingService(false)
       alert(error.message || '서비스 기록 저장 중 오류가 발생했습니다.')
       return
     }
 
-    alert('서비스 기록이 추가되었습니다.')
+    const engineerRows = selectedEngineerIds.map((eid) => ({
+      service_id: newService.service_id,
+      engineer_id: eid,
+    }))
 
+    const { error: engineerError } = await supabase
+      .from('service_engineers')
+      .insert(engineerRows)
+
+    setIsSavingService(false)
+
+    if (engineerError) {
+      alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.')
+      return
+    }
+
+    alert('서비스 기록이 추가되었습니다.')
     setServiceForm({
       visit_date: '',
       service_notes: '',
       visitor: '',
+      service_type: '신규SETUP',
     })
+    setSelectedEngineerIds([])
     setIsServiceModalOpen(false)
     setSelectedDeviceId(null)
-
     await fetchDetail()
   }
 
@@ -331,7 +368,10 @@ export default function CustomerDetailPage() {
       visit_date: service.visit_date ?? '',
       service_notes: service.service_notes ?? '',
       visitor: service.visitor ?? '',
+      service_type: service.service_type ?? '신규SETUP',
     })
+    const engineerIds = (service.service_engineers ?? []).map((se) => se.engineer_id)
+    setSelectedEditEngineerIds(engineerIds)
     setIsEditServiceModalOpen(true)
   }
 
@@ -348,8 +388,12 @@ export default function CustomerDetailPage() {
       return
     }
 
-    const visitYear = serviceEditForm.visit_date.slice(0, 4)
+    if (selectedEditEngineerIds.length === 0) {
+      alert('방문 엔지니어를 선택해주세요.')
+      return
+    }
 
+    const visitYear = serviceEditForm.visit_date.slice(0, 4)
     setIsSavingServiceEdit(true)
 
     const { error } = await supabase
@@ -359,22 +403,44 @@ export default function CustomerDetailPage() {
         visit_date: serviceEditForm.visit_date.trim(),
         service_notes: serviceEditForm.service_notes.trim(),
         visitor: serviceEditForm.visitor.trim() || null,
+        service_type: serviceEditForm.service_type,
       })
       .eq('service_id', selectedService.service_id)
 
+    if (error) {
+      setIsSavingServiceEdit(false)
+      alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.')
+      return
+    }
+
+    // 기존 엔지니어 연결 삭제 후 다시 저장
+    await supabase
+      .from('service_engineers')
+      .delete()
+      .eq('service_id', selectedService.service_id)
+
+    const engineerRows = selectedEditEngineerIds.map((eid) => ({
+      service_id: selectedService.service_id,
+      engineer_id: eid,
+    }))
+
+    const { error: engineerError } = await supabase
+      .from('service_engineers')
+      .insert(engineerRows)
+
     setIsSavingServiceEdit(false)
 
-    if (error) {
-      alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.')
+    if (engineerError) {
+      alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.')
       return
     }
 
     alert('서비스 기록이 수정되었습니다.')
     setIsEditServiceModalOpen(false)
     setSelectedService(null)
+    setSelectedEditEngineerIds([])
     await fetchDetail()
   }
-
   const handleDeleteService = async () => {
     if (!selectedService) return
 
@@ -1245,7 +1311,7 @@ export default function CustomerDetailPage() {
                               marginBottom: 10,
                             }}
                           >
-                            <div style={{ fontWeight: 800 }}>서비스 노트</div>
+                            <div style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</div>
 
                             <button
                               onClick={() => handleOpenEditServiceModal(h)}
@@ -1286,8 +1352,14 @@ export default function CustomerDetailPage() {
                               color: TEXT_MUTED,
                             }}
                           >
-                            <div>{h.visit_date ?? '-'}</div>
-                            <div>방문자 : {h.visitor ?? '-'}</div>
+                           <div>{h.visit_date ?? '-'}</div>
+                            <div style={{ textAlign: 'right' }}>
+                              방문자 : {h.service_engineers && h.service_engineers.length > 0
+                                ? h.service_engineers
+                                    .map((se) => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim())
+                                    .join(', ')
+                                : (h.visitor ?? '-')}
+                            </div>
                           </div>
                         </div>
                       ))
@@ -2023,10 +2095,69 @@ export default function CustomerDetailPage() {
                       service_notes: e.target.value,
                     }))
                   }
-                  placeholder="service_notes"
-                  rows={10}
+                  placeholder="서비스 내용"
+                  rows={8}
                   style={textareaStyle}
                 />
+
+                {/* 서비스 유형 */}
+                <select
+                  value={serviceForm.service_type}
+                  onChange={(e) =>
+                    setServiceForm((prev) => ({
+                      ...prev,
+                      service_type: e.target.value,
+                    }))
+                  }
+                  style={inputStyle}
+                >
+                  <option value="신규SETUP">신규 SETUP</option>
+                  <option value="A/S(유상)">A/S (유상)</option>
+                  <option value="B/S(영업)">B/S (영업)</option>
+                  <option value="이전SETUP">이전 SETUP</option>
+                  <option value="유상교육">유상교육</option>
+                </select>
+
+                {/* 엔지니어 멀티선택 */}
+                <div style={{
+                  border: `1px solid ${INPUT_BORDER}`,
+                  borderRadius: 10,
+                  padding: 12,
+                  background: INPUT_BG,
+                }}>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>
+                    방문 엔지니어 선택
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {engineers.map((eng) => {
+                      const isSelected = selectedEngineerIds.includes(eng.engineer_id)
+                      return (
+                        <button
+                          key={eng.engineer_id}
+                          onClick={() => {
+                            setSelectedEngineerIds((prev) =>
+                              isSelected
+                                ? prev.filter((id) => id !== eng.engineer_id)
+                                : [...prev, eng.engineer_id]
+                            )
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: 20,
+                            border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`,
+                            background: isSelected ? '#234ea2' : INPUT_BG,
+                            color: isSelected ? '#ffffff' : TEXT_PRIMARY,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {eng.name} {eng.position ? `(${eng.position})` : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <input
@@ -2040,7 +2171,6 @@ export default function CustomerDetailPage() {
                     }
                     style={dateInputStyle}
                   />
-
                   <input
                     value={serviceForm.visitor}
                     onChange={(e) =>
@@ -2049,7 +2179,7 @@ export default function CustomerDetailPage() {
                         visitor: e.target.value,
                       }))
                     }
-                    placeholder="방문자(visitor)"
+                    placeholder="비고 (선택)"
                     style={inputStyle}
                   />
                 </div>
@@ -2137,10 +2267,69 @@ export default function CustomerDetailPage() {
                       service_notes: e.target.value,
                     }))
                   }
-                  placeholder="service_notes"
-                  rows={10}
+                  placeholder="서비스 내용"
+                  rows={8}
                   style={textareaStyle}
                 />
+
+                {/* 서비스 유형 */}
+                <select
+                  value={serviceEditForm.service_type}
+                  onChange={(e) =>
+                    setServiceEditForm((prev) => ({
+                      ...prev,
+                      service_type: e.target.value,
+                    }))
+                  }
+                  style={inputStyle}
+                >
+                  <option value="신규SETUP">신규 SETUP</option>
+                  <option value="A/S(유상)">A/S (유상)</option>
+                  <option value="B/S(영업)">B/S (영업)</option>
+                  <option value="이전SETUP">이전 SETUP</option>
+                  <option value="유상교육">유상교육</option>
+                </select>
+
+                {/* 엔지니어 멀티선택 */}
+                <div style={{
+                  border: `1px solid ${INPUT_BORDER}`,
+                  borderRadius: 10,
+                  padding: 12,
+                  background: INPUT_BG,
+                }}>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>
+                    방문 엔지니어 선택
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {engineers.map((eng) => {
+                      const isSelected = selectedEditEngineerIds.includes(eng.engineer_id)
+                      return (
+                        <button
+                          key={eng.engineer_id}
+                          onClick={() => {
+                            setSelectedEditEngineerIds((prev) =>
+                              isSelected
+                                ? prev.filter((id) => id !== eng.engineer_id)
+                                : [...prev, eng.engineer_id]
+                            )
+                          }}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: 20,
+                            border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`,
+                            background: isSelected ? '#234ea2' : INPUT_BG,
+                            color: isSelected ? '#ffffff' : TEXT_PRIMARY,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {eng.name} {eng.position ? `(${eng.position})` : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <input
@@ -2154,7 +2343,6 @@ export default function CustomerDetailPage() {
                     }
                     style={dateInputStyle}
                   />
-
                   <input
                     value={serviceEditForm.visitor}
                     onChange={(e) =>
@@ -2163,7 +2351,7 @@ export default function CustomerDetailPage() {
                         visitor: e.target.value,
                       }))
                     }
-                    placeholder="방문자(visitor)"
+                    placeholder="비고 (선택)"
                     style={inputStyle}
                   />
                 </div>

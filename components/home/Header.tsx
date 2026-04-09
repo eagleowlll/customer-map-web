@@ -88,6 +88,19 @@ export default function Header() {
 >
   자료실
 </span>
+<span
+  onClick={() => router.push('/engineers')}
+  style={{ fontSize: 16, fontWeight: 700, color: '#111111', cursor: 'pointer' }}
+>
+  직원 현황
+</span>
+
+<span
+  onClick={() => router.push('/activity')}
+  style={{ fontSize: 16, fontWeight: 700, color: '#111111', cursor: 'pointer' }}
+>
+  활동 현황
+</span>
         </div>
       </div>
 
