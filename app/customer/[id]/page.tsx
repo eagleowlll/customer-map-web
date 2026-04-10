@@ -165,6 +165,7 @@ export default function CustomerDetailPage() {
 
   const [deviceImageFile, setDeviceImageFile] = useState<File | null>(null)
   const [engineers, setEngineers] = useState<Engineer[]>([])
+  const [selectedEngineerIds, setSelectedEngineerIds] = useState<number[]>([])
 const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>([])
   const [serviceForm, setServiceForm] = useState({
     visit_date: '',
@@ -371,6 +372,7 @@ const handleOpenServiceModal = (deviceId: number) => {
       service_type: service.service_type ?? '신규SETUP',
     })
     const engineerIds = (service.service_engineers ?? []).map((se) => se.engineer_id)
+    
     setSelectedEditEngineerIds(engineerIds)
     setIsEditServiceModalOpen(true)
   }
