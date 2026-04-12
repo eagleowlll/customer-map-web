@@ -976,7 +976,29 @@ const handleOpenServiceModal = (deviceId: number) => {
           </h1>
 
           <div style={{ display: 'grid', gap: 10, fontSize: 16, color: TEXT_SECONDARY }}>
-            <p style={{ margin: 0 }}>주소: {customer?.address ?? '-'}</p>
+            <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+  주소: {customer?.address ?? '-'}
+  {customer?.address && (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(customer.address ?? '')
+        alert('주소가 복사되었습니다!')
+      }}
+      style={{
+        padding: '3px 10px',
+        fontSize: 12,
+        fontWeight: 700,
+        background: '#234ea2',
+        color: '#ffffff',
+        border: 'none',
+        borderRadius: 6,
+        cursor: 'pointer',
+      }}
+    >
+      복사
+    </button>
+  )}
+</p>
             <p style={{ margin: 0 }}>상태: {customer?.status ?? '-'}</p>
             <p style={{ margin: 0 }}>대리점: {customer?.agency ?? '-'}</p>
           </div>
