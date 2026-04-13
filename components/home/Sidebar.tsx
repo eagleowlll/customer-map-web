@@ -48,7 +48,7 @@ export default function Sidebar({
   onScrollSave,
 }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
       {/* 검색 */}
       <div style={{ position: 'relative', marginBottom: 12 }}>
         <input

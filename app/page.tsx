@@ -434,7 +434,7 @@ useEffect(() => {
           minHeight: 0,
         }}
       >
-          <div className={mobileTab === 'map' ? 'mobile-hide' : ''}>
+          <div className={mobileTab === 'map' ? 'mobile-hide' : ''} style={{ minHeight: 0, height: '100%' }}>
           <Sidebar
             query={query}
             setQuery={setQuery}
