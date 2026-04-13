@@ -44,9 +44,9 @@ export default function HomePage() {
   const [focusedCustomerId, setFocusedCustomerId] = useState<number | null>(null)
   const [latestServiceDateMap, setLatestServiceDateMap] = useState<Map<number, number>>(new Map())
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
-const [mapLevel, setMapLevel] = useState<number | null>(null)
-const [openOverlayCustomerId, setOpenOverlayCustomerId] = useState<number | null>(null)
-
+  const [mapLevel, setMapLevel] = useState<number | null>(null)
+  const [openOverlayCustomerId, setOpenOverlayCustomerId] = useState<number | null>(null)
+  const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list')
 
   const [query, setQuery] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재', '이탈'])
@@ -368,16 +368,70 @@ useEffect(() => {
         }}
       >
 
-        <div
+       <style>{`
+        @media (max-width: 768px) {
+          .home-grid { grid-template-columns: 1fr !important; }
+          .mobile-tab-bar { display: flex !important; }
+          .mobile-hide { display: none !important; }
+        }
+      `}</style>
+
+      {/* 모바일 탭 */}
+      <div
+        className="mobile-tab-bar"
+        style={{
+          display: 'none',
+          marginBottom: 12,
+          border: `1px solid #e5e7eb`,
+          borderRadius: 12,
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={() => setMobileTab('list')}
           style={{
-            display: 'grid',
-            gridTemplateColumns: '360px 1fr',
-            gap: 16,
-            alignItems: 'stretch',
             flex: 1,
-            minHeight: 0,
+            padding: '10px 0',
+            fontWeight: 700,
+            fontSize: 14,
+            border: 'none',
+            cursor: 'pointer',
+            background: mobileTab === 'list' ? '#234ea2' : '#ffffff',
+            color: mobileTab === 'list' ? '#ffffff' : '#111111',
           }}
         >
+          업체 목록
+        </button>
+        <button
+          onClick={() => setMobileTab('map')}
+          style={{
+            flex: 1,
+            padding: '10px 0',
+            fontWeight: 700,
+            fontSize: 14,
+            border: 'none',
+            cursor: 'pointer',
+            background: mobileTab === 'map' ? '#234ea2' : '#ffffff',
+            color: mobileTab === 'map' ? '#ffffff' : '#111111',
+          }}
+        >
+          지도
+        </button>
+      </div>
+
+      <div
+        className="home-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '360px 1fr',
+          gap: 16,
+          alignItems: 'stretch',
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+          <div className={mobileTab === 'map' ? 'mobile-hide' : ''}>
           <Sidebar
             query={query}
             setQuery={setQuery}
@@ -391,7 +445,9 @@ useEffect(() => {
             listScrollRef={listScrollRef}
             onScrollSave={saveHomeState}
           />
+          </div>
 
+         <div className={mobileTab === 'list' ? 'mobile-hide' : ''}>
          <MapView
   customers={filteredCustomers}
   deviceMap={deviceMap}
@@ -408,6 +464,7 @@ useEffect(() => {
   }}
   onOpenOverlayChange={setOpenOverlayCustomerId}
 />
+</div>
         </div>
 
         <AddCustomerModal
