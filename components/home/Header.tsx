@@ -97,19 +97,33 @@ export default function Header() {
             </div>
 
             {isOpen && (
-              <div style={{
-                position: 'absolute', right: 0, top: 40, zIndex: 10000,
-                background: '#1e1f23', border: '1px solid #333',
-                borderRadius: 8, padding: 8, width: 120,
-              }}>
-                <div
-                  onClick={handleLogout}
-                  style={{ padding: 8, cursor: 'pointer', color: '#fff' }}
-                >
-                  로그아웃
-                </div>
-              </div>
-            )}
+          <div style={{
+            position: 'absolute', right: 0, top: 40, zIndex: 10000,
+            background: '#ffffff', border: '1px solid #e5e5e5',
+            borderRadius: 12, padding: 8, width: 150,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+          }}>
+            <div
+              onClick={() => { router.push('/account'); setIsOpen(false) }}
+              style={{
+                padding: '10px 12px', cursor: 'pointer', color: '#111111',
+                fontWeight: 600, fontSize: 14, borderRadius: 8,
+                borderBottom: '1px solid #f0f0f0',
+              }}
+            >
+              정보 수정
+            </div>
+            <div
+              onClick={handleLogout}
+              style={{
+                padding: '10px 12px', cursor: 'pointer', color: '#dc2626',
+                fontWeight: 600, fontSize: 14, borderRadius: 8,
+              }}
+            >
+              로그아웃
+            </div>
+          </div>
+        )}
           </div>
 
           {/* 햄버거 버튼 - 모바일에서만 표시 */}
