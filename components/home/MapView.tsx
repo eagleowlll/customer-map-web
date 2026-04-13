@@ -125,7 +125,7 @@ useEffect(() => {
       if (!kakaoMapRef.current) {
        const isMobile = window.innerWidth <= 768
         kakaoMapRef.current = new kakao.maps.Map(mapRef.current, {
-          center: new kakao.maps.LatLng(isMobile ? 39.2 : 36.5, isMobile ? 128.0 : 127.8),
+          center: new kakao.maps.LatLng(isMobile ? 38.6 : 36.5, isMobile ? 128.0 : 127.8),
           level: isMobile ? 13 : 13,
         })
 
