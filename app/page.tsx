@@ -46,8 +46,17 @@ export default function HomePage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
   const [mapLevel, setMapLevel] = useState<number | null>(null)
   const [openOverlayCustomerId, setOpenOverlayCustomerId] = useState<number | null>(null)
-  const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list')
+ const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list')
 
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      setMobileTab('list')
+    }
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+}, [])
   const [query, setQuery] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재', '이탈'])
 
