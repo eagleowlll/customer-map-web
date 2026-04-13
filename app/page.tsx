@@ -394,7 +394,9 @@ useEffect(() => {
         }}
       >
         <button
-          onClick={() => setMobileTab('list')}
+          onClick={() => {
+            setMobileTab('list')
+          }}
           style={{
             flex: 1,
             padding: '10px 0',
