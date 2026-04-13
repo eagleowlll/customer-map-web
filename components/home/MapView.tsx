@@ -114,7 +114,7 @@ export default function MapView({
   }
 
   // 지도 초기화
-  useEffect(() => {
+useEffect(() => {
     let mounted = true
 
     async function initMap() {
@@ -123,10 +123,18 @@ export default function MapView({
       if (!mounted) return
 
       if (!kakaoMapRef.current) {
+       const isMobile = window.innerWidth <= 768
         kakaoMapRef.current = new kakao.maps.Map(mapRef.current, {
-          center: new kakao.maps.LatLng(36.5, 127.8),
-          level: 13,
+          center: new kakao.maps.LatLng(isMobile ? 39.2 : 36.5, isMobile ? 128.0 : 127.8),
+          level: isMobile ? 13 : 13,
         })
+
+         ;(window as any).__kakaoMapInstance = kakaoMapRef.current
+
+        const resizeObserver = new ResizeObserver(() => {
+          kakaoMapRef.current?.relayout()
+        })
+        resizeObserver.observe(mapRef.current!)
 
         kakao.maps.event.addListener(kakaoMapRef.current, 'click', () => {
           if (openInfoWindowRef.current) {
@@ -385,8 +393,9 @@ export default function MapView({
       </div>
 
       {/* 지도 */}
-      <div
+     <div
         ref={mapRef}
+        className="kakao-map-container"
         style={{
           width: '100%', height: '100%', minHeight: 0,
           borderRadius: 20, overflow: 'hidden',

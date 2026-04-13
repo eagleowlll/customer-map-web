@@ -371,12 +371,14 @@ useEffect(() => {
 
        <style>{`
         @media (max-width: 768px) {
-          .home-grid { grid-template-columns: 1fr !important; }
-          .mobile-tab-bar { display: flex !important; }
-          .mobile-hide { display: none !important; }
-          .home-wrapper { height: calc(100vh - 44px) !important; padding: 12px !important; }
-          .home-grid > div { height: 100% !important; min-height: 0; }
-        }
+  .home-grid { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
+  .mobile-tab-bar { display: flex !important; }
+  .mobile-hide { display: none !important; }
+  .home-wrapper { height: calc(100dvh - 44px) !important; padding: 12px !important; }
+  .home-grid { height: 100% !important; }
+  .home-grid > div { height: 100% !important; min-height: 0 !important; }
+  .home-grid > div > div { height: 100% !important; }
+}
       `}</style>
 
       {/* 모바일 탭 */}
@@ -407,7 +409,21 @@ useEffect(() => {
           업체 목록
         </button>
         <button
-          onClick={() => setMobileTab('map')}
+          onClick={() => {
+            setMobileTab('map')
+            setTimeout(() => {
+              const kakao = (window as any).kakao
+              if (kakao?.maps) {
+                const container = document.querySelector('.kakao-map-container')
+                if (container) {
+                  kakao.maps.event.trigger(container, 'resize')
+                }
+              }
+              // relayout 직접 호출
+              const mapInstance = (window as any).__kakaoMapInstance
+              if (mapInstance) mapInstance.relayout()
+            }, 200)
+          }}
           style={{
             flex: 1,
             padding: '10px 0',
@@ -434,7 +450,7 @@ useEffect(() => {
           minHeight: 0,
         }}
       >
-          <div className={mobileTab === 'map' ? 'mobile-hide' : ''} style={{ minHeight: 0, height: '100%' }}>
+<div className={mobileTab === 'map' ? 'mobile-hide' : ''} style={{ minHeight: 0, height: '100%' }}>
           <Sidebar
             query={query}
             setQuery={setQuery}
@@ -450,7 +466,12 @@ useEffect(() => {
           />
           </div>
 
-         <div className={mobileTab === 'list' ? 'mobile-hide' : ''} style={{ minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+         <div style={{
+  minHeight: 0,
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+}}>
          <MapView
   customers={filteredCustomers}
   deviceMap={deviceMap}
