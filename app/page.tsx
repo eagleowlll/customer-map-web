@@ -366,6 +366,7 @@ useEffect(() => {
           background: PAGE_BG,
           overflow: 'hidden',
         }}
+        className="home-wrapper"
       >
 
        <style>{`
@@ -373,6 +374,8 @@ useEffect(() => {
           .home-grid { grid-template-columns: 1fr !important; }
           .mobile-tab-bar { display: flex !important; }
           .mobile-hide { display: none !important; }
+          .home-wrapper { height: calc(100vh - 44px) !important; padding: 12px !important; }
+          .home-grid > div { height: 100%; min-height: 0; }
         }
       `}</style>
 
