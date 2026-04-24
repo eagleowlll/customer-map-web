@@ -34,9 +34,9 @@ export default function Header() {
 
   const menuItems = [
     { label: '고객사 현황', onClick: () => { sessionStorage.removeItem(HOME_STATE_KEY); window.location.href = '/' } },
-    { label: '자료실', onClick: () => router.push('/library') },
-    { label: '직원 현황', onClick: () => router.push('/engineers') },
     { label: '활동 현황', onClick: () => router.push('/activity') },
+    { label: '견적서', onClick: () => router.push('/quote') },
+    { label: '자료실', onClick: () => router.push('/library') },
   ]
 
   return (

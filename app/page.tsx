@@ -46,7 +46,7 @@ export default function HomePage() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
   const [mapLevel, setMapLevel] = useState<number | null>(null)
   const [openOverlayCustomerId, setOpenOverlayCustomerId] = useState<number | null>(null)
- const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list')
+  const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list')
 
 useEffect(() => {
   const handleVisibilityChange = () => {
