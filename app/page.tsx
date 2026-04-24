@@ -58,8 +58,14 @@ useEffect(() => {
   return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
 }, [])
   const [query, setQuery] = useState('')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재', '이탈'])
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['활성', '잠재'])
+const [selectedCategories, setSelectedCategories] = useState<string[]>(['81', '83', '84'])
 
+const toggleCategory = (category: string) => {
+  setSelectedCategories((prev) =>
+    prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+  )
+}
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false)
   const [isSavingCustomer, setIsSavingCustomer] = useState(false)
 
@@ -88,9 +94,10 @@ useEffect(() => {
   const saveHomeState = () => {
     if (typeof window === 'undefined') return
 
-    const payload = {
+   const payload = {
   query,
   selectedStatuses,
+  selectedCategories,
   listScrollTop: listScrollRef.current?.scrollTop ?? 0,
   mapCenter,
   mapLevel,
@@ -124,12 +131,12 @@ if (navType.type !== 'back_forward') {
         setQuery(parsed.query)
       }
 
-      if (
-        Array.isArray(parsed.selectedStatuses) &&
-        parsed.selectedStatuses.every((item: unknown) => typeof item === 'string')
-      ) {
-        setSelectedStatuses(parsed.selectedStatuses)
-      }
+     if (
+  Array.isArray(parsed.selectedCategories) &&
+  parsed.selectedCategories.every((item: unknown) => typeof item === 'string')
+) {
+  setSelectedCategories(parsed.selectedCategories)
+}
 
       if (typeof parsed.listScrollTop === 'number') {
         pendingListScrollTopRef.current = parsed.listScrollTop
@@ -163,7 +170,7 @@ if (typeof parsed.openOverlayCustomerId === 'number') {
   useEffect(() => {
   if (!restoredHomeStateRef.current) return
   saveHomeState()
-}, [query, selectedStatuses, mapCenter, mapLevel, openOverlayCustomerId])
+}, [query, selectedStatuses, selectedCategories, mapCenter, mapLevel, openOverlayCustomerId])
 
   const resetForms = () => {
     setCustomerForm({
@@ -232,6 +239,13 @@ if (typeof parsed.openOverlayCustomerId === 'number') {
         selectedStatuses.length === 0 ? false : selectedStatuses.includes(c.status ?? '')
 
       if (!statusMatched) return false
+      const categoryMatched =
+  selectedCategories.length === 0 ? false :
+  !c.category || c.category === '' || c.category === 'EMPTY'
+    ? true
+    : selectedCategories.includes(c.category)
+
+if (!categoryMatched) return false
 
       const devices = deviceMap.get(Number(c.customer_id)) || []
       const deviceLine = getDeviceLine(devices).toLowerCase()
@@ -262,7 +276,7 @@ if (typeof parsed.openOverlayCustomerId === 'number') {
 
       return bLatest - aLatest
     })
-  }, [customers, query, selectedStatuses, deviceMap, latestServiceDateMap])
+  }, [customers, query, selectedStatuses, selectedCategories, deviceMap, latestServiceDateMap])
 
 useEffect(() => {
   if (pendingListScrollTopRef.current == null) return
@@ -488,8 +502,10 @@ useEffect(() => {
   deviceMap={deviceMap}
   focusedCustomerId={focusedCustomerId}
   selectedStatuses={selectedStatuses}
-  toggleStatus={toggleStatus}
-  onAddClick={() => setIsAddCustomerModalOpen(true)}
+toggleStatus={toggleStatus}
+selectedCategories={selectedCategories}
+toggleCategory={toggleCategory}
+onAddClick={() => setIsAddCustomerModalOpen(true)}
   restoredMapCenter={mapCenter}
   restoredMapLevel={mapLevel}
   restoredOpenOverlayCustomerId={openOverlayCustomerId}

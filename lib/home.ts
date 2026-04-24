@@ -8,6 +8,7 @@ export type Customer = {
   longitude: number | null
   status: string | null
   agency: string | null
+  category: string | null
 }
 
 export type Device = {

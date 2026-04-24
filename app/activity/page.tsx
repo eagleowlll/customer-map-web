@@ -236,10 +236,12 @@ export default function ActivityPage() {
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(35,78,162,0.15)')}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)')}
               >
-                <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}` }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
-                  <div style={{ fontSize: 13, color: TEXT_MUTED, marginTop: 2 }}>{row.engineer.position ?? ''}</div>
-                </div>
+            <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}` }}>
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+    <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
+    <div style={{ fontSize: 13, color: TEXT_MUTED }}>{row.engineer.position ?? ''}</div>
+  </div>
+</div>
                 <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
                   {SERVICE_TYPES.map((type) => (
                     <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

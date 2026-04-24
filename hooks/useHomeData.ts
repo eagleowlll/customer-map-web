@@ -18,8 +18,8 @@ export function useHomeData({
   const fetchData = async () => {
     const [customerRes, deviceRes, historyRes] = await Promise.all([
       supabase
-        .from('customers')
-        .select('customer_id, company_name, address, latitude, longitude, status, agency')
+  .from('customers')
+  .select('customer_id, company_name, address, latitude, longitude, status, agency, category')
         .order('customer_id', { ascending: false })
         .range(0, 5000),
 
@@ -42,8 +42,9 @@ export function useHomeData({
         address: c.address ?? null,
         latitude: c.latitude == null ? null : Number(c.latitude),
         longitude: c.longitude == null ? null : Number(c.longitude),
-        status: c.status ?? null,
-        agency: c.agency ?? null,
+   status: c.status ?? null,
+agency: c.agency ?? null,
+category: c.category ?? null,
       }))
       setCustomers(normalizedCustomers)
     }

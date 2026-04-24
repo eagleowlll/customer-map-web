@@ -24,6 +24,8 @@ type Props = {
   focusedCustomerId: number | null
   selectedStatuses: string[]
   toggleStatus: (status: string) => void
+  selectedCategories: string[]
+  toggleCategory: (category: string) => void
   onAddClick: () => void
   restoredMapCenter: { lat: number; lng: number } | null
   restoredMapLevel: number | null
@@ -38,6 +40,8 @@ export default function MapView({
   focusedCustomerId,
   selectedStatuses,
   toggleStatus,
+  selectedCategories,
+  toggleCategory,
   onAddClick,
   restoredMapCenter,
   restoredMapLevel,
@@ -52,6 +56,7 @@ export default function MapView({
   const clustererRef = useRef<any>(null)
   const customerMapRef = useRef<Map<number, Customer>>(new Map())
   const [isMapReady, setIsMapReady] = useState(false)
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const restoredMapStateAppliedRef = useRef(false)
 
   // 오버레이 동적 생성 함수
@@ -357,27 +362,62 @@ useEffect(() => {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* 좌측 상단 필터 */}
-      <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 1000, display: 'flex', gap: 8 }}>
-        {['활성', '잠재', '이탈'].map((status) => {
-          const active = selectedStatuses.includes(status)
-          return (
-            <button
-              key={status}
-              onClick={() => toggleStatus(status)}
-              style={{
-                padding: '10px 14px', borderRadius: 12,
-                border: active ? 'none' : '1px solid #ddd',
-                background: active ? '#234ea2' : '#ffffff',
-                color: active ? '#ffffff' : '#111111',
-                fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              {status}
-            </button>
-          )
-        })}
-      </div>
+     {/* 좌측 상단 필터 */}
+<div style={{ position: 'absolute', top: 16, left: 16, zIndex: 1000, display: 'flex', gap: 8, alignItems: 'center' }}>
+  {/* 상태 필터 */}
+  {['활성', '잠재', '이탈'].map((status) => {
+    const active = selectedStatuses.includes(status)
+    return (
+      <button key={status} onClick={() => toggleStatus(status)}
+        style={{
+          padding: '10px 14px', borderRadius: 12,
+          border: active ? 'none' : '1px solid #ddd',
+          background: active ? '#234ea2' : '#ffffff',
+          color: active ? '#ffffff' : '#111111',
+          fontWeight: 700, cursor: 'pointer',
+        }}>
+        {status}
+      </button>
+    )
+  })}
+
+  {/* 구분 필터 — 계열 버튼 + 드롭다운 */}
+  <div style={{ position: 'relative' }}>
+    <button
+      onClick={() => setShowCategoryMenu(prev => !prev)}
+      style={{
+        padding: '10px 14px', borderRadius: 12, fontWeight: 700, cursor: 'pointer',
+        border: selectedCategories.length === 3 ? '1px solid #ddd' : 'none',
+        background: selectedCategories.length === 3 ? '#ffffff' : '#0891b2',
+        color: selectedCategories.length === 3 ? '#111111' : '#ffffff',
+      }}>
+      계열{selectedCategories.length < 3 ? ` (${selectedCategories.sort().join(',')})` : ''}
+    </button>
+   {showCategoryMenu && (
+  <div style={{
+    position: 'absolute', top: '110%', left: 0, zIndex: 2000,
+    background: '#fff', borderRadius: 10, padding: '6px',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+    display: 'flex', flexDirection: 'row', gap: 4,
+  }}>
+    {['81', '83', '84'].map(cat => {
+      const checked = selectedCategories.includes(cat)
+      return (
+        <button key={cat} onClick={() => toggleCategory(cat)}
+          style={{
+            padding: '7px 12px', borderRadius: 8, border: 'none',
+            cursor: 'pointer', fontWeight: 700, fontSize: 13,
+            background: checked ? '#234ea2' : '#f4f5f7',
+            color: checked ? '#fff' : '#555',
+          }}>
+          {cat}
+        </button>
+      )
+    })}
+  </div>
+)}
+  </div>
+</div>
 
       {/* 우측 상단 업체등록 */}
       <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
