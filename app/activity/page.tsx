@@ -179,10 +179,6 @@ export default function ActivityPage() {
     <main style={{ padding: 24, background: PAGE_BG, minHeight: '100vh' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: TEXT_PRIMARY, margin: 0, marginBottom: 20 }}>
-          활동 현황
-        </h1>
-
         {/* 날짜 선택 카드 */}
         <div style={{
           background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`,

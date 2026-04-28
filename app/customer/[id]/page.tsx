@@ -58,6 +58,21 @@ type Engineer = {
   position: string | null
 }
 
+// ── 견적 관련 타입 추가 ──
+type Quote = {
+  quote_id: number
+  quote_number: string
+  quote_date: string
+  total_supply: number
+  total_amount: number
+  status: string
+  subject: string | null
+  recipient: string | null
+  order_date: string | null
+  revenue_date: string | null
+  engineers?: { name: string; position: string | null }
+}
+
 const PAGE_BG = '#f4f5f7'
 const PANEL_BG = '#ffffff'
 const CARD_BG = '#f9fafb'
@@ -71,6 +86,16 @@ const WHITE_BUTTON_BG = '#234ea2'
 const WHITE_BUTTON_TEXT = '#ffffff'
 const DANGER_BG = '#dc2626'
 
+const STATUS_COLORS: Record<string, string> = {
+  '견적중': '#f59e0b',
+  '수주': '#3b82f6',
+  '매출완료': '#16a34a',
+  '실패': '#dc2626',
+  '보류': '#9ca3af',
+}
+
+const numKR = (n: number) => Math.round(n).toLocaleString('ko-KR')
+
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: 12,
@@ -82,7 +107,6 @@ const inputStyle: CSSProperties = {
   outline: 'none',
 }
 
-// date input with white background so calendar icon is visible
 const dateInputStyle: CSSProperties = {
   width: '100%',
   padding: 12,
@@ -111,16 +135,11 @@ const textareaStyle: CSSProperties = {
 function getInstallDisplay(device: Device) {
   const rawYear = device.install_year?.toString().trim() || ''
   const rawDate = device.install_date?.toString().trim() || ''
-
   if (!rawDate && !rawYear) return '-'
-
   if (rawYear && rawDate) {
-    if (rawDate.startsWith(rawYear)) {
-      return rawDate
-    }
+    if (rawDate.startsWith(rawYear)) return rawDate
     return `${rawYear} - ${rawDate}`
   }
-
   if (rawDate) return rawDate
   return rawYear
 }
@@ -135,6 +154,7 @@ export default function CustomerDetailPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [history, setHistory] = useState<ServiceHistory[]>([])
+  const [quotes, setQuotes] = useState<Quote[]>([])  // ← 견적 이력
 
   const [loading, setLoading] = useState(true)
 
@@ -146,6 +166,7 @@ export default function CustomerDetailPage() {
   const [isEditContactModalOpen, setIsEditContactModalOpen] = useState(false)
   const [isEditDeviceModalOpen, setIsEditDeviceModalOpen] = useState(false)
   const [isDeviceImageModalOpen, setIsDeviceImageModalOpen] = useState(false)
+  const [isQuoteHistoryModalOpen, setIsQuoteHistoryModalOpen] = useState(false)  // ← 거래이력 모달
 
   const [isSavingService, setIsSavingService] = useState(false)
   const [isSavingServiceEdit, setIsSavingServiceEdit] = useState(false)
@@ -166,85 +187,55 @@ export default function CustomerDetailPage() {
   const [deviceImageFile, setDeviceImageFile] = useState<File | null>(null)
   const [engineers, setEngineers] = useState<Engineer[]>([])
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<number[]>([])
-const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>([])
+  const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>([])
+
   const [serviceForm, setServiceForm] = useState({
-    visit_date: '',
-    service_notes: '',
-    visitor: '',
-    service_type: '신규SETUP',
+    visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP',
   })
-
   const [serviceEditForm, setServiceEditForm] = useState({
-    visit_date: '',
-    service_notes: '',
-    visitor: '',
-    service_type: '신규SETUP',
+    visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP',
   })
-
   const [customerEditForm, setCustomerEditForm] = useState({
-    company_name: '',
-    address: '',
-    agency: '',
-    status: '활성',
+    company_name: '', address: '', agency: '', status: '활성',
   })
-
   const [contactForm, setContactForm] = useState({
-    name: '',
-    department: '',
-    position: '',
-    phone: '',
+    name: '', department: '', position: '', phone: '',
   })
-
   const [contactEditForm, setContactEditForm] = useState({
-    name: '',
-    department: '',
-    position: '',
-    phone: '',
+    name: '', department: '', position: '', phone: '',
   })
-
   const [deviceForm, setDeviceForm] = useState({
-    device_name: '',
-    device_name2: '',
-    option: '',
-    serial_number: '',
-    program: 'ACCTee',
-    install_date: '',
-    install_engineer: '',
-    category: '20',
+    device_name: '', device_name2: '', option: '', serial_number: '',
+    program: 'ACCTee', install_date: '', install_engineer: '', category: '20',
   })
-
   const [deviceEditForm, setDeviceEditForm] = useState({
-    device_name: '',
-    device_name2: '',
-    option: '',
-    serial_number: '',
-    program: 'ACCTee',
-    install_date: '',
-    install_engineer: '',
-    category: '20',
+    device_name: '', device_name2: '', option: '', serial_number: '',
+    program: 'ACCTee', install_date: '', install_engineer: '', category: '20',
   })
 
   const fetchDetail = async () => {
     setLoading(true)
-
-    const [{ data: customerData }, { data: devicesData }, { data: contactsData }, { data: historyData }, { data: engineersData }] =
-      await Promise.all([
-        supabase.from('customers').select('*').eq('customer_id', customerId).single(),
-        supabase.from('devices').select('*').eq('customer_id', customerId).order('device_id', { ascending: true }),
-        supabase.from('contacts').select('*').eq('customer_id', customerId).order('contact_id', { ascending: true }),
-         supabase
-          .from('service_history')
-          .select('*, service_engineers(engineer_id, engineers(name, position))')
-          .eq('customer_id', customerId)
-          .order('service_id', { ascending: false }),
-        supabase.from('engineers').select('*').order('engineer_id', { ascending: true }),
-      ])
-
+    const [
+      { data: customerData },
+      { data: devicesData },
+      { data: contactsData },
+      { data: historyData },
+      { data: engineersData },
+      { data: quotesData },
+    ] = await Promise.all([
+      supabase.from('customers').select('*').eq('customer_id', customerId).single(),
+      supabase.from('devices').select('*').eq('customer_id', customerId).order('device_id', { ascending: true }),
+      supabase.from('contacts').select('*').eq('customer_id', customerId).order('contact_id', { ascending: true }),
+      supabase.from('service_history').select('*, service_engineers(engineer_id, engineers(name, position))').eq('customer_id', customerId).order('service_id', { ascending: false }),
+      supabase.from('engineers').select('*').order('engineer_id', { ascending: true }),
+      supabase.from('quotes').select('*, engineers(name, position)').eq('customer_id', customerId).order('quote_date', { ascending: false }),  // ← 견적 조회
+    ])
     setCustomer(customerData ?? null)
     setDevices(devicesData ?? [])
     setContacts(contactsData ?? [])
     setHistory(historyData ?? [])
     setEngineers(engineersData ?? [])
+    setQuotes((quotesData as Quote[]) ?? [])
     setLoading(false)
   }
 
@@ -255,108 +246,42 @@ const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>
 
   const geocodeAddress = async (address: string) => {
     const kakao = await loadKakaoMap()
-
     return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-      if (!kakao.maps.services) {
-        reject(new Error('Kakao Maps services 라이브러리가 로드되지 않았습니다.'))
-        return
-      }
-
+      if (!kakao.maps.services) { reject(new Error('Kakao Maps services 라이브러리가 로드되지 않았습니다.')); return }
       const geocoder = new kakao.maps.services.Geocoder()
-
       geocoder.addressSearch(address, (result: any[], status: string) => {
-        if (status !== kakao.maps.services.Status.OK || !result[0]) {
-          reject(new Error('주소 좌표 변환 실패'))
-          return
-        }
-
-        resolve({
-          latitude: Number(result[0].y),
-          longitude: Number(result[0].x),
-        })
+        if (status !== kakao.maps.services.Status.OK || !result[0]) { reject(new Error('주소 좌표 변환 실패')); return }
+        resolve({ latitude: Number(result[0].y), longitude: Number(result[0].x) })
       })
     })
   }
 
-const handleOpenServiceModal = (deviceId: number) => {
+  const handleOpenServiceModal = (deviceId: number) => {
     setSelectedDeviceId(deviceId)
-    setServiceForm({
-      visit_date: '',
-      service_notes: '',
-      visitor: '',
-      service_type: '신규SETUP',
-    })
+    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
     setSelectedEngineerIds([])
     setIsServiceModalOpen(true)
   }
 
   const handleAddService = async () => {
-    if (!selectedDeviceId) {
-      alert('장비를 먼저 선택해주세요.')
-      return
-    }
-
-    if (!serviceForm.visit_date.trim()) {
-      alert('방문일자를 입력해주세요.')
-      return
-    }
-
-    if (!serviceForm.service_notes.trim()) {
-      alert('서비스 내용을 입력해주세요.')
-      return
-    }
-
-    if (selectedEngineerIds.length === 0) {
-      alert('방문 엔지니어를 선택해주세요.')
-      return
-    }
-
+    if (!selectedDeviceId) { alert('장비를 먼저 선택해주세요.'); return }
+    if (!serviceForm.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
+    if (!serviceForm.service_notes.trim()) { alert('서비스 내용을 입력해주세요.'); return }
+    if (selectedEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
     const visitYear = serviceForm.visit_date.slice(0, 4)
     setIsSavingService(true)
-
-    const { data: newService, error } = await supabase
-      .from('service_history')
-      .insert([{
-        customer_id: customerId,
-        device_id: selectedDeviceId,
-        visit_year: visitYear,
-        visit_date: serviceForm.visit_date.trim(),
-        service_notes: serviceForm.service_notes.trim(),
-        visitor: serviceForm.visitor.trim() || null,
-        service_type: serviceForm.service_type,
-      }])
-      .select()
-      .single()
-
-    if (error) {
-      setIsSavingService(false)
-      alert(error.message || '서비스 기록 저장 중 오류가 발생했습니다.')
-      return
-    }
-
-    const engineerRows = selectedEngineerIds.map((eid) => ({
-      service_id: newService.service_id,
-      engineer_id: eid,
-    }))
-
-    const { error: engineerError } = await supabase
-      .from('service_engineers')
-      .insert(engineerRows)
-
+    const { data: newService, error } = await supabase.from('service_history').insert([{
+      customer_id: customerId, device_id: selectedDeviceId, visit_year: visitYear,
+      visit_date: serviceForm.visit_date.trim(), service_notes: serviceForm.service_notes.trim(),
+      visitor: serviceForm.visitor.trim() || null, service_type: serviceForm.service_type,
+    }]).select().single()
+    if (error) { setIsSavingService(false); alert(error.message || '서비스 기록 저장 중 오류가 발생했습니다.'); return }
+    const engineerRows = selectedEngineerIds.map((eid) => ({ service_id: newService.service_id, engineer_id: eid }))
+    const { error: engineerError } = await supabase.from('service_engineers').insert(engineerRows)
     setIsSavingService(false)
-
-    if (engineerError) {
-      alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (engineerError) { alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 추가되었습니다.')
-    setServiceForm({
-      visit_date: '',
-      service_notes: '',
-      visitor: '',
-      service_type: '신규SETUP',
-    })
+    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
     setSelectedEngineerIds([])
     setIsServiceModalOpen(false)
     setSelectedDeviceId(null)
@@ -365,104 +290,45 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleOpenEditServiceModal = (service: ServiceHistory) => {
     setSelectedService(service)
-    setServiceEditForm({
-      visit_date: service.visit_date ?? '',
-      service_notes: service.service_notes ?? '',
-      visitor: service.visitor ?? '',
-      service_type: service.service_type ?? '신규SETUP',
-    })
+    setServiceEditForm({ visit_date: service.visit_date ?? '', service_notes: service.service_notes ?? '', visitor: service.visitor ?? '', service_type: service.service_type ?? '신규SETUP' })
     const engineerIds = (service.service_engineers ?? []).map((se) => se.engineer_id)
-    
     setSelectedEditEngineerIds(engineerIds)
     setIsEditServiceModalOpen(true)
   }
 
   const handleUpdateService = async () => {
     if (!selectedService) return
-
-    if (!serviceEditForm.visit_date.trim()) {
-      alert('방문일자를 입력해주세요.')
-      return
-    }
-
-    if (!serviceEditForm.service_notes.trim()) {
-      alert('서비스 내용을 입력해주세요.')
-      return
-    }
-
-    if (selectedEditEngineerIds.length === 0) {
-      alert('방문 엔지니어를 선택해주세요.')
-      return
-    }
-
+    if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
+    if (!serviceEditForm.service_notes.trim()) { alert('서비스 내용을 입력해주세요.'); return }
+    if (selectedEditEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
     const visitYear = serviceEditForm.visit_date.slice(0, 4)
     setIsSavingServiceEdit(true)
-
-    const { error } = await supabase
-      .from('service_history')
-      .update({
-        visit_year: visitYear,
-        visit_date: serviceEditForm.visit_date.trim(),
-        service_notes: serviceEditForm.service_notes.trim(),
-        visitor: serviceEditForm.visitor.trim() || null,
-        service_type: serviceEditForm.service_type,
-      })
-      .eq('service_id', selectedService.service_id)
-
-    if (error) {
-      setIsSavingServiceEdit(false)
-      alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.')
-      return
-    }
-
-    // 기존 엔지니어 연결 삭제 후 다시 저장
-    await supabase
-      .from('service_engineers')
-      .delete()
-      .eq('service_id', selectedService.service_id)
-
-    const engineerRows = selectedEditEngineerIds.map((eid) => ({
-      service_id: selectedService.service_id,
-      engineer_id: eid,
-    }))
-
-    const { error: engineerError } = await supabase
-      .from('service_engineers')
-      .insert(engineerRows)
-
+    const { error } = await supabase.from('service_history').update({
+      visit_year: visitYear, visit_date: serviceEditForm.visit_date.trim(),
+      service_notes: serviceEditForm.service_notes.trim(), visitor: serviceEditForm.visitor.trim() || null,
+      service_type: serviceEditForm.service_type,
+    }).eq('service_id', selectedService.service_id)
+    if (error) { setIsSavingServiceEdit(false); alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.'); return }
+    await supabase.from('service_engineers').delete().eq('service_id', selectedService.service_id)
+    const engineerRows = selectedEditEngineerIds.map((eid) => ({ service_id: selectedService.service_id, engineer_id: eid }))
+    const { error: engineerError } = await supabase.from('service_engineers').insert(engineerRows)
     setIsSavingServiceEdit(false)
-
-    if (engineerError) {
-      alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (engineerError) { alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 수정되었습니다.')
     setIsEditServiceModalOpen(false)
     setSelectedService(null)
     setSelectedEditEngineerIds([])
     await fetchDetail()
   }
+
   const handleDeleteService = async () => {
     if (!selectedService) return
-
     const ok = confirm('이 서비스 기록을 삭제하시겠습니까?')
     if (!ok) return
-
     setIsSavingServiceEdit(true)
-
-    const { error } = await supabase
-      .from('service_history')
-      .delete()
-      .eq('service_id', selectedService.service_id)
-
+    const { error } = await supabase.from('service_history').delete().eq('service_id', selectedService.service_id)
     setIsSavingServiceEdit(false)
-
-    if (error) {
-      alert(error.message || '서비스 기록 삭제 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '서비스 기록 삭제 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 삭제되었습니다.')
     setIsEditServiceModalOpen(false)
     setSelectedService(null)
@@ -470,52 +336,24 @@ const handleOpenServiceModal = (deviceId: number) => {
   }
 
   const handleOpenEditCustomerModal = () => {
-    setCustomerEditForm({
-      company_name: customer?.company_name ?? '',
-      address: customer?.address ?? '',
-      agency: customer?.agency ?? '',
-      status: customer?.status ?? '활성',
-    })
+    setCustomerEditForm({ company_name: customer?.company_name ?? '', address: customer?.address ?? '', agency: customer?.agency ?? '', status: customer?.status ?? '활성' })
     setIsEditCustomerModalOpen(true)
   }
 
   const handleUpdateCustomer = async () => {
     if (!customer) return
-
-    if (!customerEditForm.company_name.trim()) {
-      alert('업체명을 입력해주세요.')
-      return
-    }
-
-    if (!customerEditForm.address.trim()) {
-      alert('주소를 입력해주세요.')
-      return
-    }
-
+    if (!customerEditForm.company_name.trim()) { alert('업체명을 입력해주세요.'); return }
+    if (!customerEditForm.address.trim()) { alert('주소를 입력해주세요.'); return }
     setIsSavingCustomerEdit(true)
-
     try {
       const coords = await geocodeAddress(customerEditForm.address.trim())
-
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          company_name: customerEditForm.company_name.trim(),
-          address: customerEditForm.address.trim(),
-          agency: customerEditForm.agency.trim() || null,
-          status: customerEditForm.status,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        })
-        .eq('customer_id', customer.customer_id)
-
+      const { error } = await supabase.from('customers').update({
+        company_name: customerEditForm.company_name.trim(), address: customerEditForm.address.trim(),
+        agency: customerEditForm.agency.trim() || null, status: customerEditForm.status,
+        latitude: coords.latitude, longitude: coords.longitude,
+      }).eq('customer_id', customer.customer_id)
       setIsSavingCustomerEdit(false)
-
-      if (error) {
-        alert(error.message || '업체 정보 수정 중 오류가 발생했습니다.')
-        return
-      }
-
+      if (error) { alert(error.message || '업체 정보 수정 중 오류가 발생했습니다.'); return }
       alert('업체 정보가 수정되었습니다.')
       setIsEditCustomerModalOpen(false)
       await fetchDetail()
@@ -527,37 +365,15 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleDeleteCustomer = async () => {
     if (!customer) return
-
     const ok = confirm('이 업체를 삭제하시겠습니까?\n관련 담당자, 장비, 서비스기록도 모두 삭제됩니다.')
     if (!ok) return
-
     setIsDeletingCustomer(true)
-
     try {
-      const { error: historyError } = await supabase
-        .from('service_history')
-        .delete()
-        .eq('customer_id', customer.customer_id)
-      if (historyError) throw historyError
-
-      const { error: contactsError } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('customer_id', customer.customer_id)
-      if (contactsError) throw contactsError
-
-      const { error: devicesError } = await supabase
-        .from('devices')
-        .delete()
-        .eq('customer_id', customer.customer_id)
-      if (devicesError) throw devicesError
-
-      const { error: customerError } = await supabase
-        .from('customers')
-        .delete()
-        .eq('customer_id', customer.customer_id)
-      if (customerError) throw customerError
-
+      await supabase.from('service_history').delete().eq('customer_id', customer.customer_id)
+      await supabase.from('contacts').delete().eq('customer_id', customer.customer_id)
+      await supabase.from('devices').delete().eq('customer_id', customer.customer_id)
+      const { error } = await supabase.from('customers').delete().eq('customer_id', customer.customer_id)
+      if (error) throw error
       alert('업체 및 관련 데이터가 삭제되었습니다.')
       setIsEditCustomerModalOpen(false)
       router.push('/')
@@ -569,40 +385,19 @@ const handleOpenServiceModal = (deviceId: number) => {
   }
 
   const handleOpenAddContactModal = () => {
-    setContactForm({
-      name: '',
-      department: '',
-      position: '',
-      phone: '',
-    })
+    setContactForm({ name: '', department: '', position: '', phone: '' })
     setIsAddContactModalOpen(true)
   }
 
   const handleAddContact = async () => {
-    if (!contactForm.name.trim()) {
-      alert('이름을 입력해주세요.')
-      return
-    }
-
+    if (!contactForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setIsSavingContact(true)
-
-    const { error } = await supabase.from('contacts').insert([
-      {
-        customer_id: customerId,
-        name: contactForm.name.trim(),
-        department: contactForm.department.trim() || null,
-        position: contactForm.position.trim() || null,
-        phone: contactForm.phone.trim() || null,
-      },
-    ])
-
+    const { error } = await supabase.from('contacts').insert([{
+      customer_id: customerId, name: contactForm.name.trim(), department: contactForm.department.trim() || null,
+      position: contactForm.position.trim() || null, phone: contactForm.phone.trim() || null,
+    }])
     setIsSavingContact(false)
-
-    if (error) {
-      alert(error.message || '담당자 추가 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '담당자 추가 중 오류가 발생했습니다.'); return }
     alert('담당자가 추가되었습니다.')
     setIsAddContactModalOpen(false)
     await fetchDetail()
@@ -610,42 +405,20 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleOpenEditContactModal = (contact: Contact) => {
     setSelectedContact(contact)
-    setContactEditForm({
-      name: contact.name ?? '',
-      department: contact.department ?? '',
-      position: contact.position ?? '',
-      phone: contact.phone ?? '',
-    })
+    setContactEditForm({ name: contact.name ?? '', department: contact.department ?? '', position: contact.position ?? '', phone: contact.phone ?? '' })
     setIsEditContactModalOpen(true)
   }
 
   const handleUpdateContact = async () => {
     if (!selectedContact) return
-
-    if (!contactEditForm.name.trim()) {
-      alert('이름을 입력해주세요.')
-      return
-    }
-
+    if (!contactEditForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setIsSavingContactEdit(true)
-
-    const { error } = await supabase
-      .from('contacts')
-      .update({
-        name: contactEditForm.name.trim(),
-        department: contactEditForm.department.trim() || null,
-        position: contactEditForm.position.trim() || null,
-        phone: contactEditForm.phone.trim() || null,
-      })
-      .eq('contact_id', selectedContact.contact_id)
-
+    const { error } = await supabase.from('contacts').update({
+      name: contactEditForm.name.trim(), department: contactEditForm.department.trim() || null,
+      position: contactEditForm.position.trim() || null, phone: contactEditForm.phone.trim() || null,
+    }).eq('contact_id', selectedContact.contact_id)
     setIsSavingContactEdit(false)
-
-    if (error) {
-      alert(error.message || '담당자 수정 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '담당자 수정 중 오류가 발생했습니다.'); return }
     alert('담당자 정보가 수정되었습니다.')
     setIsEditContactModalOpen(false)
     setSelectedContact(null)
@@ -654,24 +427,12 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleDeleteContact = async () => {
     if (!selectedContact) return
-
     const ok = confirm('이 담당자를 삭제하시겠습니까?')
     if (!ok) return
-
     setIsSavingContactEdit(true)
-
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('contact_id', selectedContact.contact_id)
-
+    const { error } = await supabase.from('contacts').delete().eq('contact_id', selectedContact.contact_id)
     setIsSavingContactEdit(false)
-
-    if (error) {
-      alert(error.message || '담당자 삭제 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '담당자 삭제 중 오류가 발생했습니다.'); return }
     alert('담당자가 삭제되었습니다.')
     setIsEditContactModalOpen(false)
     setSelectedContact(null)
@@ -679,49 +440,21 @@ const handleOpenServiceModal = (deviceId: number) => {
   }
 
   const handleOpenAddDeviceModal = () => {
-    setDeviceForm({
-      device_name: '',
-      device_name2: '',
-      option: '',
-      serial_number: '',
-      program: 'ACCTee',
-      install_date: '',
-      install_engineer: '',
-      category: '20',
-    })
+    setDeviceForm({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
     setIsAddDeviceModalOpen(true)
   }
 
   const handleAddDevice = async () => {
-    if (!deviceForm.device_name.trim()) {
-      alert('장비 라인업을 입력해주세요.')
-      return
-    }
-
+    if (!deviceForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDevice(true)
-
-    const { error } = await supabase.from('devices').insert([
-      {
-        customer_id: customerId,
-        device_name: deviceForm.device_name.trim(),
-        device_name2: deviceForm.device_name2.trim() || null,
-        option: deviceForm.option.trim() || null,
-        serial_number: deviceForm.serial_number.trim() || null,
-        program: deviceForm.program,
-        install_date: deviceForm.install_date || null,
-        install_year: null,
-        install_engineer: deviceForm.install_engineer.trim() || null,
-        category: deviceForm.category,
-      },
-    ])
-
+    const { error } = await supabase.from('devices').insert([{
+      customer_id: customerId, device_name: deviceForm.device_name.trim(), device_name2: deviceForm.device_name2.trim() || null,
+      option: deviceForm.option.trim() || null, serial_number: deviceForm.serial_number.trim() || null,
+      program: deviceForm.program, install_date: deviceForm.install_date || null, install_year: null,
+      install_engineer: deviceForm.install_engineer.trim() || null, category: deviceForm.category,
+    }])
     setIsSavingDevice(false)
-
-    if (error) {
-      alert(error.message || '장비 추가 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '장비 추가 중 오류가 발생했습니다.'); return }
     alert('장비가 추가되었습니다.')
     setIsAddDeviceModalOpen(false)
     await fetchDetail()
@@ -730,50 +463,25 @@ const handleOpenServiceModal = (deviceId: number) => {
   const handleOpenEditDeviceModal = (device: Device) => {
     setSelectedDevice(device)
     setDeviceEditForm({
-      device_name: device.device_name ?? '',
-      device_name2: device.device_name2 ?? '',
-      option: device.option ?? '',
-      serial_number: device.serial_number ?? '',
-      program: device.program ?? 'ACCTee',
-      install_date: device.install_date ?? '',
-      install_engineer: device.install_engineer ?? '',
-      category: device.category ?? '20',
+      device_name: device.device_name ?? '', device_name2: device.device_name2 ?? '', option: device.option ?? '',
+      serial_number: device.serial_number ?? '', program: device.program ?? 'ACCTee',
+      install_date: device.install_date ?? '', install_engineer: device.install_engineer ?? '', category: device.category ?? '20',
     })
     setIsEditDeviceModalOpen(true)
   }
 
   const handleUpdateDevice = async () => {
     if (!selectedDevice) return
-
-    if (!deviceEditForm.device_name.trim()) {
-      alert('장비 라인업을 입력해주세요.')
-      return
-    }
-
+    if (!deviceEditForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDeviceEdit(true)
-
-    const { error } = await supabase
-      .from('devices')
-      .update({
-        device_name: deviceEditForm.device_name.trim(),
-        device_name2: deviceEditForm.device_name2.trim() || null,
-        option: deviceEditForm.option.trim() || null,
-        serial_number: deviceEditForm.serial_number.trim() || null,
-        program: deviceEditForm.program,
-        install_date: deviceEditForm.install_date || null,
-        install_year: null,
-        install_engineer: deviceEditForm.install_engineer.trim() || null,
-        category: deviceEditForm.category,
-      })
-      .eq('device_id', selectedDevice.device_id)
-
+    const { error } = await supabase.from('devices').update({
+      device_name: deviceEditForm.device_name.trim(), device_name2: deviceEditForm.device_name2.trim() || null,
+      option: deviceEditForm.option.trim() || null, serial_number: deviceEditForm.serial_number.trim() || null,
+      program: deviceEditForm.program, install_date: deviceEditForm.install_date || null, install_year: null,
+      install_engineer: deviceEditForm.install_engineer.trim() || null, category: deviceEditForm.category,
+    }).eq('device_id', selectedDevice.device_id)
     setIsSavingDeviceEdit(false)
-
-    if (error) {
-      alert(error.message || '장비 수정 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '장비 수정 중 오류가 발생했습니다.'); return }
     alert('장비 정보가 수정되었습니다.')
     setIsEditDeviceModalOpen(false)
     setSelectedDevice(null)
@@ -782,24 +490,12 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleDeleteDevice = async () => {
     if (!selectedDevice) return
-
     const ok = confirm('이 장비를 삭제하시겠습니까?')
     if (!ok) return
-
     setIsSavingDeviceEdit(true)
-
-    const { error } = await supabase
-      .from('devices')
-      .delete()
-      .eq('device_id', selectedDevice.device_id)
-
+    const { error } = await supabase.from('devices').delete().eq('device_id', selectedDevice.device_id)
     setIsSavingDeviceEdit(false)
-
-    if (error) {
-      alert(error.message || '장비 삭제 중 오류가 발생했습니다.')
-      return
-    }
-
+    if (error) { alert(error.message || '장비 삭제 중 오류가 발생했습니다.'); return }
     alert('장비가 삭제되었습니다.')
     setIsEditDeviceModalOpen(false)
     setSelectedDevice(null)
@@ -814,43 +510,20 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const handleUploadDeviceImage = async () => {
     if (!selectedImageDevice) return
-
-    if (!deviceImageFile) {
-      alert('이미지 파일을 선택해주세요.')
-      return
-    }
-
+    if (!deviceImageFile) { alert('이미지 파일을 선택해주세요.'); return }
     setIsSavingDeviceImage(true)
-
     try {
       const fileExt = deviceImageFile.name.split('.').pop()
       const fileName = `device-${selectedImageDevice.device_id}-${Date.now()}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('device-images')
-        .upload(fileName, deviceImageFile, {
-          upsert: true,
-        })
-
+      const { error: uploadError } = await supabase.storage.from('device-images').upload(fileName, deviceImageFile, { upsert: true })
       if (uploadError) throw uploadError
-
       const { data } = supabase.storage.from('device-images').getPublicUrl(fileName)
-      const publicUrl = data.publicUrl
-
-      const { error: updateError } = await supabase
-        .from('devices')
-        .update({
-          image_url: publicUrl,
-        })
-        .eq('device_id', selectedImageDevice.device_id)
-
+      const { error: updateError } = await supabase.from('devices').update({ image_url: data.publicUrl }).eq('device_id', selectedImageDevice.device_id)
       if (updateError) throw updateError
-
       alert('장비 사진이 등록되었습니다.')
       setIsDeviceImageModalOpen(false)
       setSelectedImageDevice(null)
       setDeviceImageFile(null)
-
       await fetchDetail()
     } catch (error: any) {
       alert(error?.message || '장비 사진 업로드 중 오류가 발생했습니다.')
@@ -861,51 +534,33 @@ const handleOpenServiceModal = (deviceId: number) => {
 
   const historyByDevice = useMemo(() => {
     const map = new Map<number, ServiceHistory[]>()
-
-    devices.forEach((d) => {
-      map.set(d.device_id, [])
-    })
-
+    devices.forEach((d) => map.set(d.device_id, []))
     history.forEach((h) => {
       if (h.device_id == null) return
-
       const deviceId = Number(h.device_id)
       const arr = map.get(deviceId) || []
       arr.push(h)
       map.set(deviceId, arr)
     })
-
     return map
   }, [devices, history])
 
+  // 견적 통계
+  const totalQuoteAmt = quotes.reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalOrderAmt = quotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalRevenueAmt = quotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
+
   const iconButtonStyle: CSSProperties = {
-    width: 34,
-    height: 34,
-    borderRadius: '50%',
-    background: WHITE_BUTTON_BG,
-    color: WHITE_BUTTON_TEXT,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 16,
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    lineHeight: 1,
+    width: 34, height: 34, borderRadius: '50%', background: WHITE_BUTTON_BG,
+    color: WHITE_BUTTON_TEXT, border: 'none', cursor: 'pointer', fontSize: 16,
+    fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
   }
 
   if (loading) {
     return (
       <>
-        <style jsx global>{`
-          html,
-          body {
-            background: ${PAGE_BG};
-          }
-        `}</style>
-
+        <style jsx global>{`html, body { background: ${PAGE_BG}; }`}</style>
         <main style={{ padding: 20, background: PAGE_BG, minHeight: '100vh', color: TEXT_PRIMARY }}>
-
           <p style={{ marginTop: 16 }}>불러오는 중...</p>
         </main>
       </>
@@ -915,61 +570,20 @@ const handleOpenServiceModal = (deviceId: number) => {
   return (
     <>
       <style jsx global>{`
-        html,
-        body {
-          background: ${PAGE_BG};
-        }
-
-        input::placeholder,
-        textarea::placeholder {
-          color: ${TEXT_MUTED};
-          opacity: 1;
-        }
-
-        select {
-          appearance: none;
-          -webkit-appearance: none;
-          -moz-appearance: none;
-        }
-
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          cursor: pointer;
-        }
+        html, body { background: ${PAGE_BG}; }
+        input::placeholder, textarea::placeholder { color: ${TEXT_MUTED}; opacity: 1; }
+        select { appearance: none; -webkit-appearance: none; -moz-appearance: none; }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
       `}</style>
 
-      <main
-        style={{
-          padding: 20,
-          maxWidth: 1400,
-          margin: '0 auto',
-          background: PAGE_BG,
-          minHeight: '100vh',
-        }}
-      >
-     
+      <main style={{ padding: 20, maxWidth: 1400, margin: '0 auto', background: PAGE_BG, minHeight: '100vh' }}>
 
-        <div
-          style={{
-            background: PANEL_BG,
-            border: `1px solid ${INPUT_BORDER}`,
-            borderRadius: 20,
-            padding: 24,
-            marginBottom: 22,
-            color: TEXT_PRIMARY,
-            position: 'relative',
-          }}
-        >
-          <button
-            onClick={handleOpenEditCustomerModal}
-            style={{
-              ...iconButtonStyle,
-              position: 'absolute',
-              top: 20,
-              right: 20,
-            }}
-          >
-            ✏️
-          </button>
+        {/* 업체 정보 패널 */}
+        <div style={{
+          background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 20,
+          padding: 24, marginBottom: 22, color: TEXT_PRIMARY, position: 'relative',
+        }}>
+          <button onClick={handleOpenEditCustomerModal} style={{ ...iconButtonStyle, position: 'absolute', top: 20, right: 20 }}>✏️</button>
 
           <h1 style={{ margin: 0, marginBottom: 18, fontSize: 32, color: TEXT_PRIMARY }}>
             {customer?.company_name ?? '고객 정보 없음'}
@@ -977,1560 +591,423 @@ const handleOpenServiceModal = (deviceId: number) => {
 
           <div style={{ display: 'grid', gap: 10, fontSize: 16, color: TEXT_SECONDARY }}>
             <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-  주소: {customer?.address ?? '-'}
-  {customer?.address && (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(customer.address ?? '')
-        alert('주소가 복사되었습니다!')
-      }}
-      style={{
-        padding: '3px 10px',
-        fontSize: 12,
-        fontWeight: 700,
-        background: '#234ea2',
-        color: '#ffffff',
-        border: 'none',
-        borderRadius: 6,
-        cursor: 'pointer',
-      }}
-    >
-      복사
-    </button>
-  )}
-</p>
+              주소: {customer?.address ?? '-'}
+              {customer?.address && (
+                <button onClick={() => { navigator.clipboard.writeText(customer.address ?? ''); alert('주소가 복사되었습니다!') }}
+                  style={{ padding: '3px 10px', fontSize: 12, fontWeight: 700, background: '#234ea2', color: '#ffffff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                  복사
+                </button>
+              )}
+            </p>
             <p style={{ margin: 0 }}>상태: {customer?.status ?? '-'}</p>
             <p style={{ margin: 0 }}>대리점: {customer?.agency ?? '-'}</p>
           </div>
+
+          {/* ── 거래 이력 버튼 ── */}
+          <button
+            onClick={() => setIsQuoteHistoryModalOpen(true)}
+            style={{
+              marginTop: 16, padding: '9px 18px', background: quotes.length > 0 ? '#eff6ff' : '#f3f4f6',
+              color: quotes.length > 0 ? WHITE_BUTTON_BG : TEXT_SECONDARY,
+              border: `1px solid ${quotes.length > 0 ? '#bfdbfe' : INPUT_BORDER}`,
+              borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+            }}>
+            📋 거래 이력 {quotes.length > 0 ? `(${quotes.length}건 · 누적 ₩${numKR(totalRevenueAmt)})` : '(없음)'}
+          </button>
         </div>
 
+        {/* 담당자 */}
         <div style={{ marginBottom: 22 }}>
           <h2 style={{ color: TEXT_PRIMARY, marginBottom: 12, fontSize: 30, fontWeight: 800 }}>담당자</h2>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              overflowX: 'auto',
-              paddingBottom: 4,
-              alignItems: 'flex-start',
-            }}
-          >
+          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'flex-start' }}>
             {(contacts ?? []).map((c) => {
               const departmentText = c.department?.trim() ? c.department : '부서정보 없음'
-
               return (
-                <div
-                  key={c.contact_id}
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 320,
-                    background: CARD_BG,
-                    borderRadius: 18,
-                    padding: 18,
-                    color: TEXT_PRIMARY,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    flex: '0 0 auto',
-                    textAlign: 'center',
-                    position: 'relative',
-                  }}
-                >
-                  <button
-                    onClick={() => handleOpenEditContactModal(c)}
-                    style={{
-                      ...iconButtonStyle,
-                      position: 'absolute',
-                      top: 14,
-                      right: 14,
-                    }}
-                  >
-                    ✏️
-                  </button>
-
-                  <div
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      marginBottom: 10,
-                      color: c.department?.trim() ? TEXT_SECONDARY : TEXT_MUTED,
-                    }}
-                  >
-                    {departmentText}
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 17,
-                      fontWeight: 800,
-                      marginBottom: 10,
-                      color: TEXT_PRIMARY,
-                    }}
-                  >
-                    {c.name ?? '-'} {c.position ?? ''}
-                  </div>
-
+                <div key={c.contact_id} style={{
+                  minWidth: 320, maxWidth: 320, background: CARD_BG, borderRadius: 18, padding: 18,
+                  color: TEXT_PRIMARY, border: `1px solid ${INPUT_BORDER}`, flex: '0 0 auto', textAlign: 'center', position: 'relative',
+                }}>
+                  <button onClick={() => handleOpenEditContactModal(c)} style={{ ...iconButtonStyle, position: 'absolute', top: 14, right: 14 }}>✏️</button>
+                  <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10, color: c.department?.trim() ? TEXT_SECONDARY : TEXT_MUTED }}>{departmentText}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 10, color: TEXT_PRIMARY }}>{c.name ?? '-'} {c.position ?? ''}</div>
                   <div style={{ fontSize: 15, color: TEXT_SECONDARY }}>{c.phone ?? '-'}</div>
                 </div>
               )
             })}
-
-            <div
-              style={{
-                minWidth: 320,
-                maxWidth: 320,
-                minHeight: 156,
-                flex: '0 0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <button
-                onClick={handleOpenAddContactModal}
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: '50%',
-                  background: WHITE_BUTTON_BG,
-                  color: WHITE_BUTTON_TEXT,
-                  border: `1px solid ${INPUT_BORDER}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 40,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  flex: '0 0 auto',
-                }}
-              >
-                +
-              </button>
+            <div style={{ minWidth: 320, maxWidth: 320, minHeight: 156, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={handleOpenAddContactModal} style={{ width: 68, height: 68, borderRadius: '50%', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, border: `1px solid ${INPUT_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, fontWeight: 700, cursor: 'pointer', flex: '0 0 auto' }}>+</button>
             </div>
           </div>
         </div>
 
+        {/* 장비 */}
         <div style={{ marginBottom: 22 }}>
           <h2 style={{ color: TEXT_PRIMARY, marginBottom: 12, fontSize: 30, fontWeight: 800 }}>장비</h2>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              overflowX: 'auto',
-              paddingBottom: 4,
-              alignItems: 'flex-start',
-            }}
-          >
+          <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'flex-start' }}>
             {(devices ?? []).map((d) => {
-              const deviceTitle = `${d.device_name ?? ''} ${d.device_name2 ?? ''} ${d.option ?? ''}`
-                .replace(/\s+/g, ' ')
-                .trim()
+              const deviceTitle = `${d.device_name ?? ''} ${d.device_name2 ?? ''} ${d.option ?? ''}`.replace(/\s+/g, ' ').trim()
               const deviceHistory = historyByDevice.get(d.device_id) || []
-
               return (
-                <div
-                  key={d.device_id}
-                  style={{
-                    minWidth: 320,
-                    maxWidth: 320,
-                    background: CARD_BG,
-                    borderRadius: 18,
-                    padding: 16,
-                    color: TEXT_PRIMARY,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    flex: '0 0 auto',
-                    position: 'relative',
-                    alignSelf: 'flex-start',
-                  }}
-                >
-                  <button
-                    onClick={() => handleOpenEditDeviceModal(d)}
-                    style={{
-                      ...iconButtonStyle,
-                      position: 'absolute',
-                      top: 14,
-                      right: 14,
-                      zIndex: 2,
-                    }}
-                  >
-                    ✏️
-                  </button>
-
-                  <div
-                    style={{
-                      height: 150,
-                      borderRadius: 14,
-                      background: 'rgba(255,255,255,0.08)',
-                      marginBottom: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                    }}
-                  >
+                <div key={d.device_id} style={{ minWidth: 320, maxWidth: 320, background: CARD_BG, borderRadius: 18, padding: 16, color: TEXT_PRIMARY, border: `1px solid ${INPUT_BORDER}`, flex: '0 0 auto', position: 'relative', alignSelf: 'flex-start' }}>
+                  <button onClick={() => handleOpenEditDeviceModal(d)} style={{ ...iconButtonStyle, position: 'absolute', top: 14, right: 14, zIndex: 2 }}>✏️</button>
+                  <div style={{ height: 150, borderRadius: 14, background: 'rgba(255,255,255,0.08)', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {d.image_url ? (
-                      <img
-                        src={d.image_url}
-                        alt={deviceTitle || 'device image'}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
+                      <img src={d.image_url} alt={deviceTitle || 'device image'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <button
-                        onClick={() => handleOpenDeviceImageModal(d)}
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: '50%',
-                          background: WHITE_BUTTON_BG,
-                          color: WHITE_BUTTON_TEXT,
-                          border: 'none',
-                          fontSize: 38,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        +
-                      </button>
+                      <button onClick={() => handleOpenDeviceImageModal(d)} style={{ width: 64, height: 64, borderRadius: '50%', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, border: 'none', fontSize: 38, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                     )}
                   </div>
-
-                  <div
-                    style={{
-                      position: 'relative',
-                      marginBottom: 10,
-                      minHeight: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        color: TEXT_PRIMARY,
-                        textAlign: 'center',
-                        width: '100%',
-                        padding: '0 8px',
-                        boxSizing: 'border-box',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        wordBreak: 'keep-all',
-                      }}
-                      title={deviceTitle || '-'}
-                    >
-                      {deviceTitle || '-'}
-                    </div>
+                  <div style={{ position: 'relative', marginBottom: 10, minHeight: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: TEXT_PRIMARY, textAlign: 'center', width: '100%', padding: '0 8px', boxSizing: 'border-box', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'keep-all' }} title={deviceTitle || '-'}>{deviceTitle || '-'}</div>
                   </div>
-
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 14,
-                      marginBottom: 6,
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
-                    S/N : {d.serial_number ?? '-'} &nbsp; | &nbsp; 프로그램 : {d.program ?? '-'}
-                  </div>
-
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 14,
-                      marginBottom: 4,
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
-                    설치 엔지니어 : {d.install_engineer ?? '-'}
-                  </div>
-
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 14,
-                      marginBottom: 12,
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
-                    납입연월 : {getInstallDisplay(d)}
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenServiceModal(d.device_id)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      background: WHITE_BUTTON_BG,
-                      color: WHITE_BUTTON_TEXT,
-                      borderRadius: 10,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      marginBottom: 14,
-                    }}
-                  >
-                    서비스 기록 추가
-                  </button>
-
+                  <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 6, color: TEXT_SECONDARY }}>S/N : {d.serial_number ?? '-'} &nbsp; | &nbsp; 프로그램 : {d.program ?? '-'}</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 4, color: TEXT_SECONDARY }}>설치 엔지니어 : {d.install_engineer ?? '-'}</div>
+                  <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 12, color: TEXT_SECONDARY }}>납입연월 : {getInstallDisplay(d)}</div>
+                  <button onClick={() => handleOpenServiceModal(d.device_id)} style={{ width: '100%', padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, marginBottom: 14 }}>서비스 기록 추가</button>
                   <div style={{ display: 'grid', gap: 10 }}>
                     {deviceHistory.length === 0 ? (
-                      <div
-                        style={{
-                          width: '100%',
-                          background: INNER_CARD_BG,
-                          color: TEXT_PRIMARY,
-                          borderRadius: 12,
-                          padding: 14,
-                          fontSize: 14,
-                          border: `1px solid ${INPUT_BORDER}`,
-                          boxSizing: 'border-box',
-                        }}
-                      >
+                      <div style={{ width: '100%', background: INNER_CARD_BG, color: TEXT_PRIMARY, borderRadius: 12, padding: 14, fontSize: 14, border: `1px solid ${INPUT_BORDER}`, boxSizing: 'border-box' }}>
                         <div style={{ fontWeight: 800, marginBottom: 10 }}>서비스 노트</div>
-                        <div style={{ marginBottom: 18 }}>{'-'}</div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-end',
-                            gap: 10,
-                            fontSize: 12,
-                            color: TEXT_MUTED,
-                          }}
-                        >
-                          <div>-</div>
-                          <div>방문자 : -</div>
+                        <div style={{ marginBottom: 18 }}>-</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10, fontSize: 12, color: TEXT_MUTED }}><div>-</div><div>방문자 : -</div></div>
+                      </div>
+                    ) : deviceHistory.map((h) => (
+                      <div key={`${d.device_id}-${h.service_id}`} style={{ width: '100%', background: INNER_CARD_BG, color: TEXT_PRIMARY, borderRadius: 12, padding: 14, fontSize: 14, border: `1px solid ${INPUT_BORDER}`, boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                          <div style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</div>
+                          <button onClick={() => handleOpenEditServiceModal(h)} style={{ padding: '6px 10px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>수정</button>
+                        </div>
+                        <div style={{ marginBottom: 18, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: TEXT_PRIMARY }}>{h.service_notes ?? '-'}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10, fontSize: 12, color: TEXT_MUTED }}>
+                          <div>{h.visit_date ?? '-'}</div>
+                          <div style={{ textAlign: 'right' }}>방문자 : {h.service_engineers && h.service_engineers.length > 0 ? h.service_engineers.map((se) => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ') : (h.visitor ?? '-')}</div>
                         </div>
                       </div>
-                    ) : (
-                      deviceHistory.map((h) => (
-                        <div
-                          key={`${d.device_id}-${h.service_id}`}
-                          style={{
-                            width: '100%',
-                            background: INNER_CARD_BG,
-                            color: TEXT_PRIMARY,
-                            borderRadius: 12,
-                            padding: 14,
-                            fontSize: 14,
-                            border: `1px solid ${INPUT_BORDER}`,
-                            boxSizing: 'border-box',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'flex-start',
-                              gap: 10,
-                              marginBottom: 10,
-                            }}
-                          >
-                            <div style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</div>
-
-                            <button
-                              onClick={() => handleOpenEditServiceModal(h)}
-                              style={{
-                                padding: '6px 10px',
-                                background: WHITE_BUTTON_BG,
-                                color: WHITE_BUTTON_TEXT,
-                                borderRadius: 8,
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: 700,
-                                fontSize: 12,
-                              }}
-                            >
-                              수정
-                            </button>
-                          </div>
-
-                          <div
-                            style={{
-                              marginBottom: 18,
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                              lineHeight: 1.5,
-                              color: TEXT_PRIMARY,
-                            }}
-                          >
-                            {h.service_notes ?? '-'}
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'flex-end',
-                              gap: 10,
-                              fontSize: 12,
-                              color: TEXT_MUTED,
-                            }}
-                          >
-                           <div>{h.visit_date ?? '-'}</div>
-                            <div style={{ textAlign: 'right' }}>
-                              방문자 : {h.service_engineers && h.service_engineers.length > 0
-                                ? h.service_engineers
-                                    .map((se) => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim())
-                                    .join(', ')
-                                : (h.visitor ?? '-')}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                    ))}
                   </div>
                 </div>
               )
             })}
-
-            <div
-              style={{
-                minWidth: 320,
-                maxWidth: 320,
-                minHeight: 520,
-                flex: '0 0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                alignSelf: 'flex-start',
-              }}
-            >
-              <button
-                onClick={handleOpenAddDeviceModal}
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: '50%',
-                  background: WHITE_BUTTON_BG,
-                  color: WHITE_BUTTON_TEXT,
-                  border: `1px solid ${INPUT_BORDER}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 40,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  flex: '0 0 auto',
-                }}
-              >
-                +
-              </button>
+            <div style={{ minWidth: 320, maxWidth: 320, minHeight: 520, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}>
+              <button onClick={handleOpenAddDeviceModal} style={{ width: 68, height: 68, borderRadius: '50%', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, border: `1px solid ${INPUT_BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, fontWeight: 700, cursor: 'pointer', flex: '0 0 auto' }}>+</button>
             </div>
           </div>
         </div>
 
-        {isEditCustomerModalOpen && (
-          <div
-            onClick={() => setIsEditCustomerModalOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 620,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                업체 정보 수정
+        {/* ── 거래 이력 모달 ── */}
+        {isQuoteHistoryModalOpen && (
+          <div onClick={() => setIsQuoteHistoryModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 780, maxHeight: '85vh', background: CARD_BG, borderRadius: 18, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}`, display: 'flex', flexDirection: 'column' }}>
+              
+              {/* 모달 헤더 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: TEXT_PRIMARY, marginBottom: 4 }}>📋 거래 이력</div>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY }}>{customer?.company_name}</div>
+                </div>
+                <button onClick={() => setIsQuoteHistoryModalOpen(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
 
+              {/* 요약 카드 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: '총 견적 발행액', value: `₩${numKR(totalQuoteAmt)}`, sub: `${quotes.length}건`, color: TEXT_PRIMARY },
+                  { label: '총 수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${quotes.filter(q => ['수주','매출완료'].includes(q.status)).length}건`, color: '#3b82f6' },
+                  { label: '누적 매출액', value: `₩${numKR(totalRevenueAmt)}`, sub: `${quotes.filter(q => q.status === '매출완료').length}건`, color: WHITE_BUTTON_BG },
+                ].map(({ label, value, sub, color }) => (
+                  <div key={label} style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', border: `1px solid ${INPUT_BORDER}`, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 견적 목록 */}
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {quotes.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: TEXT_MUTED, fontSize: 14 }}>견적 이력이 없습니다</div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: CARD_BG }}>
+                      <tr style={{ borderBottom: `2px solid ${INPUT_BORDER}` }}>
+                        {['견적번호', '날짜', '담당자', '내용', '금액', '상태'].map(h => (
+                          <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: TEXT_SECONDARY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quotes.map(q => (
+                        <tr key={q.quote_id} style={{ borderBottom: `1px solid ${INPUT_BORDER}` }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                          <td style={{ padding: '10px 10px', fontWeight: 700, color: WHITE_BUTTON_BG, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
+                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>{q.engineers?.name ?? '-'}</td>
+                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject ?? '-'}</td>
+                          <td style={{ padding: '10px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
+                          <td style={{ padding: '10px 10px' }}>
+                            <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: (STATUS_COLORS[q.status] || '#9ca3af') + '22', color: STATUS_COLORS[q.status] || TEXT_SECONDARY }}>
+                              {q.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 업체 수정 모달 */}
+        {isEditCustomerModalOpen && (
+          <div onClick={() => setIsEditCustomerModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>업체 정보 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input
-                  value={customerEditForm.company_name}
-                  onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, company_name: e.target.value }))}
-                  placeholder="업체명(company_name)"
-                  style={inputStyle}
-                />
-
-                <input
-                  value={customerEditForm.address}
-                  onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, address: e.target.value }))}
-                  placeholder="주소(address)"
-                  style={inputStyle}
-                />
-
-                <input
-                  value={customerEditForm.agency}
-                  onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, agency: e.target.value }))}
-                  placeholder="대리점(agency)"
-                  style={inputStyle}
-                />
-
-                <select
-                  value={customerEditForm.status}
-                  onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, status: e.target.value }))}
-                  style={inputStyle}
-                >
+                <input value={customerEditForm.company_name} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, company_name: e.target.value }))} placeholder="업체명(company_name)" style={inputStyle} />
+                <input value={customerEditForm.address} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, address: e.target.value }))} placeholder="주소(address)" style={inputStyle} />
+                <input value={customerEditForm.agency} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, agency: e.target.value }))} placeholder="대리점(agency)" style={inputStyle} />
+                <select value={customerEditForm.status} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, status: e.target.value }))} style={inputStyle}>
                   <option value="활성">상태: 활성</option>
                   <option value="잠재">상태: 잠재</option>
                   <option value="이탈">상태: 이탈</option>
                 </select>
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={handleDeleteCustomer}
-                  disabled={isDeletingCustomer}
-                  style={{
-                    padding: '10px 14px',
-                    background: DANGER_BG,
-                    color: '#fff',
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isDeletingCustomer ? 0.7 : 1,
-                  }}
-                >
-                  {isDeletingCustomer ? '삭제 중...' : '삭제'}
-                </button>
-
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
+                <button onClick={handleDeleteCustomer} disabled={isDeletingCustomer} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isDeletingCustomer ? 0.7 : 1 }}>{isDeletingCustomer ? '삭제 중...' : '삭제'}</button>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={() => setIsEditCustomerModalOpen(false)}
-                    style={{
-                      padding: '10px 14px',
-                      background: PANEL_BG,
-                      color: TEXT_PRIMARY,
-                      borderRadius: 10,
-                      border: `1px solid ${INPUT_BORDER}`,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    취소
-                  </button>
-
-                  <button
-                    onClick={handleUpdateCustomer}
-                    disabled={isSavingCustomerEdit}
-                    style={{
-                      padding: '10px 14px',
-                      background: WHITE_BUTTON_BG,
-                      color: WHITE_BUTTON_TEXT,
-                      borderRadius: 10,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      opacity: isSavingCustomerEdit ? 0.7 : 1,
-                    }}
-                  >
-                    {isSavingCustomerEdit ? '저장 중...' : '저장'}
-                  </button>
+                  <button onClick={() => setIsEditCustomerModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                  <button onClick={handleUpdateCustomer} disabled={isSavingCustomerEdit} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingCustomerEdit ? 0.7 : 1 }}>{isSavingCustomerEdit ? '저장 중...' : '저장'}</button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* 담당자 추가 모달 */}
         {isAddContactModalOpen && (
-          <div
-            onClick={() => setIsAddContactModalOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 560,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                담당자 추가
-              </div>
-
+          <div onClick={() => setIsAddContactModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>담당자 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input
-                  value={contactForm.name}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="이름(name)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactForm.department}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, department: e.target.value }))}
-                  placeholder="부서(department)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactForm.position}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))}
-                  placeholder="직책(position)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactForm.phone}
-                  onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="전화번호(phone)"
-                  style={inputStyle}
-                />
+                <input value={contactForm.name} onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름(name)" style={inputStyle} />
+                <input value={contactForm.department} onChange={(e) => setContactForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서(department)" style={inputStyle} />
+                <input value={contactForm.position} onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책(position)" style={inputStyle} />
+                <input value={contactForm.phone} onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호(phone)" style={inputStyle} />
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => setIsAddContactModalOpen(false)}
-                  style={{
-                    padding: '10px 14px',
-                    background: PANEL_BG,
-                    color: TEXT_PRIMARY,
-                    borderRadius: 10,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  취소
-                </button>
-
-                <button
-                  onClick={handleAddContact}
-                  disabled={isSavingContact}
-                  style={{
-                    padding: '10px 14px',
-                    background: WHITE_BUTTON_BG,
-                    color: WHITE_BUTTON_TEXT,
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingContact ? 0.7 : 1,
-                  }}
-                >
-                  {isSavingContact ? '저장 중...' : '저장'}
-                </button>
+                <button onClick={() => setIsAddContactModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                <button onClick={handleAddContact} disabled={isSavingContact} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingContact ? 0.7 : 1 }}>{isSavingContact ? '저장 중...' : '저장'}</button>
               </div>
             </div>
           </div>
         )}
 
+        {/* 담당자 수정 모달 */}
         {isEditContactModalOpen && (
-          <div
-            onClick={() => {
-              setIsEditContactModalOpen(false)
-              setSelectedContact(null)
-            }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 560,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                담당자 수정
-              </div>
-
+          <div onClick={() => { setIsEditContactModalOpen(false); setSelectedContact(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>담당자 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input
-                  value={contactEditForm.name}
-                  onChange={(e) => setContactEditForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="이름(name)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactEditForm.department}
-                  onChange={(e) => setContactEditForm((prev) => ({ ...prev, department: e.target.value }))}
-                  placeholder="부서(department)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactEditForm.position}
-                  onChange={(e) => setContactEditForm((prev) => ({ ...prev, position: e.target.value }))}
-                  placeholder="직책(position)"
-                  style={inputStyle}
-                />
-                <input
-                  value={contactEditForm.phone}
-                  onChange={(e) => setContactEditForm((prev) => ({ ...prev, phone: e.target.value }))}
-                  placeholder="전화번호(phone)"
-                  style={inputStyle}
-                />
+                <input value={contactEditForm.name} onChange={(e) => setContactEditForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름(name)" style={inputStyle} />
+                <input value={contactEditForm.department} onChange={(e) => setContactEditForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서(department)" style={inputStyle} />
+                <input value={contactEditForm.position} onChange={(e) => setContactEditForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책(position)" style={inputStyle} />
+                <input value={contactEditForm.phone} onChange={(e) => setContactEditForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호(phone)" style={inputStyle} />
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={handleDeleteContact}
-                  disabled={isSavingContactEdit}
-                  style={{
-                    padding: '10px 14px',
-                    background: DANGER_BG,
-                    color: '#fff',
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingContactEdit ? 0.7 : 1,
-                  }}
-                >
-                  삭제
-                </button>
-
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
+                <button onClick={handleDeleteContact} disabled={isSavingContactEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingContactEdit ? 0.7 : 1 }}>삭제</button>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={() => {
-                      setIsEditContactModalOpen(false)
-                      setSelectedContact(null)
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      background: PANEL_BG,
-                      color: TEXT_PRIMARY,
-                      borderRadius: 10,
-                      border: `1px solid ${INPUT_BORDER}`,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    취소
-                  </button>
-
-                  <button
-                    onClick={handleUpdateContact}
-                    disabled={isSavingContactEdit}
-                    style={{
-                      padding: '10px 14px',
-                      background: WHITE_BUTTON_BG,
-                      color: WHITE_BUTTON_TEXT,
-                      borderRadius: 10,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      opacity: isSavingContactEdit ? 0.7 : 1,
-                    }}
-                  >
-                    {isSavingContactEdit ? '저장 중...' : '저장'}
-                  </button>
+                  <button onClick={() => { setIsEditContactModalOpen(false); setSelectedContact(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                  <button onClick={handleUpdateContact} disabled={isSavingContactEdit} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingContactEdit ? 0.7 : 1 }}>{isSavingContactEdit ? '저장 중...' : '저장'}</button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* 장비 추가 모달 */}
         {isAddDeviceModalOpen && (
-          <div
-            onClick={() => setIsAddDeviceModalOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 760,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                장비 추가
-              </div>
-
+          <div onClick={() => setIsAddDeviceModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 760, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>장비 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <input
-                    value={deviceForm.device_name}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, device_name: e.target.value }))}
-                    placeholder="장비 라인업(ex. SURFCOM)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
-                  <input
-                    value={deviceForm.device_name2}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, device_name2: e.target.value }))}
-                    placeholder="장비 모델명(ex. 1600D)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
-                  <input
-                    value={deviceForm.option}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, option: e.target.value }))}
-                    placeholder="옵션(ex. -12)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
+                  <input value={deviceForm.device_name} onChange={(e) => setDeviceForm((prev) => ({ ...prev, device_name: e.target.value }))} placeholder="장비 라인업(ex. SURFCOM)" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceForm.device_name2} onChange={(e) => setDeviceForm((prev) => ({ ...prev, device_name2: e.target.value }))} placeholder="장비 모델명(ex. 1600D)" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceForm.option} onChange={(e) => setDeviceForm((prev) => ({ ...prev, option: e.target.value }))} placeholder="옵션(ex. -12)" style={{ ...inputStyle, fontSize: 12 }} />
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input
-                    value={deviceForm.serial_number}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, serial_number: e.target.value }))}
-                    placeholder="시리얼넘버(serial_number)"
-                    style={inputStyle}
-                  />
-                  <select
-                    value={deviceForm.program}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, program: e.target.value }))}
-                    style={inputStyle}
-                  >
+                  <input value={deviceForm.serial_number} onChange={(e) => setDeviceForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버(serial_number)" style={inputStyle} />
+                  <select value={deviceForm.program} onChange={(e) => setDeviceForm((prev) => ({ ...prev, program: e.target.value }))} style={inputStyle}>
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
                     <option value="CALYPSO">프로그램: CALYPSO</option>
                     <option value="없음">프로그램: 없음</option>
                   </select>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input
-                    type="date"
-                    value={deviceForm.install_date}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_date: e.target.value }))}
-                    style={dateInputStyle}
-                  />
-                  <select
-                    value={deviceForm.category}
-                    onChange={(e) => setDeviceForm((prev) => ({ ...prev, category: e.target.value }))}
-                    style={inputStyle}
-                  >
+                  <input type="date" value={deviceForm.install_date} onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_date: e.target.value }))} style={dateInputStyle} />
+                  <select value={deviceForm.category} onChange={(e) => setDeviceForm((prev) => ({ ...prev, category: e.target.value }))} style={inputStyle}>
                     <option value="20">구분: 20</option>
                     <option value="81">구분: 81</option>
                     <option value="83">구분: 83</option>
                     <option value="84">구분: 84</option>
                   </select>
                 </div>
-
-                <input
-                  value={deviceForm.install_engineer}
-                  onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_engineer: e.target.value }))}
-                  placeholder="설치 엔지니어(install_engineer)"
-                  style={inputStyle}
-                />
+                <input value={deviceForm.install_engineer} onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어(install_engineer)" style={inputStyle} />
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => setIsAddDeviceModalOpen(false)}
-                  style={{
-                    padding: '10px 14px',
-                    background: PANEL_BG,
-                    color: TEXT_PRIMARY,
-                    borderRadius: 10,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  취소
-                </button>
-
-                <button
-                  onClick={handleAddDevice}
-                  disabled={isSavingDevice}
-                  style={{
-                    padding: '10px 14px',
-                    background: WHITE_BUTTON_BG,
-                    color: WHITE_BUTTON_TEXT,
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingDevice ? 0.7 : 1,
-                  }}
-                >
-                  {isSavingDevice ? '저장 중...' : '저장'}
-                </button>
+                <button onClick={() => setIsAddDeviceModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                <button onClick={handleAddDevice} disabled={isSavingDevice} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDevice ? 0.7 : 1 }}>{isSavingDevice ? '저장 중...' : '저장'}</button>
               </div>
             </div>
           </div>
         )}
 
+        {/* 장비 수정 모달 */}
         {isEditDeviceModalOpen && (
-          <div
-            onClick={() => {
-              setIsEditDeviceModalOpen(false)
-              setSelectedDevice(null)
-            }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 760,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                장비 수정
-              </div>
-
+          <div onClick={() => { setIsEditDeviceModalOpen(false); setSelectedDevice(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 760, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>장비 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <input
-                    value={deviceEditForm.device_name}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name: e.target.value }))}
-                    placeholder="장비 라인업(ex. SURFCOM)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
-                  <input
-                    value={deviceEditForm.device_name2}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name2: e.target.value }))}
-                    placeholder="장비 모델명(ex. 1600D)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
-                  <input
-                    value={deviceEditForm.option}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, option: e.target.value }))}
-                    placeholder="옵션(ex. -12)"
-                    style={{ ...inputStyle, fontSize: 12 }}
-                  />
+                  <input value={deviceEditForm.device_name} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name: e.target.value }))} placeholder="장비 라인업(ex. SURFCOM)" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceEditForm.device_name2} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name2: e.target.value }))} placeholder="장비 모델명(ex. 1600D)" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceEditForm.option} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, option: e.target.value }))} placeholder="옵션(ex. -12)" style={{ ...inputStyle, fontSize: 12 }} />
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input
-                    value={deviceEditForm.serial_number}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, serial_number: e.target.value }))}
-                    placeholder="시리얼넘버(serial_number)"
-                    style={inputStyle}
-                  />
-                  <select
-                    value={deviceEditForm.program}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, program: e.target.value }))}
-                    style={inputStyle}
-                  >
+                  <input value={deviceEditForm.serial_number} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버(serial_number)" style={inputStyle} />
+                  <select value={deviceEditForm.program} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, program: e.target.value }))} style={inputStyle}>
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
                     <option value="CALYPSO">프로그램: CALYPSO</option>
                     <option value="없음">프로그램: 없음</option>
                   </select>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input
-                    type="date"
-                    value={deviceEditForm.install_date}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_date: e.target.value }))}
-                    style={dateInputStyle}
-                  />
-                  <select
-                    value={deviceEditForm.category}
-                    onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, category: e.target.value }))}
-                    style={inputStyle}
-                  >
+                  <input type="date" value={deviceEditForm.install_date} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_date: e.target.value }))} style={dateInputStyle} />
+                  <select value={deviceEditForm.category} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, category: e.target.value }))} style={inputStyle}>
                     <option value="20">구분: 20</option>
                     <option value="81">구분: 81</option>
                     <option value="83">구분: 83</option>
                     <option value="84">구분: 84</option>
                   </select>
                 </div>
-
-                <input
-                  value={deviceEditForm.install_engineer}
-                  onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_engineer: e.target.value }))}
-                  placeholder="설치 엔지니어(install_engineer)"
-                  style={inputStyle}
-                />
+                <input value={deviceEditForm.install_engineer} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어(install_engineer)" style={inputStyle} />
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={handleDeleteDevice}
-                  disabled={isSavingDeviceEdit}
-                  style={{
-                    padding: '10px 14px',
-                    background: DANGER_BG,
-                    color: '#fff',
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingDeviceEdit ? 0.7 : 1,
-                  }}
-                >
-                  삭제
-                </button>
-
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
+                <button onClick={handleDeleteDevice} disabled={isSavingDeviceEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDeviceEdit ? 0.7 : 1 }}>삭제</button>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={() => {
-                      setIsEditDeviceModalOpen(false)
-                      setSelectedDevice(null)
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      background: PANEL_BG,
-                      color: TEXT_PRIMARY,
-                      borderRadius: 10,
-                      border: `1px solid ${INPUT_BORDER}`,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    취소
-                  </button>
-
-                  <button
-                    onClick={handleUpdateDevice}
-                    disabled={isSavingDeviceEdit}
-                    style={{
-                      padding: '10px 14px',
-                      background: WHITE_BUTTON_BG,
-                      color: WHITE_BUTTON_TEXT,
-                      borderRadius: 10,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      opacity: isSavingDeviceEdit ? 0.7 : 1,
-                    }}
-                  >
-                    {isSavingDeviceEdit ? '저장 중...' : '저장'}
-                  </button>
+                  <button onClick={() => { setIsEditDeviceModalOpen(false); setSelectedDevice(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                  <button onClick={handleUpdateDevice} disabled={isSavingDeviceEdit} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDeviceEdit ? 0.7 : 1 }}>{isSavingDeviceEdit ? '저장 중...' : '저장'}</button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* 서비스 추가 모달 */}
         {isServiceModalOpen && (
-          <div
-            onClick={() => {
-              setIsServiceModalOpen(false)
-              setSelectedDeviceId(null)
-            }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 620,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>
-                서비스 기록 추가
-              </div>
-
+          <div onClick={() => { setIsServiceModalOpen(false); setSelectedDeviceId(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <textarea
-                  value={serviceForm.service_notes}
-                  onChange={(e) =>
-                    setServiceForm((prev) => ({
-                      ...prev,
-                      service_notes: e.target.value,
-                    }))
-                  }
-                  placeholder="서비스 내용"
-                  rows={8}
-                  style={textareaStyle}
-                />
-
-                {/* 서비스 유형 */}
-                <select
-                  value={serviceForm.service_type}
-                  onChange={(e) =>
-                    setServiceForm((prev) => ({
-                      ...prev,
-                      service_type: e.target.value,
-                    }))
-                  }
-                  style={inputStyle}
-                >
+                <textarea value={serviceForm.service_notes} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
+                <select value={serviceForm.service_type} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
                   <option value="신규SETUP">신규 SETUP</option>
                   <option value="A/S(유상)">A/S (유상)</option>
                   <option value="B/S(영업)">B/S (영업)</option>
                   <option value="이전SETUP">이전 SETUP</option>
                   <option value="유상교육">유상교육</option>
                 </select>
-
-                {/* 엔지니어 멀티선택 */}
-                <div style={{
-                  border: `1px solid ${INPUT_BORDER}`,
-                  borderRadius: 10,
-                  padding: 12,
-                  background: INPUT_BG,
-                }}>
-                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>
-                    방문 엔지니어 선택
-                  </div>
+                <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어 선택</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {engineers.map((eng) => {
                       const isSelected = selectedEngineerIds.includes(eng.engineer_id)
                       return (
-                        <button
-                          key={eng.engineer_id}
-                          onClick={() => {
-                            setSelectedEngineerIds((prev) =>
-                              isSelected
-                                ? prev.filter((id) => id !== eng.engineer_id)
-                                : [...prev, eng.engineer_id]
-                            )
-                          }}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: 20,
-                            border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`,
-                            background: isSelected ? '#234ea2' : INPUT_BG,
-                            color: isSelected ? '#ffffff' : TEXT_PRIMARY,
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
+                        <button key={eng.engineer_id} onClick={() => setSelectedEngineerIds((prev) => isSelected ? prev.filter((id) => id !== eng.engineer_id) : [...prev, eng.engineer_id])}
+                          style={{ padding: '8px 14px', borderRadius: 20, border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`, background: isSelected ? '#234ea2' : INPUT_BG, color: isSelected ? '#ffffff' : TEXT_PRIMARY, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                           {eng.name} {eng.position ? `(${eng.position})` : ''}
                         </button>
                       )
                     })}
                   </div>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <input
-                    type="date"
-                    value={serviceForm.visit_date}
-                    onChange={(e) =>
-                      setServiceForm((prev) => ({
-                        ...prev,
-                        visit_date: e.target.value,
-                      }))
-                    }
-                    style={dateInputStyle}
-                  />
-                  <input
-                    value={serviceForm.visitor}
-                    onChange={(e) =>
-                      setServiceForm((prev) => ({
-                        ...prev,
-                        visitor: e.target.value,
-                      }))
-                    }
-                    placeholder="비고 (선택)"
-                    style={inputStyle}
-                  />
+                  <input type="date" value={serviceForm.visit_date} onChange={(e) => setServiceForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
+                  <input value={serviceForm.visitor} onChange={(e) => setServiceForm((prev) => ({ ...prev, visitor: e.target.value }))} placeholder="비고 (선택)" style={inputStyle} />
                 </div>
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => {
-                    setIsServiceModalOpen(false)
-                    setSelectedDeviceId(null)
-                  }}
-                  style={{
-                    padding: '10px 14px',
-                    background: PANEL_BG,
-                    color: TEXT_PRIMARY,
-                    borderRadius: 10,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  취소
-                </button>
-
-                <button
-                  onClick={handleAddService}
-                  disabled={isSavingService}
-                  style={{
-                    padding: '10px 14px',
-                    background: WHITE_BUTTON_BG,
-                    color: WHITE_BUTTON_TEXT,
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingService ? 0.7 : 1,
-                  }}
-                >
-                  {isSavingService ? '저장 중...' : '저장'}
-                </button>
+                <button onClick={() => { setIsServiceModalOpen(false); setSelectedDeviceId(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                <button onClick={handleAddService} disabled={isSavingService} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingService ? 0.7 : 1 }}>{isSavingService ? '저장 중...' : '저장'}</button>
               </div>
             </div>
           </div>
         )}
 
+        {/* 서비스 수정 모달 */}
         {isEditServiceModalOpen && (
-          <div
-            onClick={() => {
-              setIsEditServiceModalOpen(false)
-              setSelectedService(null)
-            }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 620,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>
-                서비스 기록 수정
-              </div>
-
+          <div onClick={() => { setIsEditServiceModalOpen(false); setSelectedService(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <textarea
-                  value={serviceEditForm.service_notes}
-                  onChange={(e) =>
-                    setServiceEditForm((prev) => ({
-                      ...prev,
-                      service_notes: e.target.value,
-                    }))
-                  }
-                  placeholder="서비스 내용"
-                  rows={8}
-                  style={textareaStyle}
-                />
-
-                {/* 서비스 유형 */}
-                <select
-                  value={serviceEditForm.service_type}
-                  onChange={(e) =>
-                    setServiceEditForm((prev) => ({
-                      ...prev,
-                      service_type: e.target.value,
-                    }))
-                  }
-                  style={inputStyle}
-                >
+                <textarea value={serviceEditForm.service_notes} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
+                <select value={serviceEditForm.service_type} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
                   <option value="신규SETUP">신규 SETUP</option>
                   <option value="A/S(유상)">A/S (유상)</option>
                   <option value="B/S(영업)">B/S (영업)</option>
                   <option value="이전SETUP">이전 SETUP</option>
                   <option value="유상교육">유상교육</option>
                 </select>
-
-                {/* 엔지니어 멀티선택 */}
-                <div style={{
-                  border: `1px solid ${INPUT_BORDER}`,
-                  borderRadius: 10,
-                  padding: 12,
-                  background: INPUT_BG,
-                }}>
-                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>
-                    방문 엔지니어 선택
-                  </div>
+                <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어 선택</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {engineers.map((eng) => {
                       const isSelected = selectedEditEngineerIds.includes(eng.engineer_id)
                       return (
-                        <button
-                          key={eng.engineer_id}
-                          onClick={() => {
-                            setSelectedEditEngineerIds((prev) =>
-                              isSelected
-                                ? prev.filter((id) => id !== eng.engineer_id)
-                                : [...prev, eng.engineer_id]
-                            )
-                          }}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: 20,
-                            border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`,
-                            background: isSelected ? '#234ea2' : INPUT_BG,
-                            color: isSelected ? '#ffffff' : TEXT_PRIMARY,
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
+                        <button key={eng.engineer_id} onClick={() => setSelectedEditEngineerIds((prev) => isSelected ? prev.filter((id) => id !== eng.engineer_id) : [...prev, eng.engineer_id])}
+                          style={{ padding: '8px 14px', borderRadius: 20, border: `1px solid ${isSelected ? '#234ea2' : INPUT_BORDER}`, background: isSelected ? '#234ea2' : INPUT_BG, color: isSelected ? '#ffffff' : TEXT_PRIMARY, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                           {eng.name} {eng.position ? `(${eng.position})` : ''}
                         </button>
                       )
                     })}
                   </div>
                 </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <input
-                    type="date"
-                    value={serviceEditForm.visit_date}
-                    onChange={(e) =>
-                      setServiceEditForm((prev) => ({
-                        ...prev,
-                        visit_date: e.target.value,
-                      }))
-                    }
-                    style={dateInputStyle}
-                  />
-                  <input
-                    value={serviceEditForm.visitor}
-                    onChange={(e) =>
-                      setServiceEditForm((prev) => ({
-                        ...prev,
-                        visitor: e.target.value,
-                      }))
-                    }
-                    placeholder="비고 (선택)"
-                    style={inputStyle}
-                  />
+                  <input type="date" value={serviceEditForm.visit_date} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
+                  <input value={serviceEditForm.visitor} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, visitor: e.target.value }))} placeholder="비고 (선택)" style={inputStyle} />
                 </div>
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  marginTop: 20,
-                }}
-              >
-                <button
-                  onClick={handleDeleteService}
-                  disabled={isSavingServiceEdit}
-                  style={{
-                    padding: '10px 14px',
-                    background: DANGER_BG,
-                    color: '#fff',
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingServiceEdit ? 0.7 : 1,
-                  }}
-                >
-                  삭제
-                </button>
-
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
+                <button onClick={handleDeleteService} disabled={isSavingServiceEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingServiceEdit ? 0.7 : 1 }}>삭제</button>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={() => {
-                      setIsEditServiceModalOpen(false)
-                      setSelectedService(null)
-                    }}
-                    style={{
-                      padding: '10px 14px',
-                      background: PANEL_BG,
-                      color: TEXT_PRIMARY,
-                      borderRadius: 10,
-                      border: `1px solid ${INPUT_BORDER}`,
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    취소
-                  </button>
-
-                  <button
-                    onClick={handleUpdateService}
-                    disabled={isSavingServiceEdit}
-                    style={{
-                      padding: '10px 14px',
-                      background: WHITE_BUTTON_BG,
-                      color: WHITE_BUTTON_TEXT,
-                      borderRadius: 10,
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 700,
-                      opacity: isSavingServiceEdit ? 0.7 : 1,
-                    }}
-                  >
-                    {isSavingServiceEdit ? '저장 중...' : '저장'}
-                  </button>
+                  <button onClick={() => { setIsEditServiceModalOpen(false); setSelectedService(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                  <button onClick={handleUpdateService} disabled={isSavingServiceEdit} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingServiceEdit ? 0.7 : 1 }}>{isSavingServiceEdit ? '저장 중...' : '저장'}</button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* 장비 사진 모달 */}
         {isDeviceImageModalOpen && (
-          <div
-            onClick={() => {
-              setIsDeviceImageModalOpen(false)
-              setSelectedImageDevice(null)
-              setDeviceImageFile(null)
-            }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.65)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 20,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 520,
-                background: CARD_BG,
-                borderRadius: 18,
-                padding: 20,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                border: `1px solid ${INPUT_BORDER}`,
-              }}
-            >
-              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>
-                장비 사진 추가
-              </div>
-
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null
-                  setDeviceImageFile(file)
-                }}
-                style={inputStyle}
-              />
-
+          <div onClick={() => { setIsDeviceImageModalOpen(false); setSelectedImageDevice(null); setDeviceImageFile(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 520, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>장비 사진 추가</div>
+              <input type="file" accept="image/*" onChange={(e) => setDeviceImageFile(e.target.files?.[0] ?? null)} style={inputStyle} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => {
-                    setIsDeviceImageModalOpen(false)
-                    setSelectedImageDevice(null)
-                    setDeviceImageFile(null)
-                  }}
-                  style={{
-                    padding: '10px 14px',
-                    background: PANEL_BG,
-                    color: TEXT_PRIMARY,
-                    borderRadius: 10,
-                    border: `1px solid ${INPUT_BORDER}`,
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  취소
-                </button>
-
-                <button
-                  onClick={handleUploadDeviceImage}
-                  disabled={isSavingDeviceImage}
-                  style={{
-                    padding: '10px 14px',
-                    background: WHITE_BUTTON_BG,
-                    color: WHITE_BUTTON_TEXT,
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    opacity: isSavingDeviceImage ? 0.7 : 1,
-                  }}
-                >
-                  {isSavingDeviceImage ? '업로드 중...' : '저장'}
-                </button>
+                <button onClick={() => { setIsDeviceImageModalOpen(false); setSelectedImageDevice(null); setDeviceImageFile(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
+                <button onClick={handleUploadDeviceImage} disabled={isSavingDeviceImage} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDeviceImage ? 0.7 : 1 }}>{isSavingDeviceImage ? '업로드 중...' : '저장'}</button>
               </div>
             </div>
           </div>
         )}
+
       </main>
     </>
   )

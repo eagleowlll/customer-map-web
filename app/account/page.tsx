@@ -28,6 +28,7 @@ export default function AccountPage() {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [position, setPosition] = useState('')
+  const [initials, setInitials] = useState('')
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null)
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -67,6 +68,7 @@ export default function AccountPage() {
         setEngineer(engineerData)
         setName(engineerData.name ?? '')
         setPosition(engineerData.position ?? '')
+        setInitials(engineerData.initials ?? '')
         setProfileImageUrl(engineerData.profile_image_url ?? null)
       }
     }
@@ -108,10 +110,11 @@ export default function AccountPage() {
     const { error } = await supabase
       .from('engineers')
       .update({
-        name: name.trim(),
-        position: position.trim() || null,
-        profile_image_url: imageUrl,
-      })
+  name: name.trim(),
+  position: position.trim() || null,
+  initials: initials.trim().toUpperCase() || null,
+  profile_image_url: imageUrl,
+})
       .eq('engineer_id', engineer.engineer_id)
 
     setIsSavingProfile(false)
@@ -236,26 +239,36 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* 이름 */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 6 }}>이름</div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="이름"
-              style={inputStyle}
-            />
-          </div>
-
-          {/* 직책 */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 6 }}>직책</div>
-            <input
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              placeholder="직책 (예: 사원, 대리)"
-              style={inputStyle}
-            />
+         {/* 이름 / 이니셜 / 직책 */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 6 }}>이름</div>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="이름"
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 6 }}>이니셜</div>
+              <input
+                value={initials}
+                onChange={(e) => setInitials(e.target.value.toUpperCase())}
+                placeholder="KJW"
+                maxLength={5}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 6 }}>직책</div>
+              <input
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                placeholder="사원, 대리"
+                style={inputStyle}
+              />
+            </div>
           </div>
 
           {/* 이메일 (수정 불가) */}

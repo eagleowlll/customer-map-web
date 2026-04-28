@@ -63,8 +63,8 @@ export default function MapView({
   const createOverlay = (c: Customer, map: any, kakao: any) => {
     const devices = deviceMap.get(Number(c.customer_id)) || []
     const deviceLines = getDeviceLines(devices)
-    const navUrl = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
-
+    const navUrlUlsan = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
+    const navUrlDongtan = `https://map.naver.com/p/directions/127.108180,37.217719,${encodeURIComponent('경기 화성시 동탄구 동탄대로24길 31-8')}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
     const overlayContent = document.createElement('div')
     overlayContent.addEventListener('click', (e) => e.stopPropagation())
     overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
@@ -102,9 +102,13 @@ export default function MapView({
              style="flex:1;text-align:center;padding:9px 10px;background:${WHITE_BUTTON_BG};color:${WHITE_BUTTON_TEXT};border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;">
             상세보기
           </a>
-          <a href="${navUrl}" target="_blank" rel="noopener noreferrer"
+          <a href="${navUrlUlsan}" target="_blank" rel="noopener noreferrer"
              style="flex:1;text-align:center;padding:9px 10px;background:#ffffff;color:#111111;border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;border:1px solid ${INPUT_BORDER};">
-            네이버 길 안내
+            울산 출발
+          </a>
+          <a href="${navUrlDongtan}" target="_blank" rel="noopener noreferrer"
+             style="flex:1;text-align:center;padding:9px 10px;background:#ffffff;color:#111111;border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;border:1px solid ${INPUT_BORDER};">
+            동탄 출발
           </a>
         </div>
       </div>
