@@ -13,11 +13,13 @@ const BLUE_BG = '#234ea2'
 const BLUE_TEXT = '#ffffff'
 
 const SERVICE_TYPES = ['신규SETUP', 'A/S(유상)', 'B/S(영업)', '이전SETUP', '유상교육']
+const TEAM_OPTIONS = ['전체', '1팀', '2팀', '3팀', '4팀']
 
 type Engineer = {
   engineer_id: number
   name: string
   position: string | null
+  teams: string | null
 }
 
 type ActivityRow = {
@@ -54,6 +56,7 @@ export default function ActivityPage() {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [loading, setLoading] = useState(false)
   const [activeBtn, setActiveBtn] = useState<string>('당월')
+  const [selectedTeam, setSelectedTeam] = useState<string>('전체')
 
   // 상세 모달
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null)
@@ -69,7 +72,6 @@ export default function ActivityPage() {
       .select('*')
       .order('engineer_id', { ascending: true })
 
-    // service_engineers → service_history join
     const { data: seData } = await supabase
       .from('service_engineers')
       .select('engineer_id, service_id')
@@ -85,7 +87,14 @@ export default function ActivityPage() {
       shMap[sh.service_id] = { service_type: sh.service_type, visit_date: sh.visit_date }
     })
 
-    const result: ActivityRow[] = (engineers ?? []).map((eng) => {
+   const positionOrder: Record<string, number> = { '수석': 0, '책임': 1, '선임': 2, '사원': 3 }
+const sortedEngineers = (engineers ?? []).sort((a, b) => {
+  const aOrder = positionOrder[a.position ?? ''] ?? 99
+  const bOrder = positionOrder[b.position ?? ''] ?? 99
+  return aOrder - bOrder
+})
+
+const result: ActivityRow[] = sortedEngineers.map((eng) => {
       const counts: Record<string, number> = {}
       SERVICE_TYPES.forEach((t) => { counts[t] = 0 })
 
@@ -112,7 +121,6 @@ export default function ActivityPage() {
     setDetails([])
     setFilterType('전체')
 
-    // 해당 엔지니어의 service_id 목록
     const { data: seData } = await supabase
       .from('service_engineers')
       .select('service_id')
@@ -125,7 +133,6 @@ export default function ActivityPage() {
       return
     }
 
-    // service_history + customers join
     const { data: shData } = await supabase
       .from('service_history')
       .select('service_id, visit_date, service_type, service_notes, customer_id, customers(company_name)')
@@ -171,6 +178,11 @@ export default function ActivityPage() {
     fetchActivity(startDate, endDate)
   }
 
+  // 팀 필터 적용
+  const filteredRows = selectedTeam === '전체'
+    ? rows
+    : rows.filter(row => row.engineer.teams === selectedTeam.replace('팀', ''))
+
   const filteredDetails = filterType === '전체'
     ? details
     : details.filter(d => d.service_type === filterType)
@@ -179,13 +191,12 @@ export default function ActivityPage() {
     <main style={{ padding: 24, background: PAGE_BG, minHeight: '100vh' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-        {/* 날짜 선택 카드 */}
+        {/* 날짜 선택 + 팀 필터 카드 */}
         <div style={{
           background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`,
           borderRadius: 16, padding: '20px 24px', marginBottom: 24,
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
-          {/* 날짜 직접 입력 먼저 */}
           <input type="date" value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setActiveBtn('') }}
             style={{ padding: '8px 12px', border: `1px solid ${INPUT_BORDER}`, borderRadius: 8, background: PAGE_BG, color: TEXT_PRIMARY, fontSize: 14, outline: 'none' }} />
@@ -200,7 +211,6 @@ export default function ActivityPage() {
 
           <div style={{ width: 1, height: 32, background: INPUT_BORDER, margin: '0 4px' }} />
 
-          {/* 당월 / 전월 버튼 */}
           {[{ label: '당월', fn: handleThisMonth }, { label: '전월', fn: handleLastMonth }].map(({ label, fn }) => (
             <button key={label} onClick={fn}
               style={{
@@ -213,14 +223,30 @@ export default function ActivityPage() {
               {label}
             </button>
           ))}
-        </div>
+
+
+          {/* 팀 필터 버튼 */}
+      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+  {TEAM_OPTIONS.map(team => (
+    <button key={team} onClick={() => setSelectedTeam(team)}
+      style={{
+        padding: '8px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+        border: `1px solid ${selectedTeam === team ? BLUE_BG : INPUT_BORDER}`,
+        background: selectedTeam === team ? BLUE_BG : PAGE_BG,
+        color: selectedTeam === team ? BLUE_TEXT : TEXT_PRIMARY,
+      }}>
+      {team}
+    </button>
+  ))}
+</div>
+</div>
 
         {/* 카드 그리드 */}
         {loading ? (
           <p style={{ color: TEXT_SECONDARY }}>불러오는 중...</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-            {rows.map((row) => (
+            {filteredRows.map((row) => (
               <div key={row.engineer.engineer_id}
                 onClick={() => fetchDetails(row.engineer)}
                 style={{
@@ -232,11 +258,19 @@ export default function ActivityPage() {
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(35,78,162,0.15)')}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)')}
               >
-            <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}` }}>
+               <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
     <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
     <div style={{ fontSize: 13, color: TEXT_MUTED }}>{row.engineer.position ?? ''}</div>
   </div>
+  {row.engineer.teams && (
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: '2px 8px',
+      borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, flexShrink: 0,
+    }}>
+      {row.engineer.teams}팀
+    </span>
+  )}
 </div>
                 <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
                   {SERVICE_TYPES.map((type) => (
@@ -265,17 +299,22 @@ export default function ActivityPage() {
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 680, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
 
-            {/* 모달 헤더 */}
             <div style={{ padding: '20px 24px', borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: TEXT_PRIMARY }}>{selectedEngineer.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: TEXT_PRIMARY }}>{selectedEngineer.name}</div>
+                  {selectedEngineer.teams && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#e0e7ff', color: BLUE_BG }}>
+                      {selectedEngineer.teams}팀
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 13, color: TEXT_MUTED }}>{selectedEngineer.position} · {startDate} ~ {endDate}</div>
               </div>
               <button onClick={() => setSelectedEngineer(null)}
                 style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: TEXT_MUTED }}>✕</button>
             </div>
 
-            {/* 서비스 타입 필터 */}
             <div style={{ padding: '12px 24px', borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {['전체', ...SERVICE_TYPES].map(type => (
                 <button key={type} onClick={() => setFilterType(type)}
@@ -290,7 +329,6 @@ export default function ActivityPage() {
               ))}
             </div>
 
-            {/* 상세 목록 */}
             <div style={{ overflowY: 'auto', flex: 1, padding: '8px 24px 24px' }}>
               {detailLoading ? (
                 <p style={{ color: TEXT_MUTED, padding: '20px 0' }}>불러오는 중...</p>

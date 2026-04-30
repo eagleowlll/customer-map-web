@@ -24,6 +24,21 @@ type Quote = {
   customers?: { company_name: string } | null
 }
 
+type Engineer = {
+  engineer_id: number
+  name: string
+  position: string | null
+  teams: string | null
+}
+
+type SalesTarget = {
+  target_id: number
+  engineer_id: number | null
+  year: number
+  quarter: number | null
+  target_amount: number
+}
+
 const numKR = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,18 +49,32 @@ const STATUS_COLORS: Record<string, string> = {
   '보류': '#9ca3af',
 }
 
+const POSITION_ORDER: Record<string, number> = {
+  '총괄': 0, '관리자': 1, '수석': 2, '책임': 3, '선임': 4, '사원': 5,
+}
+
 export default function AdminPage() {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [authorized, setAuthorized] = useState(false)
 
-  // 견적서 삭제 모달
+  // 견적서 삭제
   const [showQuoteModal, setShowQuoteModal] = useState(false)
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [deleting, setDeleting] = useState<number | null>(null)
+
+  // 목표 금액 관리
+  const [showTargetModal, setShowTargetModal] = useState(false)
+  const [engineers, setEngineers] = useState<Engineer[]>([])
+  const [targets, setTargets] = useState<SalesTarget[]>([])
+  const [targetLoading, setTargetLoading] = useState(false)
+  const thisYear = new Date().getFullYear()
+  const [targetYear, setTargetYear] = useState(thisYear)
+  const [editingTarget, setEditingTarget] = useState<{ engineerId: number | null; amount: string } | null>(null)
+  const [savingTarget, setSavingTarget] = useState(false)
 
   useEffect(() => {
     const check = async () => {
@@ -60,6 +89,7 @@ export default function AdminPage() {
     check()
   }, [])
 
+  // 견적서 목록
   const fetchQuotes = async (q?: string) => {
     setQuoteLoading(true)
     let query = supabase
@@ -67,11 +97,9 @@ export default function AdminPage() {
       .select('*, engineers(name), customers(company_name)')
       .order('quote_date', { ascending: false })
       .limit(50)
-
     if (q && q.trim()) {
       query = query.or(`quote_number.ilike.%${q}%,subject.ilike.%${q}%`)
     }
-
     const { data } = await query
     setQuotes((data as Quote[]) || [])
     setQuoteLoading(false)
@@ -93,6 +121,67 @@ export default function AdminPage() {
     fetchQuotes(searchQuery)
   }
 
+  // 목표 금액 관리
+  const fetchTargetData = async () => {
+    setTargetLoading(true)
+    const [{ data: eData }, { data: tData }] = await Promise.all([
+      supabase.from('engineers').select('engineer_id, name, position, teams').order('engineer_id'),
+      supabase.from('sales_targets').select('*').eq('year', targetYear).is('quarter', null),
+    ])
+    const sorted = (eData || []).sort((a: Engineer, b: Engineer) =>
+      (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99)
+    )
+    setEngineers(sorted)
+    setTargets(tData || [])
+    setTargetLoading(false)
+  }
+
+  const handleOpenTargetModal = () => {
+    setShowTargetModal(true)
+    setEditingTarget(null)
+    fetchTargetData()
+  }
+
+  useEffect(() => {
+    if (showTargetModal) fetchTargetData()
+  }, [targetYear])
+
+  const getTarget = (engineerId: number | null) =>
+    targets.find(t => t.engineer_id === engineerId) ?? null
+
+  const handleSaveTarget = async () => {
+    if (!editingTarget) return
+    if (!editingTarget.amount.trim()) {
+      // 금액 비어있으면 삭제
+      const existing = getTarget(editingTarget.engineerId)
+      if (existing) {
+        await supabase.from('sales_targets').delete().eq('target_id', existing.target_id)
+      }
+      setEditingTarget(null)
+      fetchTargetData()
+      return
+    }
+
+    const amount = Number(editingTarget.amount.replace(/,/g, ''))
+    if (isNaN(amount) || amount < 0) { alert('올바른 금액을 입력해주세요.'); return }
+
+    setSavingTarget(true)
+    const existing = getTarget(editingTarget.engineerId)
+    if (existing) {
+      await supabase.from('sales_targets').update({ target_amount: amount }).eq('target_id', existing.target_id)
+    } else {
+      await supabase.from('sales_targets').insert({
+        engineer_id: editingTarget.engineerId,
+        year: targetYear,
+        quarter: null,
+        target_amount: amount,
+      })
+    }
+    setSavingTarget(false)
+    setEditingTarget(null)
+    fetchTargetData()
+  }
+
   const inp: React.CSSProperties = {
     padding: '8px 12px', border: `1px solid ${BORDER}`, borderRadius: 8,
     fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box',
@@ -105,6 +194,26 @@ export default function AdminPage() {
   )
 
   if (!authorized) return null
+
+  // 팀별 그룹핑
+  const teamGroups = engineers.reduce((acc, eng) => {
+    const team = eng.teams ?? '미배정'
+    if (!acc[team]) acc[team] = []
+    acc[team].push(eng)
+    return acc
+  }, {} as Record<string, Engineer[]>)
+
+  const teamOrder = Object.keys(teamGroups).sort((a, b) => {
+    if (a === '미배정') return 1
+    if (b === '미배정') return -1
+    return a.localeCompare(b)
+  })
+
+  // 팀별 목표 합계
+  const getTeamTotal = (teamEngineers: Engineer[]) =>
+    teamEngineers.reduce((s, e) => s + (getTarget(e.engineer_id)?.target_amount || 0), 0)
+
+  const totalAllTarget = engineers.reduce((s, e) => s + (getTarget(e.engineer_id)?.target_amount || 0), 0)
 
   return (
     <div style={{ background: PAGE_BG, minHeight: '100vh', padding: 24, fontFamily: 'Malgun Gothic, sans-serif' }}>
@@ -125,7 +234,7 @@ export default function AdminPage() {
               연간 목표 금액을 개인별 / 팀별로 설정하고 수정합니다.
             </div>
             <button style={{ width: '100%', padding: '10px', background: BLUE, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              onClick={() => alert('준비 중입니다.')}>
+              onClick={handleOpenTargetModal}>
               관리하기
             </button>
           </div>
@@ -185,6 +294,114 @@ export default function AdminPage() {
         </div>
       </div>
 
+      {/* 목표 금액 관리 모달 */}
+      {showTargetModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: CARD_BG, borderRadius: 18, padding: 24, width: '100%', maxWidth: 680, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+
+            {/* 헤더 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: TEXT }}>🎯 목표 금액 관리</div>
+              <button onClick={() => setShowTargetModal(false)}
+                style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            </div>
+
+            {/* 연도 선택 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <span style={{ fontSize: 13, color: GRAY, fontWeight: 600 }}>연도</span>
+              <select value={targetYear} onChange={e => setTargetYear(Number(e.target.value))} style={{ ...inp, width: 100 }}>
+                {[thisYear - 1, thisYear, thisYear + 1].map(y => <option key={y} value={y}>{y}년</option>)}
+              </select>
+              <span style={{ fontSize: 12, color: GRAY }}>연간 목표 기준 (월/분기는 자동 계산)</span>
+            </div>
+
+            {/* 전체 합계 */}
+            <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px', marginBottom: 16, border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: BLUE }}>계측부 전체 목표</span>
+              <span style={{ fontSize: 18, fontWeight: 800, color: BLUE }}>₩{numKR(totalAllTarget)}</span>
+            </div>
+
+            {/* 팀별 목록 */}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {targetLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: GRAY }}>불러오는 중...</div>
+              ) : (
+                teamOrder.map(team => (
+                  <div key={team} style={{ marginBottom: 20 }}>
+                    {/* 팀 헤더 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, padding: '6px 0', borderBottom: `2px solid ${BORDER}` }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>{team === '미배정' ? '미배정' : `${team}팀`}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: GRAY }}>소계 ₩{numKR(getTeamTotal(teamGroups[team]))}</span>
+                    </div>
+
+                    {/* 팀원 목록 */}
+                    {teamGroups[team].map(eng => {
+                      const target = getTarget(eng.engineer_id)
+                      const isEditing = editingTarget?.engineerId === eng.engineer_id
+
+                      return (
+                        <div key={eng.engineer_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: `1px solid #f3f4f6` }}>
+                          {/* 이름/직책 */}
+                          <div style={{ width: 120, flexShrink: 0 }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{eng.name}</span>
+                            <span style={{ fontSize: 11, color: GRAY, marginLeft: 6 }}>{eng.position}</span>
+                          </div>
+
+                          {/* 현재 목표 or 입력창 */}
+                          {isEditing ? (
+                            <div style={{ flex: 1, display: 'flex', gap: 6 }}>
+                              <input
+                                type="number"
+                                value={editingTarget.amount}
+                                onChange={e => setEditingTarget(prev => prev ? { ...prev, amount: e.target.value } : null)}
+                                onKeyDown={e => e.key === 'Enter' && handleSaveTarget()}
+                                placeholder="금액 입력 (비우면 삭제)"
+                                style={{ ...inp, flex: 1, fontSize: 13 }}
+                                autoFocus
+                              />
+                              <button onClick={handleSaveTarget} disabled={savingTarget}
+                                style={{ padding: '6px 14px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: savingTarget ? 0.7 : 1 }}>
+                                {savingTarget ? '...' : '저장'}
+                              </button>
+                              <button onClick={() => setEditingTarget(null)}
+                                style={{ padding: '6px 10px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                                취소
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ flex: 1 }}>
+                                {target ? (
+                                  <div>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>₩{numKR(target.target_amount)}</span>
+                                    <span style={{ fontSize: 11, color: GRAY, marginLeft: 8 }}>월 ₩{numKR(Math.round(target.target_amount / 12))}</span>
+                                  </div>
+                                ) : (
+                                  <span style={{ fontSize: 13, color: '#d1d5db' }}>미설정</span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => setEditingTarget({ engineerId: eng.engineer_id, amount: target ? String(target.target_amount) : '' })}
+                                style={{ padding: '5px 12px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
+                                {target ? '수정' : '설정'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 12, color: GRAY }}>
+              * 금액을 비운 채 저장하면 해당 목표가 삭제됩니다
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 견적서 삭제 모달 */}
       {showQuoteModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
@@ -197,13 +414,10 @@ export default function AdminPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchQuotes(searchQuery)}
                 placeholder="견적번호 또는 견적 내용으로 검색"
-                style={{ ...inp, flex: 1 }}
-              />
+                style={{ ...inp, flex: 1 }} />
               <button onClick={() => fetchQuotes(searchQuery)}
                 style={{ padding: '8px 16px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                 검색
@@ -251,10 +465,7 @@ export default function AdminPage() {
                 </table>
               )}
             </div>
-
-            <div style={{ marginTop: 12, fontSize: 12, color: GRAY }}>
-              * 최근 50건 표시 / 검색으로 더 찾을 수 있습니다
-            </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: GRAY }}>* 최근 50건 표시 / 검색으로 더 찾을 수 있습니다</div>
           </div>
         </div>
       )}
