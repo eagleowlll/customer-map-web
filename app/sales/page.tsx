@@ -32,7 +32,7 @@ type Quote = {
   customer_id: number | null
   engineers?: { name: string; position: string | null }
   customers?: { company_name: string } | null
-  quote_items?: { product_name: string | null }[]
+  quote_items?: { price_list_id: string | null }[]
 }
 
 type Engineer = {
@@ -348,7 +348,7 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: CARD_BG, borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', position: 'relative' }}>
+      <div style={{ background: CARD_BG, borderRadius: 18, width: '100%',minWidth:1000, maxWidth: 1200, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', position: 'relative' }}>
 
         {/* 모달 헤더 */}
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${BORDER}` }}>
@@ -426,7 +426,7 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
                       <td style={{ padding: '10px 8px', color: GRAY, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
                     <td style={{ padding: '10px 8px', color: GRAY, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {q.quote_items && q.quote_items.length > 0
-                        ? q.quote_items.map(i => i.product_name).filter(Boolean).join(', ')
+                        ? q.quote_items.map(i => i.price_list_id).filter(Boolean).join(', ')
                         : '-'}
                     </td>
                     <td style={{ padding: '10px 8px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
@@ -548,7 +548,7 @@ export default function SalesPage() {
     setLoading(true)
     const [{ data: qData }, { data: eData }, { data: tData }] = await Promise.all([
       supabase.from('quotes')
-        .select('*, engineers(name, position), customers(company_name), quote_items(product_name)')
+        .select('*, engineers(name, position), customers(company_name), quote_items(price_list_id)')
         .order('quote_date', { ascending: false }),
       supabase.from('engineers').select('engineer_id, name, position, teams').order('engineer_id'),
       supabase.from('sales_targets').select('*'),

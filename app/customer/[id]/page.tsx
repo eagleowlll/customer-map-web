@@ -192,6 +192,7 @@ export default function CustomerDetailPage() {
       // ── quote_items 포함 조회 ──
       supabase.from('quotes').select('*, engineers(name, position), quote_items(product_name)').eq('customer_id', customerId).order('quote_date', { ascending: false }),
     ])
+    
     setCustomer(customerData ?? null)
     setDevices(devicesData ?? [])
     setContacts(contactsData ?? [])
