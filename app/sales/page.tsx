@@ -17,6 +17,9 @@ type Quote = {
   total_supply: number
   total_tax: number
   total_amount: number
+  total_cost: number | null
+  total_profit: number | null
+  profit_rate: number | null
   status: string
   order_date: string | null
   revenue_date: string | null
@@ -86,15 +89,12 @@ function getCurrentFY(): number {
   return now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1
 }
 
-// ── 남은 기간 계산 ────────────────────────────────────────────────────────────
 function getRemainingLabel(mode: string, fy: number, month: number): string | null {
   const now = new Date()
   const nowFY = getCurrentFY()
-
   if (mode === 'year') {
     if (fy !== nowFY) return null
-    // FY 종료: 다음해 3월말
-    const fyEnd = new Date(fy + 1, 2, 31) // 3월 31일
+    const fyEnd = new Date(fy + 1, 2, 31)
     const diffMs = fyEnd.getTime() - now.getTime()
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
     const diffMonths = Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30))
@@ -102,26 +102,21 @@ function getRemainingLabel(mode: string, fy: number, month: number): string | nu
     if (diffMonths <= 1) return `잔여 ${diffDays}일`
     return `잔여 ${diffMonths}개월`
   }
-
   if (mode === 'month') {
     const nowMonth = now.getMonth() + 1
     const nowYear = now.getFullYear()
-    // 현재 달인지 확인
     const targetYear = month < 4 ? fy + 1 : fy
     if (targetYear === nowYear && month === nowMonth) {
       const lastDay = new Date(nowYear, nowMonth, 0).getDate()
-      const remaining = lastDay - now.getDate()
-      return `잔여 ${remaining}일`
+      return `잔여 ${lastDay - now.getDate()}일`
     }
     return null
   }
-
-  if (mode === 'q1' || mode === 'q2' || mode === 'q3' || mode === 'q4') {
+  if (['q1', 'q2', 'q3', 'q4'].includes(mode)) {
     if (fy !== nowFY) return null
     const nowFQ = getFiscalQuarter(now.toISOString())
     const modeQ = parseInt(mode.replace('q', ''))
     if (nowFQ !== modeQ) return null
-    // 분기 종료월
     const qEndMonth = modeQ === 1 ? 6 : modeQ === 2 ? 9 : modeQ === 3 ? 12 : 3
     const qEndYear = modeQ === 4 ? fy + 1 : fy
     const qEnd = new Date(qEndYear, qEndMonth - 1 + 1, 0)
@@ -129,7 +124,6 @@ function getRemainingLabel(mode: string, fy: number, month: number): string | nu
     if (diffDays <= 0) return '기간 종료'
     return `잔여 ${diffDays}일`
   }
-
   return null
 }
 
@@ -158,25 +152,22 @@ function AnimatedGauge({ pct, color, height = 12, delay = 0 }: { pct: number; co
 }
 
 // ── 분기별 막대 그래프 ────────────────────────────────────────────────────────
-function QuarterlyChart({ quotes, fy, engineers, targets }: { quotes: Quote[]; fy: number; engineers: Engineer[]; targets: SalesTarget[] }) {
+function QuarterlyChart({ quotes, fy }: { quotes: Quote[]; fy: number }) {
   const quarters = [
-    { key: 'q1', label: 'Q1', desc: '4~6월', months: [4, 5, 6] },
-    { key: 'q2', label: 'Q2', desc: '7~9월', months: [7, 8, 9] },
-    { key: 'q3', label: 'Q3', desc: '10~12월', months: [10, 11, 12] },
-    { key: 'q4', label: 'Q4', desc: '1~3월', months: [1, 2, 3] },
+    { key: 'q1', label: 'Q1', desc: '4~6월', q: 1 },
+    { key: 'q2', label: 'Q2', desc: '7~9월', q: 2 },
+    { key: 'q3', label: 'Q3', desc: '10~12월', q: 3 },
+    { key: 'q4', label: 'Q4', desc: '1~3월', q: 4 },
   ]
 
-  const data = quarters.map(q => {
-    const qQuotes = quotes.filter(quote => {
-      const docFY = getFiscalYear(quote.quote_date)
-      if (docFY !== fy) return false
-      return getFiscalQuarter(quote.quote_date) === parseInt(q.key.replace('q', ''))
-    })
+  const data = quarters.map(qd => {
+    const qQuotes = quotes.filter(q => getFiscalYear(q.quote_date) === fy && getFiscalQuarter(q.quote_date) === qd.q)
+    const revenueQuotes = qQuotes.filter(q => q.status === '매출완료')
     return {
-      ...q,
-      quoteAmt: qQuotes.reduce((s, qt) => s + (qt.total_supply || 0), 0),
-      revenueAmt: qQuotes.filter(qt => qt.status === '매출완료').reduce((s, qt) => s + (qt.total_supply || 0), 0),
-      orderAmt: qQuotes.filter(qt => ['수주', '매출완료'].includes(qt.status)).reduce((s, qt) => s + (qt.total_supply || 0), 0),
+      ...qd,
+      quoteAmt: qQuotes.reduce((s, q) => s + (q.total_supply || 0), 0),
+      revenueAmt: revenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0),
+      profitAmt: revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0),
     }
   })
 
@@ -186,24 +177,26 @@ function QuarterlyChart({ quotes, fy, engineers, targets }: { quotes: Quote[]; f
 
   return (
     <div style={{ background: CARD_BG, borderRadius: 14, padding: '20px 22px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 20 }}>📈 분기별 실적 추이 <span style={{ fontSize: 12, color: GRAY, fontWeight: 400 }}>FY{fy}</span></div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 20 }}>
+        📈 분기별 실적 추이
+        <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 8 }}>FY{fy}</span>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, alignItems: 'end' }}>
         {data.map((d, i) => {
-          const isCurrent = fy === nowFY && i + 1 === nowFQ
-          const barHeight = maxAmt > 0 ? Math.max(4, (d.quoteAmt / maxAmt) * 160) : 4
-          const revenueHeight = maxAmt > 0 ? Math.max(0, (d.revenueAmt / maxAmt) * 160) : 0
+          const isCurrent = fy === nowFY && d.q === nowFQ
+          const barHeight = Math.max(4, (d.quoteAmt / maxAmt) * 160)
+          const revenueHeight = Math.max(0, (d.revenueAmt / maxAmt) * 160)
+          const profitRate = d.revenueAmt > 0 ? (d.profitAmt / d.revenueAmt * 100) : null
           return (
             <div key={d.key} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 11, color: GRAY, marginBottom: 6 }}>
-                ₩{numKR(d.revenueAmt)}
-              </div>
+              <div style={{ fontSize: 11, color: GRAY, marginBottom: 2 }}>₩{numKR(d.revenueAmt)}</div>
+              {profitRate !== null && (
+                <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700, marginBottom: 4 }}>
+                  순이익 {profitRate.toFixed(1)}%
+                </div>
+              )}
               <div style={{ position: 'relative', height: 160, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                {/* 견적 발행 바 (배경) */}
-                <div style={{
-                  width: 44, height: barHeight, background: isCurrent ? '#bfdbfe' : '#e5e7eb',
-                  borderRadius: '6px 6px 0 0', position: 'absolute', bottom: 0,
-                }} />
-                {/* 매출완료 바 (전경) */}
+                <div style={{ width: 44, height: barHeight, background: isCurrent ? '#bfdbfe' : '#e5e7eb', borderRadius: '6px 6px 0 0', position: 'absolute', bottom: 0 }} />
                 <BarAnimate height={revenueHeight} color={isCurrent ? BLUE : '#94a3b8'} />
               </div>
               <div style={{ marginTop: 8 }}>
@@ -217,12 +210,13 @@ function QuarterlyChart({ quotes, fy, engineers, targets }: { quotes: Quote[]; f
       </div>
       <div style={{ display: 'flex', gap: 16, marginTop: 16, fontSize: 11, color: GRAY }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: 12, height: 12, background: '#e5e7eb', borderRadius: 2 }} />
-          견적 발행액
+          <div style={{ width: 12, height: 12, background: '#e5e7eb', borderRadius: 2 }} />견적 발행액
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: 12, height: 12, background: '#94a3b8', borderRadius: 2 }} />
-          매출 완료액
+          <div style={{ width: 12, height: 12, background: '#94a3b8', borderRadius: 2 }} />매출 완료액
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 12, height: 12, background: '#16a34a', borderRadius: 2 }} />순이익률 (매출완료 기준)
         </div>
       </div>
     </div>
@@ -245,9 +239,12 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
   const tc = TEAM_COLORS[teamId] || { bg: '#f3f4f6', text: BLUE, bar: BLUE }
   const teamEngIds = engineers.filter(e => e.teams === teamId).map(e => e.engineer_id)
   const teamQuotes = filteredQuotes.filter(q => teamEngIds.includes(q.engineer_id))
+  const revenueQuotes = teamQuotes.filter(q => q.status === '매출완료')
 
   const quoteAmt = teamQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
-  const revenueAmt = teamQuotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
+  const revenueAmt = revenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
+  const profitAmt = revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
+  const profitRate = revenueAmt > 0 ? (profitAmt / revenueAmt * 100) : null
 
   const teamYearTarget = engineers.filter(e => e.teams === teamId).reduce((s, e) => {
     const t = targets.find(t => t.engineer_id === e.engineer_id && t.year === fy && t.quarter === null)
@@ -271,14 +268,21 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
         </div>
         {achieve !== null && <span style={{ fontSize: 13, fontWeight: 800, color: achieveColor }}>{achieve.toFixed(1)}%</span>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
         <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
           <div style={{ fontSize: 10, color: GRAY }}>견적 발행</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>₩{numKR(quoteAmt)}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: TEXT }}>₩{numKR(quoteAmt)}</div>
         </div>
         <div style={{ background: tc.bg, borderRadius: 8, padding: '8px 10px' }}>
           <div style={{ fontSize: 10, color: GRAY }}>매출 완료</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: tc.bar }}>₩{numKR(revenueAmt)}</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: tc.bar }}>₩{numKR(revenueAmt)}</div>
+        </div>
+        <div style={{ background: profitAmt > 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: GRAY }}>순이익</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: profitAmt > 0 ? '#16a34a' : GRAY }}>
+            {profitAmt > 0 ? `₩${numKR(profitAmt)}` : '-'}
+          </div>
+          {profitRate !== null && <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700 }}>{profitRate.toFixed(1)}%</div>}
         </div>
       </div>
       {periodTarget > 0 && (
@@ -296,7 +300,7 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
 
 // ── 개인 견적 모달 ────────────────────────────────────────────────────────────
 function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
-  engineer: Engineer & { quotedAmt: number; revenueAmt: number; targetAmt: number; achieve: number | null }
+  engineer: Engineer & { quotedAmt: number; revenueAmt: number; profitAmt: number; profitRate: number | null; targetAmt: number; achieve: number | null }
   quotes: Quote[]
   onClose: () => void
   onStatusSave: (q: Quote, status: string, orderDate: string, revenueDate: string, failReason: string) => Promise<void>
@@ -341,39 +345,52 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: CARD_BG, borderRadius: 18, width: '100%', maxWidth: 820, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+      <div style={{ background: CARD_BG, borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', position: 'relative' }}>
 
         {/* 모달 헤더 */}
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 20, fontWeight: 800, color: TEXT }}>{engineer.name}</span>
                 <span style={{ fontSize: 12, color: GRAY }}>{engineer.position}</span>
                 {engineer.teams && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.text, fontWeight: 700 }}>{engineer.teams}팀</span>}
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
-                <span style={{ color: GRAY }}>견적 <b style={{ color: TEXT }}>₩{numKR(engineer.quotedAmt)}</b></span>
-                <span style={{ color: GRAY }}>매출 <b style={{ color: BLUE }}>₩{numKR(engineer.revenueAmt)}</b></span>
-                {engineer.achieve !== null && <span style={{ color: achieveColor, fontWeight: 700 }}>달성률 {engineer.achieve.toFixed(1)}%</span>}
+              {/* 수익 요약 */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, auto)', gap: '6px 20px', fontSize: 13 }}>
+                <div>
+                  <span style={{ color: GRAY, fontSize: 11 }}>견적 발행</span>
+                  <div style={{ fontWeight: 700, color: TEXT }}>₩{numKR(engineer.quotedAmt)}</div>
+                </div>
+                <div>
+                  <span style={{ color: GRAY, fontSize: 11 }}>매출 완료</span>
+                  <div style={{ fontWeight: 700, color: BLUE }}>₩{numKR(engineer.revenueAmt)}</div>
+                </div>
+                <div>
+                  <span style={{ color: GRAY, fontSize: 11 }}>순이익</span>
+                  <div style={{ fontWeight: 800, color: '#16a34a' }}>
+                    {engineer.profitAmt > 0 ? `₩${numKR(engineer.profitAmt)}` : '-'}
+                    {engineer.profitRate !== null && <span style={{ fontSize: 11, marginLeft: 4 }}>({engineer.profitRate.toFixed(1)}%)</span>}
+                  </div>
+                </div>
+                {engineer.achieve !== null && (
+                  <div>
+                    <span style={{ color: GRAY, fontSize: 11 }}>목표 달성률</span>
+                    <div style={{ fontWeight: 800, color: achieveColor }}>{engineer.achieve.toFixed(1)}%</div>
+                  </div>
+                )}
               </div>
             </div>
             <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
           </div>
 
-          {/* 검색 + 상태 필터 */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
               placeholder="견적번호 / 고객사 / 내용 검색"
               style={{ ...inp, flex: 1, minWidth: 200 }} />
             {['전체', '견적중', '수주', '매출완료', '실패', '보류'].map(s => (
               <button key={s} onClick={() => { setStatusFilter(s); setPage(1) }}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  fontWeight: 700, fontSize: 12,
-                  background: statusFilter === s ? (STATUS_COLORS[s] || BLUE) : '#f3f4f6',
-                  color: statusFilter === s ? '#fff' : TEXT,
-                }}>
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: statusFilter === s ? (STATUS_COLORS[s] || BLUE) : '#f3f4f6', color: statusFilter === s ? '#fff' : TEXT }}>
                 {s}
               </button>
             ))}
@@ -388,34 +405,52 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead style={{ position: 'sticky', top: 0, background: CARD_BG, zIndex: 1 }}>
                 <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
-                  {['견적번호', '날짜', '고객사', '내용', '금액', '상태', '관리'].map(h => (
+                  {['견적번호', '날짜', '고객사', '내용', '품목', '매출액', '순이익', '이익률', '상태', '관리'].map(h => (
                     <th key={h} style={{ padding: '10px 8px', textAlign: 'left', color: GRAY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {paged.map(q => (
-                  <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}` }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ padding: '10px 8px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
-                    <td style={{ padding: '10px 8px', color: GRAY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
-                    <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
-                    <td style={{ padding: '10px 8px', color: GRAY, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
+                {paged.map(q => {
+                  const hasProfit = q.status === '매출완료' && q.total_profit != null
+                  return (
+                    <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}` }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                      <td style={{ padding: '10px 8px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
+                      <td style={{ padding: '10px 8px', color: GRAY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
+                      <td style={{ padding: '10px 8px', color: GRAY, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
+                    <td style={{ padding: '10px 8px', color: GRAY, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {q.quote_items && q.quote_items.length > 0
+                        ? q.quote_items.map(i => i.product_name).filter(Boolean).join(', ')
+                        : '-'}
+                    </td>
                     <td style={{ padding: '10px 8px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
-                    <td style={{ padding: '10px 8px' }}>
-                      <span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '22', color: STATUS_COLORS[q.status] || GRAY }}>
-                        {q.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 8px' }}>
-                      <button onClick={() => { setEditQuote(q); setEditStatus(q.status); setEditOrderDate(q.order_date || ''); setEditRevenueDate(q.revenue_date || ''); setEditFailReason(q.fail_reason || '') }}
-                        style={{ padding: '4px 10px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
-                        상태변경
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
+                        {hasProfit
+                          ? <span style={{ fontWeight: 700, color: '#16a34a' }}>₩{numKR(q.total_profit!)}</span>
+                          : <span style={{ color: '#d1d5db' }}>-</span>}
+                      </td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
+                        {hasProfit
+                          ? <span style={{ fontWeight: 700, color: (q.profit_rate || 0) >= 40 ? '#16a34a' : '#f59e0b' }}>{q.profit_rate?.toFixed(1)}%</span>
+                          : <span style={{ color: '#d1d5db' }}>-</span>}
+                      </td>
+                      <td style={{ padding: '10px 8px' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '22', color: STATUS_COLORS[q.status] || GRAY }}>
+                          {q.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 8px' }}>
+                        <button onClick={() => { setEditQuote(q); setEditStatus(q.status); setEditOrderDate(q.order_date || ''); setEditRevenueDate(q.revenue_date || ''); setEditFailReason(q.fail_reason || '') }}
+                          style={{ padding: '4px 10px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                          상태변경
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}
@@ -425,9 +460,7 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
         {totalPages > 1 && (
           <div style={{ padding: '12px 24px', borderTop: `1px solid ${BORDER}`, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontWeight: 700 }}>
-              ‹
-            </button>
+              style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, fontWeight: 700 }}>‹</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
               <button key={p} onClick={() => setPage(p)}
                 style={{ width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: page === p ? BLUE : '#f3f4f6', color: page === p ? '#fff' : TEXT }}>
@@ -435,16 +468,15 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
               </button>
             ))}
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, fontWeight: 700 }}>
-              ›
-            </button>
+              style={{ padding: '6px 12px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, fontWeight: 700 }}>›</button>
             <span style={{ fontSize: 12, color: GRAY, marginLeft: 8 }}>{filtered.length}건 중 {(page - 1) * PAGE_SIZE + 1}~{Math.min(page * PAGE_SIZE, filtered.length)}건</span>
           </div>
         )}
 
         {/* 상태 변경 서브 모달 */}
+        {/* 상태 변경 서브 모달 */}
         {editQuote && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: 340, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 12 }}>상태 변경</div>
               <div style={{ fontSize: 12, color: GRAY, marginBottom: 14 }}>{editQuote.quote_number}</div>
@@ -502,17 +534,19 @@ export default function SalesPage() {
   const thisMonth = new Date().getMonth() + 1
 
   const [fy, setFy] = useState(currentFY)
-  const [mode, setMode] = useState<'year' | 'q1' | 'q2' | 'q3' | 'q4' | 'month'>('year')
+  const [mode, setMode] = useState<'year' | 'q1' | 'q2' | 'q3' | 'q4' | 'month'>('month')
   const [month, setMonth] = useState(thisMonth)
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
-  const [selectedEngineer, setSelectedEngineer] = useState<(Engineer & { quotedAmt: number; revenueAmt: number; targetAmt: number; achieve: number | null }) | null>(null)
+  const [selectedEngineer, setSelectedEngineer] = useState<any | null>(null)
 
   useEffect(() => { fetchAll() }, [])
 
   const fetchAll = async () => {
     setLoading(true)
     const [{ data: qData }, { data: eData }, { data: tData }] = await Promise.all([
-      supabase.from('quotes').select('*, engineers(name, position), customers(company_name)').order('quote_date', { ascending: false }),
+      supabase.from('quotes')
+        .select('*, engineers(name, position), customers(company_name)')
+        .order('quote_date', { ascending: false }),
       supabase.from('engineers').select('engineer_id, name, position, teams').order('engineer_id'),
       supabase.from('sales_targets').select('*'),
     ])
@@ -546,9 +580,13 @@ export default function SalesPage() {
   const filteredQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy) && (teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true))
   const prevQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy - 1) && (teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true))
 
+  const revenueQuotes = filteredQuotes.filter(q => q.status === '매출완료')
   const totalQuoteAmt = filteredQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
   const totalOrderAmt = filteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
-  const totalRevenueAmt = filteredQuotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalRevenueAmt = revenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalCostAmt = revenueQuotes.reduce((s, q) => s + (q.total_cost || 0), 0)
+  const totalProfitAmt = revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
+  const totalProfitRate = totalRevenueAmt > 0 ? (totalProfitAmt / totalRevenueAmt * 100) : null
   const totalQuoteCnt = filteredQuotes.length
   const totalOrderCnt = filteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).length
   const convRate = totalQuoteCnt > 0 ? (totalOrderCnt / totalQuoteCnt * 100) : 0
@@ -562,14 +600,16 @@ export default function SalesPage() {
   const totalTargetAmt = mode === 'year' ? totalYearTarget : mode === 'month' ? Math.round(totalYearTarget / 12) : Math.round(totalYearTarget / 4)
   const totalAchieve = totalTargetAmt > 0 ? (totalRevenueAmt / totalTargetAmt * 100) : null
   const totalAchieveColor = totalAchieve === null ? GRAY : totalAchieve >= 100 ? '#16a34a' : totalAchieve >= 70 ? '#f59e0b' : '#dc2626'
-
   const remainingLabel = getRemainingLabel(mode, fy, month)
-
+  const [showChart, setShowChart] = useState(false)
   const engineerStats = filteredEngineers.map(eng => {
     const myQuotes = filteredQuotes.filter(q => q.engineer_id === eng.engineer_id)
+    const myRevenueQuotes = myQuotes.filter(q => q.status === '매출완료')
     const quotedAmt = myQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
-    const revenueAmt = myQuotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
+    const revenueAmt = myRevenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
     const orderedAmt = myQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
+    const profitAmt = myRevenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
+    const profitRate = revenueAmt > 0 ? (profitAmt / revenueAmt * 100) : null
     const quotedCnt = myQuotes.length
     const orderedCnt = myQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).length
     const conv = quotedCnt > 0 ? (orderedCnt / quotedCnt * 100) : 0
@@ -577,7 +617,7 @@ export default function SalesPage() {
     const yearTargetAmt = myTarget?.target_amount || 0
     const targetAmt = mode === 'year' ? yearTargetAmt : mode === 'month' ? Math.round(yearTargetAmt / 12) : Math.round(yearTargetAmt / 4)
     const achieve = targetAmt > 0 ? (revenueAmt / targetAmt * 100) : null
-    return { ...eng, quotedAmt, orderedAmt, revenueAmt, quotedCnt, orderedCnt, conv, targetAmt, achieve }
+    return { ...eng, quotedAmt, orderedAmt, revenueAmt, profitAmt, profitRate, quotedCnt, orderedCnt, conv, targetAmt, achieve }
   })
 
   const handleStatusSave = async (q: Quote, status: string, orderDate: string, revenueDate: string, failReason: string) => {
@@ -602,7 +642,7 @@ export default function SalesPage() {
 
         {/* ── 필터 ── */}
         <div style={{ background: CARD_BG, borderRadius: 14, padding: '14px 18px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
-         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <select value={fy} onChange={e => setFy(Number(e.target.value))} style={{ ...inp, width: 110 }}>
               {[currentFY + 1, currentFY, currentFY - 1].map(y => <option key={y} value={y}>FY{y}</option>)}
             </select>
@@ -623,8 +663,7 @@ export default function SalesPage() {
                 ⏱ {remainingLabel}
               </span>
             )}
-      
-         <div style={{ flex: 1 }} />
+            <div style={{ flex: 1 }} />
             <div style={{ width: 1, height: 24, background: BORDER, margin: '0 4px' }} />
             <span style={{ fontSize: 12, color: GRAY, fontWeight: 700 }}>팀:</span>
             <button onClick={() => setTeamFilter(null)}
@@ -638,7 +677,7 @@ export default function SalesPage() {
               </button>
             ))}
           </div>
-             </div>
+        </div>
 
         {/* ── 사업부 전체 요약 ── */}
         <div style={{ background: CARD_BG, borderRadius: 14, padding: '20px 22px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
@@ -647,18 +686,20 @@ export default function SalesPage() {
             <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 8 }}>{getPeriodLabel(mode, fy, month)}</span>
             {remainingLabel && <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginLeft: 8 }}>· {remainingLabel}</span>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
             {[
               { label: '견적 발행액', value: `₩${numKR(totalQuoteAmt)}`, sub: `${totalQuoteCnt}건` },
               { label: '수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${totalOrderCnt}건` },
               { label: '매출 완료액', value: `₩${numKR(totalRevenueAmt)}`, highlight: true },
+              { label: '원가 합계', value: totalCostAmt > 0 ? `₩${numKR(totalCostAmt)}` : '-', sub: '매출완료 기준' },
+              { label: '순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '-', sub: totalProfitRate !== null ? `이익률 ${totalProfitRate.toFixed(1)}%` : null, color: '#16a34a' },
               { label: '수주 전환율', value: `${convRate.toFixed(1)}%`, sub: `${totalOrderCnt}/${totalQuoteCnt}건` },
               { label: '전년 동기 대비', value: yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange.toFixed(1)}%` : '-', color: yoyChange !== null ? (yoyChange >= 0 ? '#16a34a' : '#dc2626') : GRAY },
               { label: '목표 달성률', value: totalAchieve !== null ? `${totalAchieve.toFixed(1)}%` : '목표 미설정', sub: totalTargetAmt > 0 ? `목표 ₩${numKR(totalTargetAmt)}` : null, color: totalAchieveColor },
             ].map(({ label, value, sub, highlight, color }: any) => (
               <div key={label} style={{ background: highlight ? '#eff6ff' : '#f8fafc', borderRadius: 10, padding: '12px 14px', border: `1px solid ${highlight ? '#bfdbfe' : BORDER}` }}>
                 <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: color || (highlight ? BLUE : TEXT) }}>{value}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: color || (highlight ? BLUE : TEXT) }}>{value}</div>
                 {sub && <div style={{ fontSize: 11, color: GRAY, marginTop: 2 }}>{sub}</div>}
               </div>
             ))}
@@ -672,12 +713,34 @@ export default function SalesPage() {
               <AnimatedGauge pct={totalAchieve || 0} color={totalAchieveColor} height={14} delay={100} />
             </>
           )}
-        </div>
 
-        {/* ── 분기별 막대 그래프 (연간 보기 시만) ── */}
-        {mode === 'year' && (
-          <QuarterlyChart quotes={quotes.filter(q => teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true)} fy={fy} engineers={sortedEngineers} targets={targets} />
-        )}
+          {/* 분기별 그래프 토글 버튼 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+            <button
+              onClick={() => setShowChart(p => !p)}
+              style={{
+                padding: '5px 14px', borderRadius: 20, border: `1px solid ${BORDER}`,
+                background: showChart ? '#f0f4ff' : '#f8fafc', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, color: showChart ? BLUE : GRAY,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              📈 분기별 추이 {showChart ? '▲' : '▼'}
+            </button>
+          </div>
+        </div>
+     
+        {/* ── 분기별 막대 그래프 — 토글로 전개 ── */}
+        <div style={{
+          overflow: 'hidden',
+          maxHeight: showChart ? 400 : 0,
+          transition: 'max-height 0.4s cubic-bezier(0.4,0,0.2,1)',
+          marginBottom: showChart ? 20 : 0,
+        }}>
+          <QuarterlyChart
+            quotes={quotes.filter(q => teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true)}
+            fy={fy}
+          />
+        </div>
 
         {/* ── 팀별 실적 ── */}
         {!teamFilter && teams.length > 0 && (
@@ -735,10 +798,12 @@ export default function SalesPage() {
                       <div style={{ fontSize: 10, color: GRAY }}>매출 완료</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: BLUE }}>₩{numKR(eng.revenueAmt)}</div>
                     </div>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                      <div style={{ fontSize: 10, color: GRAY }}>수주 전환율</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: eng.conv >= 50 ? '#16a34a' : '#f59e0b' }}>{eng.conv.toFixed(0)}%</div>
-                      <div style={{ fontSize: 10, color: GRAY }}>{eng.orderedCnt}/{eng.quotedCnt}건</div>
+                    <div style={{ background: eng.profitAmt > 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 10, color: GRAY }}>순이익</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: eng.profitAmt > 0 ? '#16a34a' : GRAY }}>
+                        {eng.profitAmt > 0 ? `₩${numKR(eng.profitAmt)}` : '-'}
+                      </div>
+                      {eng.profitRate !== null && <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700 }}>{eng.profitRate.toFixed(1)}%</div>}
                     </div>
                   </div>
                   {eng.targetAmt > 0 && (
@@ -765,8 +830,7 @@ export default function SalesPage() {
           onClose={() => setSelectedEngineer(null)}
           onStatusSave={async (q, status, orderDate, revenueDate, failReason) => {
             await handleStatusSave(q, status, orderDate, revenueDate, failReason)
-            // 모달 내 quotes도 갱신
-            setSelectedEngineer(prev => prev ? { ...prev } : null)
+            setSelectedEngineer((prev: any) => prev ? { ...prev } : null)
           }}
         />
       )}

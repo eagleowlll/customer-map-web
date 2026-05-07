@@ -129,9 +129,6 @@ const S = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   titleText: { fontSize: 22, fontFamily: 'NotoSansCJK', letterSpacing: 8, textAlign: 'center', paddingBottom: 3 },
-  titleUnderlineWrap: { alignItems: 'center', marginBottom: 2 },
-  titleLine1: { height: 2, backgroundColor: '#000', width: '100%', marginBottom: 2 },
-  titleLine2: { height: 1, backgroundColor: '#000', width: '100%' },
   dateRow: { textAlign: 'center', fontSize: 10, marginBottom: 10 },
   headerRow: { flexDirection: 'row', marginBottom: 4 },
   headerLeft: { flex: 1 },
@@ -156,14 +153,10 @@ const S = StyleSheet.create({
   itemRow: { flexDirection: 'row', borderTopWidth: THIN, borderTopColor: '#999', minHeight: 16 },
   td: { borderRightWidth: THICK, borderRightColor: '#000', paddingVertical: 3, paddingHorizontal: 4, fontSize: 9 },
   tdLast: { paddingVertical: 3, paddingHorizontal: 4, fontSize: 9 },
-  tdCenter: { textAlign: 'center' },
-  tdRight: { textAlign: 'right' },
   remarkRow: { flexDirection: 'row', minHeight: 80 },
   remarkContent: { flex: 1, borderRightWidth: THICK, borderRightColor: '#000', padding: 6 },
-  remarkRight: { flexDirection: 'column', width: 0 },
   remarkLine: { fontSize: 8.5, marginBottom: 2 },
   summaryRow: { flexDirection: 'row', borderTopWidth: THICK, borderTopColor: '#000', height: 22, alignItems: 'center' },
-  titleItemRow: { flexDirection: 'row', borderTopWidth: THICK, borderTopColor: '#000', borderBottomWidth: THICK, borderBottomColor: '#000' },
 })
 
 type PDFDocProps = {
@@ -261,7 +254,7 @@ function QuotePDFDoc({ company, receiver, quoteNo, dateDisplay, titleItem, rows,
               {remarks.split('\n').map((line, i) => <Text key={i} style={S.remarkLine}>{line}</Text>)}
               <Text style={[S.remarkLine, { marginTop: 2 }]}>* 담당자 : {engineerName}</Text>
             </View>
-            <View style={{ width: COL.qty, borderLeftWidth: 0, borderRightWidth: THICK, borderRightColor: '#000' }} />
+            <View style={{ width: COL.qty, borderRightWidth: THICK, borderRightColor: '#000' }} />
             <View style={{ width: COL.unit, borderRightWidth: THICK, borderRightColor: '#000' }} />
             <View style={{ width: COL.supply, borderRightWidth: THICK, borderRightColor: '#000' }} />
             <View style={{ width: COL.tax }} />
@@ -321,7 +314,7 @@ function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRa
         ))}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
           <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e5e7eb', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>공급가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#1C3557' }}>₩{numKR(totalSupply)}</div></div>
-          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e5e7eb', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>상품가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#374151' }}>₩{numKR(totalProduct)}</div></div>
+          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e5e7eb', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>원가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#374151' }}>₩{numKR(totalProduct)}</div></div>
           <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', borderRadius: 8, padding: '10px 12px', border: `1px solid ${isGood ? '#bbf7d0' : '#fecaca'}`, textAlign: 'center' }}>
             <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>매출이익 합계</div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6 }}>
@@ -388,6 +381,10 @@ export default function QuotePage() {
   const totalSupply = rows.reduce((s, r) => s + r.supply_price, 0)
   const totalTax = rows.reduce((s, r) => s + r.tax, 0)
   const totalAmount = totalSupply + totalTax
+  // 전체 원가 / 이익 / 이익률 계산
+  const totalCost = rows.reduce((s, r) => s + r.product_price, 0)
+  const totalProfit = rows.reduce((s, r) => s + r.profit, 0)
+  const totalProfitRate = totalSupply > 0 ? (totalProfit / totalSupply) * 100 : 0
   const engineerName = engineer ? `${engineer.name} ${engineer.position || ''}`.trim() : ''
 
   const handleCustomerSearch = async (q: string) => {
@@ -433,12 +430,22 @@ export default function QuotePage() {
           customer_id: customerId,
           engineer_id: engineer.engineer_id,
           quote_date: `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`,
-          total_supply: totalSupply, total_tax: totalTax, total_amount: totalAmount,
-          status: '견적중', recipient: receiver, subject: titleItem, note: remarks,
+          total_supply: totalSupply,
+          total_tax: totalTax,
+          total_amount: totalAmount,
+          // ── 원가/이익 정보 저장 ──
+          total_cost: totalCost,
+          total_profit: totalProfit,
+          profit_rate: parseFloat(totalProfitRate.toFixed(2)),
+          status: '견적중',
+          recipient: receiver,
+          subject: titleItem,
+          note: remarks,
         }).select().single()
 
       if (quoteError) throw quoteError
 
+      // ── quote_items: 원가/이익/환율/관세율 포함 저장 ──
       const items = rows.filter(r => r.supply_price > 0).map(r => ({
         quote_id: quoteData.quote_id,
         price_list_id: r.selectedItem?.id ?? null,
@@ -449,6 +456,12 @@ export default function QuotePage() {
         supply_amount: r.supply_price,
         tax_amount: r.tax,
         category: null,
+        // ── 추가 저장 필드 ──
+        cost_amount: r.product_price,
+        profit_amount: r.profit,
+        profit_rate: r.profit_rate,
+        exchange_rate: r.exchange_rate || exchangeRate,
+        tariff_rate: r.tariff_rate,
       }))
 
       if (items.length > 0) {
@@ -723,10 +736,9 @@ export default function QuotePage() {
 
             {/* 헤더 */}
             <div style={{ background: '#234ea2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {/* 왼쪽: 제목 */}
               <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>📄 PDF 미리보기</span>
 
-              {/* 가운데: 견적 확정 버튼 */}
+              {/* 견적 확정 버튼 */}
               <button
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isSaving}
@@ -738,7 +750,7 @@ export default function QuotePage() {
                 {isSaving ? '저장 중...' : '견적 확정'}
               </button>
 
-              {/* 오른쪽: 견적번호 시퀀스 */}
+              {/* 시퀀스 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 8px' }}>
                 <button onClick={() => setSeqIndex(prev => Math.max(0, prev - 1))} style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: '20px' }}>◀</button>
                 <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, minWidth: 20, textAlign: 'center' }}>{seqLetter}</span>
@@ -758,26 +770,43 @@ export default function QuotePage() {
             )}
           </div>
         </div>
-
       </div>
 
       {/* 견적 확정 확인 모달 */}
       {showConfirmModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: '#111113', marginBottom: 12 }}>견적 확정</div>
-            <div style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.9, marginBottom: 24 }}>
+            <div style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.9, marginBottom: 16 }}>
               견적 확정 시에는 실적으로 기록이 되며<br />
               <b>관리자의 승인 없이는 삭제가 불가능합니다.</b>
             </div>
+            {/* 저장될 수익 정보 미리보기 */}
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, fontWeight: 700 }}>저장될 수익 정보</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>공급가</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#234ea2' }}>₩{numKR(totalSupply)}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>원가</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>₩{numKR(totalCost)}</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>순이익</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: totalProfitRate >= 40 ? '#16a34a' : '#dc2626' }}>
+                    ₩{numKR(totalProfit)} ({totalProfitRate.toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setShowConfirmModal(false)}
+              <button onClick={() => setShowConfirmModal(false)}
                 style={{ flex: 1, padding: '11px', background: '#f3f4f6', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
-              <button
-                onClick={() => { setShowConfirmModal(false); handleSaveQuote() }}
+              <button onClick={() => { setShowConfirmModal(false); handleSaveQuote() }}
                 style={{ flex: 1, padding: '11px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 확인
               </button>
@@ -785,7 +814,6 @@ export default function QuotePage() {
           </div>
         </div>
       )}
-
     </div>
   )
 }

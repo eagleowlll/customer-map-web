@@ -65,6 +65,9 @@ type Quote = {
   quote_date: string
   total_supply: number
   total_amount: number
+  total_cost: number | null
+  total_profit: number | null
+  profit_rate: number | null
   status: string
   subject: string | null
   recipient: string | null
@@ -709,11 +712,19 @@ export default function CustomerDetailPage() {
               </div>
 
               {/* 요약 카드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+         {/* 요약 카드 */}
+              {(() => {
+                const revenueQuotes = quotes.filter(q => q.status === '매출완료')
+                const totalProfitAmt = revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
+                const totalProfitRate = totalRevenueAmt > 0 ? (totalProfitAmt / totalRevenueAmt * 100) : null
+                return (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
                   { label: '총 견적 발행액', value: `₩${numKR(totalQuoteAmt)}`, sub: `${quotes.length}건`, color: TEXT_PRIMARY },
                   { label: '총 수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${quotes.filter(q => ['수주','매출완료'].includes(q.status)).length}건`, color: '#3b82f6' },
                   { label: '누적 매출액', value: `₩${numKR(totalRevenueAmt)}`, sub: `${quotes.filter(q => q.status === '매출완료').length}건`, color: WHITE_BUTTON_BG },
+                  { label: '누적 순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '-', sub: '매출완료 기준', color: '#16a34a' },
+                  { label: '평균 이익률', value: totalProfitRate !== null && totalProfitAmt > 0 ? `${totalProfitRate.toFixed(1)}%` : '-', sub: '매출완료 기준', color: totalProfitRate !== null && totalProfitRate >= 40 ? '#16a34a' : '#f59e0b' },
                 ].map(({ label, value, sub, color }) => (
                   <div key={label} style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', border: `1px solid ${INPUT_BORDER}`, textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>{label}</div>
@@ -722,6 +733,8 @@ export default function CustomerDetailPage() {
                   </div>
                 ))}
               </div>
+               )
+              })()}
 
               {/* 견적 목록 */}
               <div style={{ overflowY: 'auto', flex: 1 }}>
@@ -731,7 +744,7 @@ export default function CustomerDetailPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead style={{ position: 'sticky', top: 0, background: CARD_BG }}>
                       <tr style={{ borderBottom: `2px solid ${INPUT_BORDER}` }}>
-                        {['견적번호', '날짜', '담당자', '내용', '금액', '상태'].map(h => (
+                      {['견적번호', '날짜', '담당자', '내용', '품목', '금액', '순이익', '이익률', '상태'].map(h => (
                           <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: TEXT_SECONDARY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -744,8 +757,23 @@ export default function CustomerDetailPage() {
                           <td style={{ padding: '10px 10px', fontWeight: 700, color: WHITE_BUTTON_BG, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
                           <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>{q.engineers?.name ?? '-'}</td>
-                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject ?? '-'}</td>
+                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject ?? '-'}</td>
+                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {q.quote_items && q.quote_items.length > 0
+                              ? q.quote_items.map(i => i.product_name).filter(Boolean).join(', ')
+                              : '-'}
+                          </td>
                           <td style={{ padding: '10px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
+                            {q.status === '매출완료' && q.total_profit
+                              ? <span style={{ fontWeight: 700, color: '#16a34a' }}>₩{numKR(q.total_profit)}</span>
+                              : <span style={{ color: '#d1d5db' }}>-</span>}
+                          </td>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
+                            {q.status === '매출완료' && q.profit_rate
+                              ? <span style={{ fontWeight: 700, color: q.profit_rate >= 40 ? '#16a34a' : '#f59e0b' }}>{q.profit_rate.toFixed(1)}%</span>
+                              : <span style={{ color: '#d1d5db' }}>-</span>}
+                          </td>
                           <td style={{ padding: '10px 10px' }}>
                             <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: (STATUS_COLORS[q.status] || '#9ca3af') + '22', color: STATUS_COLORS[q.status] || TEXT_SECONDARY }}>
                               {q.status}
@@ -924,7 +952,7 @@ export default function CustomerDetailPage() {
                   <option value="유상교육">유상교육</option>
                 </select>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
-                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어 선택</div>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 직원 선택</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {engineers.map((eng) => {
                       const isSelected = selectedEngineerIds.includes(eng.engineer_id)
