@@ -58,7 +58,6 @@ type Engineer = {
   position: string | null
 }
 
-// ── 견적 관련 타입 추가 ──
 type Quote = {
   quote_id: number
   quote_number: string
@@ -74,6 +73,7 @@ type Quote = {
   order_date: string | null
   revenue_date: string | null
   engineers?: { name: string; position: string | null }
+  quote_items?: { product_name: string | null }[]
 }
 
 const PAGE_BG = '#f4f5f7'
@@ -100,39 +100,19 @@ const STATUS_COLORS: Record<string, string> = {
 const numKR = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
 const inputStyle: CSSProperties = {
-  width: '100%',
-  padding: 12,
-  border: `1px solid ${INPUT_BORDER}`,
-  borderRadius: 10,
-  boxSizing: 'border-box',
-  color: TEXT_PRIMARY,
-  background: INPUT_BG,
-  outline: 'none',
+  width: '100%', padding: 12, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10,
+  boxSizing: 'border-box', color: TEXT_PRIMARY, background: INPUT_BG, outline: 'none',
 }
 
 const dateInputStyle: CSSProperties = {
-  width: '100%',
-  padding: 12,
-  border: `1px solid ${INPUT_BORDER}`,
-  borderRadius: 10,
-  boxSizing: 'border-box',
-  color: '#111113',
-  background: '#ffffff',
-  outline: 'none',
-  colorScheme: 'light',
+  width: '100%', padding: 12, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10,
+  boxSizing: 'border-box', color: '#111113', background: '#ffffff', outline: 'none', colorScheme: 'light',
 }
 
 const textareaStyle: CSSProperties = {
-  width: '100%',
-  padding: 12,
-  border: `1px solid ${INPUT_BORDER}`,
-  borderRadius: 10,
-  resize: 'vertical',
-  color: TEXT_PRIMARY,
-  boxSizing: 'border-box',
-  lineHeight: 1.5,
-  background: INPUT_BG,
-  outline: 'none',
+  width: '100%', padding: 12, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10,
+  resize: 'vertical', color: TEXT_PRIMARY, boxSizing: 'border-box', lineHeight: 1.5,
+  background: INPUT_BG, outline: 'none',
 }
 
 function getInstallDisplay(device: Device) {
@@ -157,8 +137,7 @@ export default function CustomerDetailPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [history, setHistory] = useState<ServiceHistory[]>([])
-  const [quotes, setQuotes] = useState<Quote[]>([])  // ← 견적 이력
-
+  const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
 
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
@@ -169,7 +148,7 @@ export default function CustomerDetailPage() {
   const [isEditContactModalOpen, setIsEditContactModalOpen] = useState(false)
   const [isEditDeviceModalOpen, setIsEditDeviceModalOpen] = useState(false)
   const [isDeviceImageModalOpen, setIsDeviceImageModalOpen] = useState(false)
-  const [isQuoteHistoryModalOpen, setIsQuoteHistoryModalOpen] = useState(false)  // ← 거래이력 모달
+  const [isQuoteHistoryModalOpen, setIsQuoteHistoryModalOpen] = useState(false)
 
   const [isSavingService, setIsSavingService] = useState(false)
   const [isSavingServiceEdit, setIsSavingServiceEdit] = useState(false)
@@ -186,52 +165,32 @@ export default function CustomerDetailPage() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [selectedImageDevice, setSelectedImageDevice] = useState<Device | null>(null)
-
   const [deviceImageFile, setDeviceImageFile] = useState<File | null>(null)
   const [engineers, setEngineers] = useState<Engineer[]>([])
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<number[]>([])
   const [selectedEditEngineerIds, setSelectedEditEngineerIds] = useState<number[]>([])
 
-  const [serviceForm, setServiceForm] = useState({
-    visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP',
-  })
-  const [serviceEditForm, setServiceEditForm] = useState({
-    visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP',
-  })
-  const [customerEditForm, setCustomerEditForm] = useState({
-    company_name: '', address: '', agency: '', status: '활성',
-  })
-  const [contactForm, setContactForm] = useState({
-    name: '', department: '', position: '', phone: '',
-  })
-  const [contactEditForm, setContactEditForm] = useState({
-    name: '', department: '', position: '', phone: '',
-  })
-  const [deviceForm, setDeviceForm] = useState({
-    device_name: '', device_name2: '', option: '', serial_number: '',
-    program: 'ACCTee', install_date: '', install_engineer: '', category: '20',
-  })
-  const [deviceEditForm, setDeviceEditForm] = useState({
-    device_name: '', device_name2: '', option: '', serial_number: '',
-    program: 'ACCTee', install_date: '', install_engineer: '', category: '20',
-  })
+  const [serviceForm, setServiceForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
+  const [serviceEditForm, setServiceEditForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
+  const [customerEditForm, setCustomerEditForm] = useState({ company_name: '', address: '', agency: '', status: '활성' })
+  const [contactForm, setContactForm] = useState({ name: '', department: '', position: '', phone: '' })
+  const [contactEditForm, setContactEditForm] = useState({ name: '', department: '', position: '', phone: '' })
+  const [deviceForm, setDeviceForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
+  const [deviceEditForm, setDeviceEditForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
 
   const fetchDetail = async () => {
     setLoading(true)
     const [
-      { data: customerData },
-      { data: devicesData },
-      { data: contactsData },
-      { data: historyData },
-      { data: engineersData },
-      { data: quotesData },
+      { data: customerData }, { data: devicesData }, { data: contactsData },
+      { data: historyData }, { data: engineersData }, { data: quotesData },
     ] = await Promise.all([
       supabase.from('customers').select('*').eq('customer_id', customerId).single(),
       supabase.from('devices').select('*').eq('customer_id', customerId).order('device_id', { ascending: true }),
       supabase.from('contacts').select('*').eq('customer_id', customerId).order('contact_id', { ascending: true }),
       supabase.from('service_history').select('*, service_engineers(engineer_id, engineers(name, position))').eq('customer_id', customerId).order('service_id', { ascending: false }),
       supabase.from('engineers').select('*').order('engineer_id', { ascending: true }),
-      supabase.from('quotes').select('*, engineers(name, position)').eq('customer_id', customerId).order('quote_date', { ascending: false }),  // ← 견적 조회
+      // ── quote_items 포함 조회 ──
+      supabase.from('quotes').select('*, engineers(name, position), quote_items(product_name)').eq('customer_id', customerId).order('quote_date', { ascending: false }),
     ])
     setCustomer(customerData ?? null)
     setDevices(devicesData ?? [])
@@ -294,8 +253,7 @@ export default function CustomerDetailPage() {
   const handleOpenEditServiceModal = (service: ServiceHistory) => {
     setSelectedService(service)
     setServiceEditForm({ visit_date: service.visit_date ?? '', service_notes: service.service_notes ?? '', visitor: service.visitor ?? '', service_type: service.service_type ?? '신규SETUP' })
-    const engineerIds = (service.service_engineers ?? []).map((se) => se.engineer_id)
-    setSelectedEditEngineerIds(engineerIds)
+    setSelectedEditEngineerIds((service.service_engineers ?? []).map((se) => se.engineer_id))
     setIsEditServiceModalOpen(true)
   }
 
@@ -313,10 +271,8 @@ export default function CustomerDetailPage() {
     }).eq('service_id', selectedService.service_id)
     if (error) { setIsSavingServiceEdit(false); alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.'); return }
     await supabase.from('service_engineers').delete().eq('service_id', selectedService.service_id)
-    const engineerRows = selectedEditEngineerIds.map((eid) => ({ service_id: selectedService.service_id, engineer_id: eid }))
-    const { error: engineerError } = await supabase.from('service_engineers').insert(engineerRows)
+    await supabase.from('service_engineers').insert(selectedEditEngineerIds.map((eid) => ({ service_id: selectedService.service_id, engineer_id: eid })))
     setIsSavingServiceEdit(false)
-    if (engineerError) { alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 수정되었습니다.')
     setIsEditServiceModalOpen(false)
     setSelectedService(null)
@@ -387,18 +343,12 @@ export default function CustomerDetailPage() {
     }
   }
 
-  const handleOpenAddContactModal = () => {
-    setContactForm({ name: '', department: '', position: '', phone: '' })
-    setIsAddContactModalOpen(true)
-  }
+  const handleOpenAddContactModal = () => { setContactForm({ name: '', department: '', position: '', phone: '' }); setIsAddContactModalOpen(true) }
 
   const handleAddContact = async () => {
     if (!contactForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setIsSavingContact(true)
-    const { error } = await supabase.from('contacts').insert([{
-      customer_id: customerId, name: contactForm.name.trim(), department: contactForm.department.trim() || null,
-      position: contactForm.position.trim() || null, phone: contactForm.phone.trim() || null,
-    }])
+    const { error } = await supabase.from('contacts').insert([{ customer_id: customerId, name: contactForm.name.trim(), department: contactForm.department.trim() || null, position: contactForm.position.trim() || null, phone: contactForm.phone.trim() || null }])
     setIsSavingContact(false)
     if (error) { alert(error.message || '담당자 추가 중 오류가 발생했습니다.'); return }
     alert('담당자가 추가되었습니다.')
@@ -416,10 +366,7 @@ export default function CustomerDetailPage() {
     if (!selectedContact) return
     if (!contactEditForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setIsSavingContactEdit(true)
-    const { error } = await supabase.from('contacts').update({
-      name: contactEditForm.name.trim(), department: contactEditForm.department.trim() || null,
-      position: contactEditForm.position.trim() || null, phone: contactEditForm.phone.trim() || null,
-    }).eq('contact_id', selectedContact.contact_id)
+    const { error } = await supabase.from('contacts').update({ name: contactEditForm.name.trim(), department: contactEditForm.department.trim() || null, position: contactEditForm.position.trim() || null, phone: contactEditForm.phone.trim() || null }).eq('contact_id', selectedContact.contact_id)
     setIsSavingContactEdit(false)
     if (error) { alert(error.message || '담당자 수정 중 오류가 발생했습니다.'); return }
     alert('담당자 정보가 수정되었습니다.')
@@ -442,20 +389,12 @@ export default function CustomerDetailPage() {
     await fetchDetail()
   }
 
-  const handleOpenAddDeviceModal = () => {
-    setDeviceForm({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
-    setIsAddDeviceModalOpen(true)
-  }
+  const handleOpenAddDeviceModal = () => { setDeviceForm({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' }); setIsAddDeviceModalOpen(true) }
 
   const handleAddDevice = async () => {
     if (!deviceForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDevice(true)
-    const { error } = await supabase.from('devices').insert([{
-      customer_id: customerId, device_name: deviceForm.device_name.trim(), device_name2: deviceForm.device_name2.trim() || null,
-      option: deviceForm.option.trim() || null, serial_number: deviceForm.serial_number.trim() || null,
-      program: deviceForm.program, install_date: deviceForm.install_date || null, install_year: null,
-      install_engineer: deviceForm.install_engineer.trim() || null, category: deviceForm.category,
-    }])
+    const { error } = await supabase.from('devices').insert([{ customer_id: customerId, device_name: deviceForm.device_name.trim(), device_name2: deviceForm.device_name2.trim() || null, option: deviceForm.option.trim() || null, serial_number: deviceForm.serial_number.trim() || null, program: deviceForm.program, install_date: deviceForm.install_date || null, install_year: null, install_engineer: deviceForm.install_engineer.trim() || null, category: deviceForm.category }])
     setIsSavingDevice(false)
     if (error) { alert(error.message || '장비 추가 중 오류가 발생했습니다.'); return }
     alert('장비가 추가되었습니다.')
@@ -465,11 +404,7 @@ export default function CustomerDetailPage() {
 
   const handleOpenEditDeviceModal = (device: Device) => {
     setSelectedDevice(device)
-    setDeviceEditForm({
-      device_name: device.device_name ?? '', device_name2: device.device_name2 ?? '', option: device.option ?? '',
-      serial_number: device.serial_number ?? '', program: device.program ?? 'ACCTee',
-      install_date: device.install_date ?? '', install_engineer: device.install_engineer ?? '', category: device.category ?? '20',
-    })
+    setDeviceEditForm({ device_name: device.device_name ?? '', device_name2: device.device_name2 ?? '', option: device.option ?? '', serial_number: device.serial_number ?? '', program: device.program ?? 'ACCTee', install_date: device.install_date ?? '', install_engineer: device.install_engineer ?? '', category: device.category ?? '20' })
     setIsEditDeviceModalOpen(true)
   }
 
@@ -477,12 +412,7 @@ export default function CustomerDetailPage() {
     if (!selectedDevice) return
     if (!deviceEditForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDeviceEdit(true)
-    const { error } = await supabase.from('devices').update({
-      device_name: deviceEditForm.device_name.trim(), device_name2: deviceEditForm.device_name2.trim() || null,
-      option: deviceEditForm.option.trim() || null, serial_number: deviceEditForm.serial_number.trim() || null,
-      program: deviceEditForm.program, install_date: deviceEditForm.install_date || null, install_year: null,
-      install_engineer: deviceEditForm.install_engineer.trim() || null, category: deviceEditForm.category,
-    }).eq('device_id', selectedDevice.device_id)
+    const { error } = await supabase.from('devices').update({ device_name: deviceEditForm.device_name.trim(), device_name2: deviceEditForm.device_name2.trim() || null, option: deviceEditForm.option.trim() || null, serial_number: deviceEditForm.serial_number.trim() || null, program: deviceEditForm.program, install_date: deviceEditForm.install_date || null, install_year: null, install_engineer: deviceEditForm.install_engineer.trim() || null, category: deviceEditForm.category }).eq('device_id', selectedDevice.device_id)
     setIsSavingDeviceEdit(false)
     if (error) { alert(error.message || '장비 수정 중 오류가 발생했습니다.'); return }
     alert('장비 정보가 수정되었습니다.')
@@ -505,11 +435,7 @@ export default function CustomerDetailPage() {
     await fetchDetail()
   }
 
-  const handleOpenDeviceImageModal = (device: Device) => {
-    setSelectedImageDevice(device)
-    setDeviceImageFile(null)
-    setIsDeviceImageModalOpen(true)
-  }
+  const handleOpenDeviceImageModal = (device: Device) => { setSelectedImageDevice(device); setDeviceImageFile(null); setIsDeviceImageModalOpen(true) }
 
   const handleUploadDeviceImage = async () => {
     if (!selectedImageDevice) return
@@ -540,15 +466,13 @@ export default function CustomerDetailPage() {
     devices.forEach((d) => map.set(d.device_id, []))
     history.forEach((h) => {
       if (h.device_id == null) return
-      const deviceId = Number(h.device_id)
-      const arr = map.get(deviceId) || []
+      const arr = map.get(Number(h.device_id)) || []
       arr.push(h)
-      map.set(deviceId, arr)
+      map.set(Number(h.device_id), arr)
     })
     return map
   }, [devices, history])
 
-  // 견적 통계
   const totalQuoteAmt = quotes.reduce((s, q) => s + (q.total_supply || 0), 0)
   const totalOrderAmt = quotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
   const totalRevenueAmt = quotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
@@ -582,39 +506,22 @@ export default function CustomerDetailPage() {
       <main style={{ padding: 20, maxWidth: 1400, margin: '0 auto', background: PAGE_BG, minHeight: '100vh' }}>
 
         {/* 업체 정보 패널 */}
-        <div style={{
-          background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 20,
-          padding: 24, marginBottom: 22, color: TEXT_PRIMARY, position: 'relative',
-        }}>
+        <div style={{ background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 20, padding: 24, marginBottom: 22, color: TEXT_PRIMARY, position: 'relative' }}>
           <button onClick={handleOpenEditCustomerModal} style={{ ...iconButtonStyle, position: 'absolute', top: 20, right: 20 }}>✏️</button>
-
-          <h1 style={{ margin: 0, marginBottom: 18, fontSize: 32, color: TEXT_PRIMARY }}>
-            {customer?.company_name ?? '고객 정보 없음'}
-          </h1>
-
+          <h1 style={{ margin: 0, marginBottom: 18, fontSize: 32, color: TEXT_PRIMARY }}>{customer?.company_name ?? '고객 정보 없음'}</h1>
           <div style={{ display: 'grid', gap: 10, fontSize: 16, color: TEXT_SECONDARY }}>
             <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               주소: {customer?.address ?? '-'}
               {customer?.address && (
                 <button onClick={() => { navigator.clipboard.writeText(customer.address ?? ''); alert('주소가 복사되었습니다!') }}
-                  style={{ padding: '3px 10px', fontSize: 12, fontWeight: 700, background: '#234ea2', color: '#ffffff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                  복사
-                </button>
+                  style={{ padding: '3px 10px', fontSize: 12, fontWeight: 700, background: '#234ea2', color: '#ffffff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>복사</button>
               )}
             </p>
             <p style={{ margin: 0 }}>상태: {customer?.status ?? '-'}</p>
             <p style={{ margin: 0 }}>대리점: {customer?.agency ?? '-'}</p>
           </div>
-
-          {/* ── 거래 이력 버튼 ── */}
-          <button
-            onClick={() => setIsQuoteHistoryModalOpen(true)}
-            style={{
-              marginTop: 16, padding: '9px 18px', background: quotes.length > 0 ? '#eff6ff' : '#f3f4f6',
-              color: quotes.length > 0 ? WHITE_BUTTON_BG : TEXT_SECONDARY,
-              border: `1px solid ${quotes.length > 0 ? '#bfdbfe' : INPUT_BORDER}`,
-              borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
-            }}>
+          <button onClick={() => setIsQuoteHistoryModalOpen(true)}
+            style={{ marginTop: 16, padding: '9px 18px', background: quotes.length > 0 ? '#eff6ff' : '#f3f4f6', color: quotes.length > 0 ? WHITE_BUTTON_BG : TEXT_SECONDARY, border: `1px solid ${quotes.length > 0 ? '#bfdbfe' : INPUT_BORDER}`, borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             📋 거래 이력 {quotes.length > 0 ? `(${quotes.length}건 · 누적 ₩${numKR(totalRevenueAmt)})` : '(없음)'}
           </button>
         </div>
@@ -626,10 +533,7 @@ export default function CustomerDetailPage() {
             {(contacts ?? []).map((c) => {
               const departmentText = c.department?.trim() ? c.department : '부서정보 없음'
               return (
-                <div key={c.contact_id} style={{
-                  minWidth: 320, maxWidth: 320, background: CARD_BG, borderRadius: 18, padding: 18,
-                  color: TEXT_PRIMARY, border: `1px solid ${INPUT_BORDER}`, flex: '0 0 auto', textAlign: 'center', position: 'relative',
-                }}>
+                <div key={c.contact_id} style={{ minWidth: 320, maxWidth: 320, background: CARD_BG, borderRadius: 18, padding: 18, color: TEXT_PRIMARY, border: `1px solid ${INPUT_BORDER}`, flex: '0 0 auto', textAlign: 'center', position: 'relative' }}>
                   <button onClick={() => handleOpenEditContactModal(c)} style={{ ...iconButtonStyle, position: 'absolute', top: 14, right: 14 }}>✏️</button>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10, color: c.department?.trim() ? TEXT_SECONDARY : TEXT_MUTED }}>{departmentText}</div>
                   <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 10, color: TEXT_PRIMARY }}>{c.name ?? '-'} {c.position ?? ''}</div>
@@ -699,10 +603,9 @@ export default function CustomerDetailPage() {
 
         {/* ── 거래 이력 모달 ── */}
         {isQuoteHistoryModalOpen && (
-          <div onClick={() => setIsQuoteHistoryModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 780, maxHeight: '85vh', background: CARD_BG, borderRadius: 18, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}`, display: 'flex', flexDirection: 'column' }}>
-              
-              {/* 모달 헤더 */}
+          <div onClick={() => setIsQuoteHistoryModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 1100, maxHeight: '90vh', background: CARD_BG, borderRadius: 18, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}`, display: 'flex', flexDirection: 'column' }}>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: TEXT_PRIMARY, marginBottom: 4 }}>📋 거래 이력</div>
@@ -712,75 +615,75 @@ export default function CustomerDetailPage() {
               </div>
 
               {/* 요약 카드 */}
-         {/* 요약 카드 */}
               {(() => {
                 const revenueQuotes = quotes.filter(q => q.status === '매출완료')
                 const totalProfitAmt = revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
                 const totalProfitRate = totalRevenueAmt > 0 ? (totalProfitAmt / totalRevenueAmt * 100) : null
                 return (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: '총 견적 발행액', value: `₩${numKR(totalQuoteAmt)}`, sub: `${quotes.length}건`, color: TEXT_PRIMARY },
-                  { label: '총 수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${quotes.filter(q => ['수주','매출완료'].includes(q.status)).length}건`, color: '#3b82f6' },
-                  { label: '누적 매출액', value: `₩${numKR(totalRevenueAmt)}`, sub: `${quotes.filter(q => q.status === '매출완료').length}건`, color: WHITE_BUTTON_BG },
-                  { label: '누적 순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '-', sub: '매출완료 기준', color: '#16a34a' },
-                  { label: '평균 이익률', value: totalProfitRate !== null && totalProfitAmt > 0 ? `${totalProfitRate.toFixed(1)}%` : '-', sub: '매출완료 기준', color: totalProfitRate !== null && totalProfitRate >= 40 ? '#16a34a' : '#f59e0b' },
-                ].map(({ label, value, sub, color }) => (
-                  <div key={label} style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', border: `1px solid ${INPUT_BORDER}`, textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
-                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{sub}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                    {[
+                      { label: '총 견적 발행액', value: `₩${numKR(totalQuoteAmt)}`, sub: `${quotes.length}건`, color: TEXT_PRIMARY },
+                      { label: '총 수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${quotes.filter(q => ['수주', '매출완료'].includes(q.status)).length}건`, color: '#3b82f6' },
+                      { label: '누적 매출액', value: `₩${numKR(totalRevenueAmt)}`, sub: `${quotes.filter(q => q.status === '매출완료').length}건`, color: WHITE_BUTTON_BG },
+                      { label: '누적 순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '-', sub: '매출완료 기준', color: '#16a34a' },
+                      { label: '평균 이익률', value: totalProfitRate !== null && totalProfitAmt > 0 ? `${totalProfitRate.toFixed(1)}%` : '-', sub: '매출완료 기준', color: totalProfitRate !== null && totalProfitRate >= 40 ? '#16a34a' : '#f59e0b' },
+                    ].map(({ label, value, sub, color }) => (
+                      <div key={label} style={{ background: '#fff', borderRadius: 10, padding: '12px 14px', border: `1px solid ${INPUT_BORDER}`, textAlign: 'center' }}>
+                        <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color }}>{value}</div>
+                        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{sub}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-               )
+                )
               })()}
 
               {/* 견적 목록 */}
-              <div style={{ overflowY: 'auto', flex: 1 }}>
+              <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
                 {quotes.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 40, color: TEXT_MUTED, fontSize: 14 }}>견적 이력이 없습니다</div>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 900 }}>
                     <thead style={{ position: 'sticky', top: 0, background: CARD_BG }}>
                       <tr style={{ borderBottom: `2px solid ${INPUT_BORDER}` }}>
-                      {['견적번호', '날짜', '담당자', '내용', '품목', '금액', '순이익', '이익률', '상태'].map(h => (
-                          <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: TEXT_SECONDARY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                        {['견적번호', '날짜', '담당자', '내용', '품목', '금액', '순이익', '이익률', '상태'].map(h => (
+                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: TEXT_SECONDARY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {quotes.map(q => (
-                        <tr key={q.quote_id} style={{ borderBottom: `1px solid ${INPUT_BORDER}` }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                          onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                          <td style={{ padding: '10px 10px', fontWeight: 700, color: WHITE_BUTTON_BG, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
-                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>{q.engineers?.name ?? '-'}</td>
-                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject ?? '-'}</td>
-                          <td style={{ padding: '10px 10px', color: TEXT_SECONDARY, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {q.quote_items && q.quote_items.length > 0
-                              ? q.quote_items.map(i => i.product_name).filter(Boolean).join(', ')
-                              : '-'}
-                          </td>
-                          <td style={{ padding: '10px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
-                            {q.status === '매출완료' && q.total_profit
-                              ? <span style={{ fontWeight: 700, color: '#16a34a' }}>₩{numKR(q.total_profit)}</span>
-                              : <span style={{ color: '#d1d5db' }}>-</span>}
-                          </td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
-                            {q.status === '매출완료' && q.profit_rate
-                              ? <span style={{ fontWeight: 700, color: q.profit_rate >= 40 ? '#16a34a' : '#f59e0b' }}>{q.profit_rate.toFixed(1)}%</span>
-                              : <span style={{ color: '#d1d5db' }}>-</span>}
-                          </td>
-                          <td style={{ padding: '10px 10px' }}>
-                            <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: (STATUS_COLORS[q.status] || '#9ca3af') + '22', color: STATUS_COLORS[q.status] || TEXT_SECONDARY }}>
-                              {q.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {quotes.map(q => {
+                        const itemNames = q.quote_items && q.quote_items.length > 0
+                          ? q.quote_items.map(i => i.product_name).filter(Boolean).join(', ')
+                          : '-'
+                        return (
+                          <tr key={q.quote_id} style={{ borderBottom: `1px solid ${INPUT_BORDER}` }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                            onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                            <td style={{ padding: '10px 12px', fontWeight: 700, color: WHITE_BUTTON_BG, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
+                            <td style={{ padding: '10px 12px', color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
+                            <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{q.engineers?.name ?? '-'}</td>
+                            <td style={{ padding: '10px 12px', color: TEXT_SECONDARY, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject ?? '-'}</td>
+                            <td style={{ padding: '10px 12px', color: TEXT_SECONDARY, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
+                            <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
+                            <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                              {q.status === '매출완료' && q.total_profit
+                                ? <span style={{ fontWeight: 700, color: '#16a34a' }}>₩{numKR(q.total_profit)}</span>
+                                : <span style={{ color: '#d1d5db' }}>-</span>}
+                            </td>
+                            <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                              {q.status === '매출완료' && q.profit_rate
+                                ? <span style={{ fontWeight: 700, color: q.profit_rate >= 40 ? '#16a34a' : '#f59e0b' }}>{q.profit_rate.toFixed(1)}%</span>
+                                : <span style={{ color: '#d1d5db' }}>-</span>}
+                            </td>
+                            <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                              <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: (STATUS_COLORS[q.status] || '#9ca3af') + '22', color: STATUS_COLORS[q.status] || TEXT_SECONDARY }}>
+                                {q.status}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -795,9 +698,9 @@ export default function CustomerDetailPage() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>업체 정보 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input value={customerEditForm.company_name} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, company_name: e.target.value }))} placeholder="업체명(company_name)" style={inputStyle} />
-                <input value={customerEditForm.address} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, address: e.target.value }))} placeholder="주소(address)" style={inputStyle} />
-                <input value={customerEditForm.agency} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, agency: e.target.value }))} placeholder="대리점(agency)" style={inputStyle} />
+                <input value={customerEditForm.company_name} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, company_name: e.target.value }))} placeholder="업체명" style={inputStyle} />
+                <input value={customerEditForm.address} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, address: e.target.value }))} placeholder="주소" style={inputStyle} />
+                <input value={customerEditForm.agency} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, agency: e.target.value }))} placeholder="대리점" style={inputStyle} />
                 <select value={customerEditForm.status} onChange={(e) => setCustomerEditForm((prev) => ({ ...prev, status: e.target.value }))} style={inputStyle}>
                   <option value="활성">상태: 활성</option>
                   <option value="잠재">상태: 잠재</option>
@@ -821,10 +724,10 @@ export default function CustomerDetailPage() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>담당자 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input value={contactForm.name} onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름(name)" style={inputStyle} />
-                <input value={contactForm.department} onChange={(e) => setContactForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서(department)" style={inputStyle} />
-                <input value={contactForm.position} onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책(position)" style={inputStyle} />
-                <input value={contactForm.phone} onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호(phone)" style={inputStyle} />
+                <input value={contactForm.name} onChange={(e) => setContactForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름" style={inputStyle} />
+                <input value={contactForm.department} onChange={(e) => setContactForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서" style={inputStyle} />
+                <input value={contactForm.position} onChange={(e) => setContactForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책" style={inputStyle} />
+                <input value={contactForm.phone} onChange={(e) => setContactForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호" style={inputStyle} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button onClick={() => setIsAddContactModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
@@ -840,10 +743,10 @@ export default function CustomerDetailPage() {
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>담당자 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
-                <input value={contactEditForm.name} onChange={(e) => setContactEditForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름(name)" style={inputStyle} />
-                <input value={contactEditForm.department} onChange={(e) => setContactEditForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서(department)" style={inputStyle} />
-                <input value={contactEditForm.position} onChange={(e) => setContactEditForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책(position)" style={inputStyle} />
-                <input value={contactEditForm.phone} onChange={(e) => setContactEditForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호(phone)" style={inputStyle} />
+                <input value={contactEditForm.name} onChange={(e) => setContactEditForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="이름" style={inputStyle} />
+                <input value={contactEditForm.department} onChange={(e) => setContactEditForm((prev) => ({ ...prev, department: e.target.value }))} placeholder="부서" style={inputStyle} />
+                <input value={contactEditForm.position} onChange={(e) => setContactEditForm((prev) => ({ ...prev, position: e.target.value }))} placeholder="직책" style={inputStyle} />
+                <input value={contactEditForm.phone} onChange={(e) => setContactEditForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="전화번호" style={inputStyle} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
                 <button onClick={handleDeleteContact} disabled={isSavingContactEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingContactEdit ? 0.7 : 1 }}>삭제</button>
@@ -868,7 +771,7 @@ export default function CustomerDetailPage() {
                   <input value={deviceForm.option} onChange={(e) => setDeviceForm((prev) => ({ ...prev, option: e.target.value }))} placeholder="옵션(ex. -12)" style={{ ...inputStyle, fontSize: 12 }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input value={deviceForm.serial_number} onChange={(e) => setDeviceForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버(serial_number)" style={inputStyle} />
+                  <input value={deviceForm.serial_number} onChange={(e) => setDeviceForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버" style={inputStyle} />
                   <select value={deviceForm.program} onChange={(e) => setDeviceForm((prev) => ({ ...prev, program: e.target.value }))} style={inputStyle}>
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
@@ -885,7 +788,7 @@ export default function CustomerDetailPage() {
                     <option value="84">구분: 84</option>
                   </select>
                 </div>
-                <input value={deviceForm.install_engineer} onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어(install_engineer)" style={inputStyle} />
+                <input value={deviceForm.install_engineer} onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어" style={inputStyle} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button onClick={() => setIsAddDeviceModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
@@ -902,12 +805,12 @@ export default function CustomerDetailPage() {
               <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16, color: TEXT_PRIMARY }}>장비 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  <input value={deviceEditForm.device_name} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name: e.target.value }))} placeholder="장비 라인업(ex. SURFCOM)" style={{ ...inputStyle, fontSize: 12 }} />
-                  <input value={deviceEditForm.device_name2} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name2: e.target.value }))} placeholder="장비 모델명(ex. 1600D)" style={{ ...inputStyle, fontSize: 12 }} />
-                  <input value={deviceEditForm.option} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, option: e.target.value }))} placeholder="옵션(ex. -12)" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceEditForm.device_name} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name: e.target.value }))} placeholder="장비 라인업" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceEditForm.device_name2} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, device_name2: e.target.value }))} placeholder="장비 모델명" style={{ ...inputStyle, fontSize: 12 }} />
+                  <input value={deviceEditForm.option} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, option: e.target.value }))} placeholder="옵션" style={{ ...inputStyle, fontSize: 12 }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <input value={deviceEditForm.serial_number} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버(serial_number)" style={inputStyle} />
+                  <input value={deviceEditForm.serial_number} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, serial_number: e.target.value }))} placeholder="시리얼넘버" style={inputStyle} />
                   <select value={deviceEditForm.program} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, program: e.target.value }))} style={inputStyle}>
                     <option value="ACCTee">프로그램: ACCTee</option>
                     <option value="Tims">프로그램: Tims</option>
@@ -924,7 +827,7 @@ export default function CustomerDetailPage() {
                     <option value="84">구분: 84</option>
                   </select>
                 </div>
-                <input value={deviceEditForm.install_engineer} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어(install_engineer)" style={inputStyle} />
+                <input value={deviceEditForm.install_engineer} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어" style={inputStyle} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
                 <button onClick={handleDeleteDevice} disabled={isSavingDeviceEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDeviceEdit ? 0.7 : 1 }}>삭제</button>
@@ -952,7 +855,7 @@ export default function CustomerDetailPage() {
                   <option value="유상교육">유상교육</option>
                 </select>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
-                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 직원 선택</div>
+                  <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어 선택</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {engineers.map((eng) => {
                       const isSelected = selectedEngineerIds.includes(eng.engineer_id)
