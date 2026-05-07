@@ -547,7 +547,7 @@ export default function SalesPage() {
     setLoading(true)
     const [{ data: qData }, { data: eData }, { data: tData }] = await Promise.all([
       supabase.from('quotes')
-        .select('*, engineers(name, position), customers(company_name)')
+        .select('*, engineers(name, position), customers(company_name), quote_items(product_name)')
         .order('quote_date', { ascending: false }),
       supabase.from('engineers').select('engineer_id, name, position, teams').order('engineer_id'),
       supabase.from('sales_targets').select('*'),
