@@ -32,6 +32,7 @@ type Quote = {
   customer_id: number | null
   engineers?: { name: string; position: string | null }
   customers?: { company_name: string } | null
+  quote_items?: { product_name: string | null }[]
 }
 
 type Engineer = {
