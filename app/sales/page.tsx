@@ -299,7 +299,7 @@ function PerformanceChart({ quotes, fy, targets, engineers, filteredEngineerIds,
               {/* 막대 영역 */}
               <div style={{ position: 'relative', height: BAR_H, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                 {/* 배경 막대 (포캐스트) */}
-                <div style={{ width: barW, height: Math.max(2, (Math.max(d.revenueAmt, d.targetAmt * 0.1) / maxAmt) * BAR_H) || 2, background: '#f1f5f9', borderRadius: '4px 4px 0 0', position: 'absolute', bottom: 0, width: barW }} />
+                <div style={{ width: barW, height: Math.max(2, (Math.max(d.revenueAmt, d.targetAmt * 0.1) / maxAmt) * BAR_H) || 2, background: '#f1f5f9', borderRadius: '4px 4px 0 0', position: 'absolute', bottom: 0 }} />
                 {/* 실적 막대 */}
                 <BarAnimate height={revenueH} color={d.isCurrent ? BLUE : '#94a3b8'} width={barW} />
                 {/* 목표선 (주황) */}
