@@ -474,6 +474,16 @@ export default function QuotePage() {
       />
     ).toBlob()
 
+    // ✅ Supabase Storage에 업로드
+    const engineerFolder = engineer?.name || 'unknown'
+    const yearFolder = new Date().getFullYear().toString() + '년'
+    const storagePath = `견적서/${yearFolder}/${engineerFolder}/${fileName}`
+    await supabase.storage.from('quote-pdfs').upload(storagePath, blob, {
+      contentType: 'application/pdf',
+      upsert: true,
+    })
+
+    // 로컬 다운로드
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -485,7 +495,7 @@ export default function QuotePage() {
       engineer_id: engineer?.engineer_id ?? null,
       quote_id: null,
       quote_number: quoteNo,
-      company_name: (company || customerQuery).trim(),
+      company_name: companyName,
     })
   }
 
