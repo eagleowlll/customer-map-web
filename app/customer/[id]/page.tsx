@@ -259,7 +259,7 @@ export default function CustomerDetailPage() {
     setIsSavingService(false)
     if (engineerError) { alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 추가되었습니다.')
-    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
+    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null, is_paid: true, work_hours: '' })
  setSelectedEngineerIds(currentUserEngineerId ? [currentUserEngineerId] : [])
     setShowExtraEngineers(false)
     setIsServiceModalOpen(true)
