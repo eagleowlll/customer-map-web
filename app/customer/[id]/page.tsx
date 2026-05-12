@@ -232,7 +232,7 @@ export default function CustomerDetailPage() {
 
   const handleOpenServiceModal = (deviceId: number) => {
     setSelectedDeviceId(deviceId)
-    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
+    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null, is_paid: true, work_hours: '' })
     setSelectedEngineerIds(currentUserEngineerId ? [currentUserEngineerId] : [])
     setShowExtraEngineers(false)
     setIsServiceModalOpen(true)
