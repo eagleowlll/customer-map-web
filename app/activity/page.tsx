@@ -20,7 +20,6 @@ type Engineer = {
   name: string
   position: string | null
   teams: string | null
-  permission_level: string
 }
 
 type ActivityRow = {
@@ -57,7 +56,7 @@ export default function ActivityPage() {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [loading, setLoading] = useState(false)
   const [activeBtn, setActiveBtn] = useState<string>('당월')
-  const [currentUser, setCurrentUser] = useState<Engineer | null>(null)
+  const [selectedTeam, setSelectedTeam] = useState<string>('전체')
 
   // 상세 모달
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null)
@@ -65,19 +64,13 @@ export default function ActivityPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [filterType, setFilterType] = useState<string>('전체')
 
-const fetchActivity = async (start: string, end: string) => {
+  const fetchActivity = async (start: string, end: string) => {
     setLoading(true)
 
-    const { data: userData } = await supabase.auth.getUser()
     const { data: engineers } = await supabase
       .from('engineers')
       .select('*')
       .order('engineer_id', { ascending: true })
-
-    if (userData.user && engineers) {
-      const me = engineers.find((e: any) => e.email === userData.user!.email)
-      if (me) setCurrentUser(me)
-    }
 
     const { data: seData } = await supabase
       .from('service_engineers')
@@ -186,16 +179,9 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
   }
 
   // 팀 필터 적용
-const visibleRows = rows.filter(row => {
-    if (!currentUser) return false
-    if (currentUser.permission_level === 'superadmin') return true
-    if (currentUser.permission_level === 'manager') return row.engineer.teams === currentUser.teams
-    return row.engineer.engineer_id === currentUser.engineer_id
-  })
-
   const filteredRows = selectedTeam === '전체'
-    ? visibleRows
-    : visibleRows.filter(row => row.engineer.teams === selectedTeam.replace('팀', ''))
+    ? rows
+    : rows.filter(row => row.engineer.teams === selectedTeam.replace('팀', ''))
 
   const filteredDetails = filterType === '전체'
     ? details
@@ -240,8 +226,7 @@ const visibleRows = rows.filter(row => {
 
 
           {/* 팀 필터 버튼 */}
-      {currentUser?.permission_level !== 'member' && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
   {TEAM_OPTIONS.map(team => (
     <button key={team} onClick={() => setSelectedTeam(team)}
       style={{
@@ -254,7 +239,6 @@ const visibleRows = rows.filter(row => {
     </button>
   ))}
 </div>
-      )}
 </div>
 
         {/* 카드 그리드 */}
