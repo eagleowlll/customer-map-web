@@ -43,7 +43,7 @@ export default function Header() {
     { label: '견적서', onClick: () => router.push('/quote'), path: '/quote' },
     { label: '실적 현황', onClick: () => router.push('/sales'), path: '/sales' },
     { label: '자료실', onClick: () => router.push('/library'), path: '/library' },
-    ...(isAdmin ? [{ label: '⚙️ 관리자', onClick: () => router.push('/admin'), path: '/admin' }] : []),
+    ...(isAdmin ? [{ label: '관리자', onClick: () => router.push('/admin'), path: '/admin' }] : []),
   ]
 
   return (

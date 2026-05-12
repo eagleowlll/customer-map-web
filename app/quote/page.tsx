@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Document, Page, Text, View, StyleSheet, Image, PDFViewer, Font
+  Document, Page, Text, View, StyleSheet, Image, PDFViewer, Font, pdf
 } from '@react-pdf/renderer'
 
 Font.register({
@@ -163,13 +163,20 @@ type PDFDocProps = {
   company: string; receiver: string; quoteNo: string; dateDisplay: string
   titleItem: string; rows: QuoteRow[]; remarks: string; engineerName: string
   totalSupply: number; totalTax: number; totalAmount: number
+  showWatermark?: boolean
 }
 
-function QuotePDFDoc({ company, receiver, quoteNo, dateDisplay, titleItem, rows, remarks, engineerName, totalSupply, totalTax, totalAmount }: PDFDocProps) {
+const QuotePDFDoc = React.memo(function QuotePDFDoc({ company, receiver, quoteNo, dateDisplay, titleItem, rows, remarks, engineerName, totalSupply, totalTax, totalAmount, showWatermark }: PDFDocProps) {
   const EMPTY_ROWS = Math.max(0, 10 - rows.length)
   return (
     <Document>
       <Page size="A4" style={S.page}>
+        {showWatermark && (
+          <View style={{ position: 'absolute', top: 180, left: 20, right: 20, alignItems: 'center', transform: 'rotate(-35deg)', zIndex: 999, opacity: 0.10 }}>
+            <Text style={{ fontSize: 72, fontFamily: 'NotoSansCJK', color: '#000000', textAlign: 'center' }}>미리보기</Text>
+            <Text style={{ fontSize: 36, fontFamily: 'NotoSansCJK', color: '#000000', textAlign: 'center', marginTop: 12 }}>{engineerName}</Text>
+          </View>
+        )}
         <View style={{ position: 'relative', marginBottom: 3 }}>
           <View style={{ alignItems: 'center', marginBottom: 0 }}>
             <Text style={S.titleText}>見　積　書</Text>
@@ -276,7 +283,7 @@ function QuotePDFDoc({ company, receiver, quoteNo, dateDisplay, titleItem, rows,
       </Page>
     </Document>
   )
-}
+}, (prev, next) => JSON.stringify(prev) === JSON.stringify(next))
 
 type ProfitPanelProps = { rows: QuoteRow[]; exchangeRate: number; rateUpdatedAt: string; rateLoading: boolean; onFetchRate: () => void }
 
@@ -328,6 +335,22 @@ function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRa
   )
 }
 
+// ── debounce 훅 ───────────────────────────────────────────────────────────────
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value)
+  useEffect(() => {
+    let mounted = true
+    const timer = setTimeout(() => {
+      if (mounted) setDebounced(value)
+    }, delay)
+    return () => {
+      mounted = false
+      clearTimeout(timer)
+    }
+  }, [value, delay])
+  return debounced
+}
+
 export default function QuotePage() {
   const supabase = createClient()
   const [isClient, setIsClient] = useState(false)
@@ -365,6 +388,13 @@ export default function QuotePage() {
   const [seqIndex, setSeqIndex] = useState(0)
   const seqLetter = String.fromCharCode(65 + seqIndex)
 
+  // ── PDF용 debounced 값 (600ms 지연) ─────────────────────────────────────────
+  const debouncedCompany = useDebounce(company || customerQuery, 600)
+  const debouncedReceiver = useDebounce(receiver, 600)
+  const debouncedTitleItem = useDebounce(titleItem, 600)
+  const debouncedRemarks = useDebounce(remarks, 600)
+  const debouncedRows = useDebounce(rows, 600)
+
   useEffect(() => {
     if (!engineer) return
     const f = async () => {
@@ -381,11 +411,15 @@ export default function QuotePage() {
   const totalSupply = rows.reduce((s, r) => s + r.supply_price, 0)
   const totalTax = rows.reduce((s, r) => s + r.tax, 0)
   const totalAmount = totalSupply + totalTax
-  // 전체 원가 / 이익 / 이익률 계산
   const totalCost = rows.reduce((s, r) => s + r.product_price, 0)
   const totalProfit = rows.reduce((s, r) => s + r.profit, 0)
   const totalProfitRate = totalSupply > 0 ? (totalProfit / totalSupply) * 100 : 0
   const engineerName = engineer ? `${engineer.name} ${engineer.position || ''}`.trim() : ''
+
+  // PDF용 합계 (debounced rows 기준)
+  const pdfTotalSupply = debouncedRows.reduce((s, r) => s + r.supply_price, 0)
+  const pdfTotalTax = debouncedRows.reduce((s, r) => s + r.tax, 0)
+  const pdfTotalAmount = pdfTotalSupply + pdfTotalTax
 
   const handleCustomerSearch = async (q: string) => {
     setCustomerQuery(q)
@@ -413,6 +447,48 @@ export default function QuotePage() {
     setCompany('')
   }
 
+  const handleDownloadPDF = async () => {
+    const firstItem = rows.find(r => r.supply_price > 0)
+    const itemName = firstItem
+      ? (firstItem.selectedItem?.model_jp || firstItem.itemText || '').trim()
+      : ''
+    const companyName = (company || customerQuery).trim()
+    const fileName = [quoteNo, companyName, '견적서', itemName]
+      .filter(Boolean)
+      .join('_')
+      .replace(/[\\/:*?"<>|]/g, '') + '.pdf'
+
+    const blob = await pdf(
+      <QuotePDFDoc
+        company={company || customerQuery}
+        receiver={receiver}
+        quoteNo={quoteNo}
+        dateDisplay={dateDisplay}
+        titleItem={titleItem}
+        rows={rows}
+        remarks={remarks}
+        engineerName={engineerName}
+        totalSupply={totalSupply}
+        totalTax={totalTax}
+        totalAmount={totalAmount}
+      />
+    ).toBlob()
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+
+    await supabase.from('download_logs').insert({
+      engineer_id: engineer?.engineer_id ?? null,
+      quote_id: null,
+      quote_number: quoteNo,
+      company_name: (company || customerQuery).trim(),
+    })
+  }
+
   const handleSaveQuote = async () => {
     if (!engineer) { alert('엔지니어 정보를 불러오는 중입니다.'); return }
     if (!company.trim() && !customerQuery.trim()) { alert('사명을 입력해주세요.'); return }
@@ -433,7 +509,6 @@ export default function QuotePage() {
           total_supply: totalSupply,
           total_tax: totalTax,
           total_amount: totalAmount,
-          // ── 원가/이익 정보 저장 ──
           total_cost: totalCost,
           total_profit: totalProfit,
           profit_rate: parseFloat(totalProfitRate.toFixed(2)),
@@ -441,11 +516,25 @@ export default function QuotePage() {
           recipient: receiver,
           subject: titleItem,
           note: remarks,
+          pdf_url: (() => {
+            const firstItem = rows.find(r => r.supply_price > 0)
+            const itemName = firstItem
+              ? (firstItem.selectedItem?.model_jp || firstItem.itemText || '').trim()
+              : ''
+            const companyName = (company || customerQuery).trim()
+            const fileName = [quoteNo, companyName, '견적서', itemName]
+              .filter(Boolean)
+              .join('_')
+              .replace(/[\\/:*?"<>|]/g, '') + '.pdf'
+            const engineerFolder = engineer?.name || ''
+            const yearFolder = new Date().getFullYear().toString() + '년'
+            const nasPath = `계측부/1. 계측 견적서 통합본/1. 계측_범용계측 (80)/견적서/${yearFolder}/${engineerFolder}/${fileName}`
+            return `https://accretech.synology.me:14506/${nasPath}`
+          })(),
         }).select().single()
 
       if (quoteError) throw quoteError
 
-      // ── quote_items: 원가/이익/환율/관세율 포함 저장 ──
       const items = rows.filter(r => r.supply_price > 0).map(r => ({
         quote_id: quoteData.quote_id,
         price_list_id: r.selectedItem?.id ?? null,
@@ -456,7 +545,6 @@ export default function QuotePage() {
         supply_amount: r.supply_price,
         tax_amount: r.tax,
         category: null,
-        // ── 추가 저장 필드 ──
         cost_amount: r.product_price,
         profit_amount: r.profit,
         profit_rate: r.profit_rate,
@@ -553,6 +641,25 @@ export default function QuotePage() {
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: 20, display: 'flex', gap: 20 }}>
 
         <div style={{ width: 420, flexShrink: 0 }}>
+
+          {/* 접속자 표시 */}
+          {engineer && (
+            <div style={{ background: '#1C3557', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#234ea2', border: '2px solid #AACCFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff' }}>
+                  {engineer.initials || engineer.name.slice(0, 2)}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{engineer.name} {engineer.position}</div>
+                  <div style={{ fontSize: 10, color: '#AACCFF' }}>{engineer.email}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#AACCFF', textAlign: 'right' }}>
+                <div>견적번호</div>
+                <div style={{ fontWeight: 800, color: '#fff', fontSize: 12 }}>{quoteNo}</div>
+              </div>
+            </div>
+          )}
 
           {/* 기본 정보 */}
           <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', marginBottom: 14, border: '1px solid #e5e7eb' }}>
@@ -738,7 +845,6 @@ export default function QuotePage() {
             <div style={{ background: '#234ea2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>📄 PDF 미리보기</span>
 
-              {/* 견적 확정 버튼 */}
               <button
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isSaving}
@@ -750,7 +856,6 @@ export default function QuotePage() {
                 {isSaving ? '저장 중...' : '견적 확정'}
               </button>
 
-              {/* 시퀀스 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 8px' }}>
                 <button onClick={() => setSeqIndex(prev => Math.max(0, prev - 1))} style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: '20px' }}>◀</button>
                 <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, minWidth: 20, textAlign: 'center' }}>{seqLetter}</span>
@@ -758,13 +863,22 @@ export default function QuotePage() {
               </div>
             </div>
 
+            {/* PDF — debounced 값 사용으로 깜빡임 방지 */}
             {isClient && (
-              <PDFViewer width="100%" height="100%" showToolbar style={{ border: 'none' }}>
+              <PDFViewer width="100%" height="100%" showToolbar={false} style={{ border: 'none' }}>
                 <QuotePDFDoc
-                  company={company || customerQuery}
-                  receiver={receiver} quoteNo={quoteNo} dateDisplay={dateDisplay}
-                  titleItem={titleItem} rows={rows} remarks={remarks} engineerName={engineerName}
-                  totalSupply={totalSupply} totalTax={totalTax} totalAmount={totalAmount}
+                  company={debouncedCompany}
+                  receiver={debouncedReceiver}
+                  quoteNo={quoteNo}
+                  dateDisplay={dateDisplay}
+                  titleItem={debouncedTitleItem}
+                  rows={debouncedRows}
+                  remarks={debouncedRemarks}
+                  engineerName={engineerName}
+                  totalSupply={pdfTotalSupply}
+                  totalTax={pdfTotalTax}
+                  totalAmount={pdfTotalAmount}
+                  showWatermark={true}
                 />
               </PDFViewer>
             )}
@@ -781,7 +895,6 @@ export default function QuotePage() {
               견적 확정 시에는 실적으로 기록이 되며<br />
               <b>관리자의 승인 없이는 삭제가 불가능합니다.</b>
             </div>
-            {/* 저장될 수익 정보 미리보기 */}
             <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid #e5e7eb' }}>
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, fontWeight: 700 }}>저장될 수익 정보</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -806,7 +919,17 @@ export default function QuotePage() {
                 style={{ flex: 1, padding: '11px', background: '#f3f4f6', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
-              <button onClick={() => { setShowConfirmModal(false); handleSaveQuote() }}
+       <button onClick={async () => {
+  setShowConfirmModal(false)
+  await handleSaveQuote()
+  await handleDownloadPDF()
+  await supabase.from('download_logs').insert({
+    engineer_id: engineer?.engineer_id ?? null,
+    quote_id: null,
+    quote_number: quoteNo,
+    company_name: (company || customerQuery).trim(),
+  })
+}}
                 style={{ flex: 1, padding: '11px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 확인
               </button>

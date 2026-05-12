@@ -1,7 +1,7 @@
 //고객 상세 페이지
 'use client'
-
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Document, Page, Text, View, StyleSheet, Image, Font, pdf } from '@react-pdf/renderer'
+import { useEffect, useMemo, useState, useCallback, type CSSProperties } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
@@ -49,6 +49,9 @@ type ServiceHistory = {
   service_notes: string | null
   visitor: string | null
   service_type: string | null
+  contact_id: number | null
+  is_paid: boolean | null
+  work_hours: number | null
   service_engineers?: { engineer_id: number; engineers: { name: string; position: string | null } }[]
 }
 
@@ -173,8 +176,8 @@ export default function CustomerDetailPage() {
   const [showExtraEngineers, setShowExtraEngineers] = useState(false)
   const [showExtraEngineersEdit, setShowExtraEngineersEdit] = useState(false)
 
-  const [serviceForm, setServiceForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
-  const [serviceEditForm, setServiceEditForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP' })
+  const [serviceForm, setServiceForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null as number | null, is_paid: true, work_hours: '' })
+  const [serviceEditForm, setServiceEditForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null as number | null, is_paid: true, work_hours: '' })
   const [customerEditForm, setCustomerEditForm] = useState({ company_name: '', address: '', agency: '', status: '활성' })
   const [contactForm, setContactForm] = useState({ name: '', department: '', position: '', phone: '' })
   const [contactEditForm, setContactEditForm] = useState({ name: '', department: '', position: '', phone: '' })
@@ -246,6 +249,9 @@ export default function CustomerDetailPage() {
       customer_id: customerId, device_id: selectedDeviceId, visit_year: visitYear,
       visit_date: serviceForm.visit_date.trim(), service_notes: serviceForm.service_notes.trim(),
       visitor: serviceForm.visitor.trim() || null, service_type: serviceForm.service_type,
+      contact_id: serviceForm.contact_id || null,
+      is_paid: serviceForm.is_paid,
+      work_hours: serviceForm.work_hours ? parseFloat(serviceForm.work_hours) : null,
     }]).select().single()
     if (error) { setIsSavingService(false); alert(error.message || '서비스 기록 저장 중 오류가 발생했습니다.'); return }
     const engineerRows = selectedEngineerIds.map((eid) => ({ service_id: newService.service_id, engineer_id: eid }))
@@ -261,9 +267,9 @@ export default function CustomerDetailPage() {
     await fetchDetail()
   }
 
-  const handleOpenEditServiceModal = (service: ServiceHistory) => {
+const handleOpenEditServiceModal = (service: ServiceHistory) => {
     setSelectedService(service)
-    setServiceEditForm({ visit_date: service.visit_date ?? '', service_notes: service.service_notes ?? '', visitor: service.visitor ?? '', service_type: service.service_type ?? '신규SETUP' })
+    setServiceEditForm({ visit_date: service.visit_date ?? '', service_notes: service.service_notes ?? '', visitor: service.visitor ?? '', service_type: service.service_type ?? '신규SETUP', contact_id: service.contact_id ?? null, is_paid: service.is_paid ?? true, work_hours: service.work_hours ? String(service.work_hours) : '' })
     setSelectedEditEngineerIds((service.service_engineers ?? []).map((se) => se.engineer_id))
     setShowExtraEngineersEdit(false)
     setIsEditServiceModalOpen(true)
@@ -276,10 +282,13 @@ export default function CustomerDetailPage() {
     if (selectedEditEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
     const visitYear = serviceEditForm.visit_date.slice(0, 4)
     setIsSavingServiceEdit(true)
-    const { error } = await supabase.from('service_history').update({
+ const { error } = await supabase.from('service_history').update({
       visit_year: visitYear, visit_date: serviceEditForm.visit_date.trim(),
       service_notes: serviceEditForm.service_notes.trim(), visitor: serviceEditForm.visitor.trim() || null,
       service_type: serviceEditForm.service_type,
+      contact_id: serviceEditForm.contact_id || null,
+      is_paid: serviceEditForm.is_paid,
+      work_hours: serviceEditForm.work_hours ? parseFloat(serviceEditForm.work_hours) : null,
     }).eq('service_id', selectedService.service_id)
     if (error) { setIsSavingServiceEdit(false); alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.'); return }
     await supabase.from('service_engineers').delete().eq('service_id', selectedService.service_id)
@@ -305,6 +314,196 @@ export default function CustomerDetailPage() {
     setSelectedService(null)
     await fetchDetail()
   }
+
+  const handlePrintReport = useCallback(async (service: ServiceHistory, device: Device) => {
+    const contact = contacts.find(c => c.contact_id === service.contact_id) ?? null
+    const engineerNames = (service.service_engineers ?? []).map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
+    const deviceTitle = `${device.device_name ?? ''} ${device.device_name2 ?? ''} ${device.option ?? ''}`.replace(/\s+/g, ' ').trim()
+
+    Font.register({
+      family: 'NotoSansCJK',
+      src: 'https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hfeE.ttf',
+    })
+
+    const RS = StyleSheet.create({
+      page: { fontFamily: 'NotoSansCJK', fontSize: 9, padding: 30, backgroundColor: '#fff' },
+      title: { fontSize: 18, fontFamily: 'NotoSansCJK', textAlign: 'center', marginBottom: 2 },
+      subtitle: { fontSize: 9, textAlign: 'center', color: '#666', marginBottom: 12 },
+      table: { borderWidth: 1, borderColor: '#000' },
+      row: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#999' },
+      cell: { padding: '4 6', borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center' },
+      label: { fontSize: 8, color: '#444', fontFamily: 'NotoSansCJK' },
+      value: { fontSize: 9, fontFamily: 'NotoSansCJK' },
+      sectionTitle: { backgroundColor: '#f0f0f0', padding: '5 6', fontSize: 9, fontFamily: 'NotoSansCJK', textAlign: 'center', borderBottomWidth: 0.5, borderBottomColor: '#999' },
+      contentBox: { minHeight: 80, padding: 10 },
+      footer: { textAlign: 'center', fontSize: 9, marginTop: 10, color: '#333', fontFamily: 'NotoSansCJK' },
+    })
+
+    const ReportDoc = () => (
+      <Document>
+        <Page size="A4" style={RS.page}>
+          <View style={{ borderWidth: 1.5, borderColor: '#000' }}>
+
+            {/* ── 헤더 ── */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: '8 12', borderBottomWidth: 1.5, borderBottomColor: '#000' }}>
+              <View style={{ flex: 1 }} />
+              <View style={{ flex: 2, alignItems: 'center' }}>
+                <Text style={{ fontSize: 22, fontFamily: 'NotoSansCJK', fontWeight: 'bold', letterSpacing: 3 }}>AFTER  SERVICE</Text>
+                <Text style={{ fontSize: 8, color: '#555', fontFamily: 'NotoSansCJK', marginTop: 2 }}>(http://www.accretechkorea.com)</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Image src="/quotelogo.png" style={{ width: 110, height: 26 }} />
+              </View>
+            </View>
+
+            {/* ── 사용자 섹션 ── */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#000', minHeight: 120 }}>
+
+              {/* 사용자 라벨 */}
+              <View style={{ width: 22, borderRightWidth: 1, borderRightColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'사\n용\n자'}</Text>
+              </View>
+
+              {/* 고객사/날짜/담당자/방문부서/연락처 */}
+              <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: '#000' }}>
+                {/* 고객사 */}
+                <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#999', height: 48, alignItems: 'center' }}>
+                  <View style={{ width: 55, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>고객사</Text>
+                  </View>
+               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{customer?.company_name ?? '-'}</Text>
+                  </View>
+                </View>
+                {/* 날짜 */}
+                <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#999', height: 24, alignItems: 'center' }}>
+                  <View style={{ width: 55, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>날짜</Text>
+                  </View>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>{service.visit_date ?? '-'}</Text>
+                  </View>
+                </View>
+                {/* 담당자 */}
+                <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#999', height: 24, alignItems: 'center' }}>
+                  <View style={{ width: 55, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>담당자</Text>
+                  </View>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>{contact ? `${contact.name ?? ''} ${contact.position ?? ''}`.trim() : '-'}</Text>
+                  </View>
+                </View>
+                {/* 방문부서 */}
+                <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#999', height: 24, alignItems: 'center' }}>
+                  <View style={{ width: 55, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>방문부서</Text>
+                  </View>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>{contact?.department ?? '-'}</Text>
+                  </View>
+                </View>
+                {/* 연락처 */}
+                <View style={{ flexDirection: 'row', height: 24, alignItems: 'center' }}>
+                  <View style={{ width: 55, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>연락처</Text>
+                  </View>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>{contact?.phone ?? '-'}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* 서명 섹션 */}
+              <View style={{ width: 180 }}>
+                {/* 고객 서명 — 고객사+날짜 높이(72) */}
+                <View style={{ height: 72, borderBottomWidth: 0.5, borderBottomColor: '#999', flexDirection: 'row' }}>
+                 <View style={{ width: 28, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'고\n객'}</Text>
+                  </View>
+                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999' }} />
+                  <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'서\n명'}</Text>
+                  </View>
+                </View>
+                {/* 담당 서명 — 담당자+방문부서+연락처 높이(72) */}
+                <View style={{ height: 72, flexDirection: 'row' }}>
+                <View style={{ width: 28, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'담\n당'}</Text>
+                  </View>
+                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999' }} />
+                  <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'서\n명'}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ── 엔지니어/장비 섹션 — 좌우 50:50 ── */}
+            {[
+              { label: '엔지니어 이름', value: engineerNames, label2: '사업부', value2: '계측' },
+              { label: '장비종류', value: device.device_name ?? '-', label2: '유/무상', value2: service.is_paid ? '유상' : '무상' },
+              { label: '장비명', value: `${device.device_name2 ?? ''} ${device.option ?? ''}`.trim() || '-', label2: '대리점', value2: customer?.agency ?? '-' },
+              { label: 'SER.NO', value: device.serial_number ?? '-', label2: 'OS Ver.', value2: device.program ?? '-' },
+              { label: '작업유형', value: service.service_type ?? '-', label2: '작업시간', value2: service.work_hours ? `${service.work_hours}h` : '-' },
+            ].map(({ label, value, label2, value2 }, i, arr) => (
+              <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i < arr.length - 1 ? 0.5 : 1, borderBottomColor: i < arr.length - 1 ? '#999' : '#000', height: 22, alignItems: 'center' }}>
+                {/* 왼쪽 50% */}
+                <View style={{ flex: 1, flexDirection: 'row', borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', alignItems: 'center' }}>
+                  <View style={{ width: 70, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' , textAlign: 'center'}}>{label}</Text>
+                  </View>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{value}</Text>
+                  </View>
+                </View>
+                {/* 오른쪽 50% */}
+                <View style={{ flex: 1, flexDirection: 'row', height: '100%', alignItems: 'center' }}>
+                  <View style={{ width: 70, borderRightWidth: 0.5, borderRightColor: '#999', height: '100%', justifyContent: 'center', paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', fontWeight: 'bold' ,textAlign: 'center'}}>{label2}</Text>
+                  </View>
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{value2}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            {/* ── A/S 내용 ── */}
+            <View style={{ borderBottomWidth: 1, borderBottomColor: '#000' }}>
+              <View style={{ borderBottomWidth: 1, borderBottomColor: '#555', padding: '4 0', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>A/S 및 납입 내용</Text>
+              </View>
+              <View style={{ minHeight: 260, padding: '8 10' }}>
+                <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK', lineHeight: 1.6 }}>{service.service_notes ?? ''}</Text>
+              </View>
+            </View>
+
+            {/* ── 기타사항 ── */}
+            <View>
+              <View style={{ borderBottomWidth: 1, borderBottomColor: '#555', padding: '4 0', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontFamily: 'NotoSansCJK' }}>기타사항</Text>
+              </View>
+              <View style={{ minHeight: 60, padding: '8 10' }}>
+              </View>
+            </View>
+
+          </View>
+
+          {/* 하단 회사명 */}
+          <Text style={{ textAlign: 'center', fontSize: 10, marginTop: 8, fontFamily: 'NotoSansCJK', fontWeight: 'bold' }}>ACCRETECHKOREA Co., Ltd.</Text>
+        </Page>
+      </Document>
+    )
+
+    const blob = await pdf(<ReportDoc />).toBlob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const dateStr = service.visit_date?.replace(/-/g, '') ?? 'unknown'
+    a.download = `${dateStr}_${customer?.company_name ?? ''}_서비스레포트.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [contacts, customer, engineers])
 
   const handleOpenEditCustomerModal = () => {
     setCustomerEditForm({ company_name: customer?.company_name ?? '', address: customer?.address ?? '', agency: customer?.agency ?? '', status: customer?.status ?? '활성' })
@@ -594,7 +793,10 @@ export default function CustomerDetailPage() {
                       <div key={`${d.device_id}-${h.service_id}`} style={{ width: '100%', background: INNER_CARD_BG, color: TEXT_PRIMARY, borderRadius: 12, padding: 14, fontSize: 14, border: `1px solid ${INPUT_BORDER}`, boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
                           <div style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</div>
-                          <button onClick={() => handleOpenEditServiceModal(h)} style={{ padding: '6px 10px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>수정</button>
+                         <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => handleOpenEditServiceModal(h)} style={{ padding: '6px 10px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>수정</button>
+                            <button onClick={() => handlePrintReport(h, d)} style={{ padding: '6px 10px', background: '#16a34a', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>레포트</button>
+                          </div>
                         </div>
                         <div style={{ marginBottom: 18, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: TEXT_PRIMARY }}>{h.service_notes ?? '-'}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10, fontSize: 12, color: TEXT_MUTED }}>
@@ -859,7 +1061,7 @@ export default function CustomerDetailPage() {
               <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <textarea value={serviceForm.service_notes} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <select value={serviceForm.service_type} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
                     <option value="신규SETUP">신규 SETUP</option>
                     <option value="A/S(유상)">A/S (유상)</option>
@@ -868,6 +1070,19 @@ export default function CustomerDetailPage() {
                     <option value="유상교육">유상교육</option>
                   </select>
                   <input type="date" value={serviceForm.visit_date} onChange={(e) => setServiceForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <select value={serviceForm.contact_id ?? ''} onChange={(e) => setServiceForm((prev) => ({ ...prev, contact_id: e.target.value ? Number(e.target.value) : null }))} style={inputStyle}>
+                    <option value="">고객 담당자 선택</option>
+                    {contacts.map(c => (
+                      <option key={c.contact_id} value={c.contact_id}>{c.name} {c.position ?? ''}</option>
+                    ))}
+                  </select>
+                  <select value={serviceForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
+                    <option value="true">유상</option>
+                    <option value="false">무상</option>
+                  </select>
+                  <input type="number" value={serviceForm.work_hours} onChange={(e) => setServiceForm((prev) => ({ ...prev, work_hours: e.target.value }))} placeholder="작업시간 (h)" step="0.5" min="0" style={inputStyle} />
                 </div>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
                   <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어</div>
@@ -921,7 +1136,7 @@ export default function CustomerDetailPage() {
               <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <textarea value={serviceEditForm.service_notes} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <select value={serviceEditForm.service_type} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
                     <option value="신규SETUP">신규 SETUP</option>
                     <option value="A/S(유상)">A/S (유상)</option>
@@ -930,6 +1145,19 @@ export default function CustomerDetailPage() {
                     <option value="유상교육">유상교육</option>
                   </select>
                   <input type="date" value={serviceEditForm.visit_date} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
+                </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <select value={serviceEditForm.contact_id ?? ''} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, contact_id: e.target.value ? Number(e.target.value) : null }))} style={inputStyle}>
+                    <option value="">고객 담당자 선택</option>
+                    {contacts.map(c => (
+                      <option key={c.contact_id} value={c.contact_id}>{c.name} {c.position ?? ''}</option>
+                    ))}
+                  </select>
+                  <select value={serviceEditForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
+                    <option value="true">유상</option>
+                    <option value="false">무상</option>
+                  </select>
+                  <input type="number" value={serviceEditForm.work_hours} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, work_hours: e.target.value }))} placeholder="작업시간 (h)" step="0.5" min="0" style={inputStyle} />
                 </div>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
                   <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어</div>
