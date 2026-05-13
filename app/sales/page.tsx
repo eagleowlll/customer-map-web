@@ -487,12 +487,15 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
 }
 
 // ── 개인 견적 모달 ────────────────────────────────────────────────────────────
-function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
+function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onStatusSave }: {
   engineer: Engineer & { quotedAmt: number; revenueAmt: number; profitAmt: number; profitRate: number | null; targetAmt: number; achieve: number | null }
   quotes: Quote[]
+  currentEngineerId: number | null
   onClose: () => void
   onStatusSave: (q: Quote, status: string, orderDate: string, revenueDate: string, failReason: string) => Promise<void>
-}) {
+})
+ {
+  const supabase = createClient()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('전체')
   const [page, setPage] = useState(1)
@@ -597,7 +600,16 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
                             if (!path) return
                             const res = await fetch(`/api/quote-pdf?path=${encodeURIComponent(path)}`)
                             const json = await res.json()
-                            if (json.signedUrl) window.open(json.signedUrl, '_blank')
+                            if (json.signedUrl) {
+                              window.open(json.signedUrl, '_blank')
+                              await supabase.from('download_logs').insert({
+                                engineer_id: currentEngineerId,
+                                quote_id: q.quote_id,
+                                quote_number: q.quote_number,
+                                company_name: q.customers?.company_name ?? null,
+                                action: 'view',
+                              })
+                            }
                           }}
                           style={{ cursor: q.pdf_url ? 'pointer' : 'default', textDecoration: q.pdf_url ? 'underline' : 'none' }}>
                           {q.quote_number} {q.pdf_url ? '📄' : ''}
@@ -712,7 +724,7 @@ export default function SalesPage() {
     const [{ data: qData }, { data: eData }, { data: tData }, { data: meData }] = await Promise.all([
       supabase.from('quotes')
         .select('*, engineers(name, position), customers(company_name), quote_items(product_name, price_list(model_jp))')
-        .order('quote_date', { ascending: false }),
+        .order('quote_date', { ascending: false }).order('quote_number', { ascending: false }),
       supabase.from('engineers').select('engineer_id, name, position, teams, permission_level').order('engineer_id'),
       supabase.from('sales_targets').select('*'),
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
@@ -974,6 +986,7 @@ export default function SalesPage() {
         <EngineerQuoteModal
           engineer={selectedEngineer}
           quotes={filteredQuotes.filter(q => q.engineer_id === selectedEngineer.engineer_id)}
+          currentEngineerId={currentEngineer?.engineer_id ?? null}
           onClose={() => setSelectedEngineer(null)}
           onStatusSave={async (q, status, orderDate, revenueDate, failReason) => {
             await handleStatusSave(q, status, orderDate, revenueDate, failReason)

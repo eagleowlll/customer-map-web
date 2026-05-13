@@ -477,11 +477,14 @@ export default function QuotePage() {
     // ✅ Supabase Storage에 업로드
     const engineerFolder = engineer?.name || 'unknown'
     const yearFolder = new Date().getFullYear().toString() + '년'
-    const storagePath = `견적서/${yearFolder}/${engineerFolder}/${fileName}`
-    await supabase.storage.from('quote-pdfs').upload(storagePath, blob, {
+   const safeFileName = `${quoteNo}.pdf`
+    const storagePath = safeFileName
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('quote-pdfs').upload(storagePath, blob, {
       contentType: 'application/pdf',
       upsert: true,
     })
+    console.log('upload data:', uploadData)
+    console.log('upload error:', uploadError)
 
     // 로컬 다운로드
     const url = URL.createObjectURL(blob)
@@ -495,7 +498,8 @@ export default function QuotePage() {
       engineer_id: engineer?.engineer_id ?? null,
       quote_id: null,
       quote_number: quoteNo,
-      company_name: companyName,
+      company_name: (company || customerQuery).trim(),
+      action: 'download',
     })
   }
 
@@ -527,18 +531,7 @@ export default function QuotePage() {
           subject: titleItem,
           note: remarks,
           pdf_url: (() => {
-            const firstItem = rows.find(r => r.supply_price > 0)
-            const itemName = firstItem
-              ? (firstItem.selectedItem?.model_jp || firstItem.itemText || '').trim()
-              : ''
-            const companyName = (company || customerQuery).trim()
-            const fileName = [quoteNo, companyName, '견적서', itemName]
-              .filter(Boolean)
-              .join('_')
-              .replace(/[\\/:*?"<>|]/g, '') + '.pdf'
-            const engineerFolder = engineer?.name || ''
-            const yearFolder = new Date().getFullYear().toString() + '년'
-            return `quote-pdfs/견적서/${yearFolder}/${engineerFolder}/${fileName}`
+         return `quote-pdfs/${quoteNo}.pdf`
           })(),
         }).select().single()
 
@@ -932,12 +925,6 @@ export default function QuotePage() {
   setShowConfirmModal(false)
   await handleSaveQuote()
   await handleDownloadPDF()
-  await supabase.from('download_logs').insert({
-    engineer_id: engineer?.engineer_id ?? null,
-    quote_id: null,
-    quote_number: quoteNo,
-    company_name: (company || customerQuery).trim(),
-  })
 }}
                 style={{ flex: 1, padding: '11px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 확인

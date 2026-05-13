@@ -19,6 +19,7 @@ type Quote = {
   total_supply: number
   status: string
   subject: string | null
+  pdf_url?: string | null
   engineers?: { name: string } | null
   customers?: { company_name: string } | null
 }
@@ -142,6 +143,14 @@ export default function AdminPage() {
     setDeleting(quote.quote_id)
     await supabase.from('quote_items').delete().eq('quote_id', quote.quote_id)
     await supabase.from('quotes').delete().eq('quote_id', quote.quote_id)
+   if (quote.pdf_url) {
+      const filePath = quote.pdf_url.replace('quote-pdfs/', '')
+      await fetch('/api/delete-quote-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+      })
+    }
     setDeleting(null)
     fetchQuotes(searchQuery)
   }
@@ -512,7 +521,7 @@ export default function AdminPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead style={{ position: 'sticky', top: 0, background: CARD_BG }}>
                     <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
-                      {['일시', '담당자', '견적번호', '고객사'].map(h => (
+                      {['일시', '담당자', '견적번호', '고객사', '구분'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: GRAY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -525,9 +534,20 @@ export default function AdminPage() {
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>
                           {new Date(log.downloaded_at).toLocaleString('ko-KR')}
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>{log.engineers?.name || '-'}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+  {log.engineers?.name || (log.action === 'view' ? '(열람자 미확인)' : '-')}
+</td>
                         <td style={{ padding: '10px 12px', color: BLUE, fontWeight: 700, whiteSpace: 'nowrap' }}>{log.quote_number}</td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{log.company_name || '-'}</td>
+                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+  <span style={{
+    padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+    background: log.action === 'view' ? '#eff6ff' : '#f0fdf4',
+    color: log.action === 'view' ? '#234ea2' : '#16a34a',
+  }}>
+    {log.action === 'view' ? '열람' : '다운로드'}
+  </span>
+</td>
                       </tr>
                     ))}
                   </tbody>
