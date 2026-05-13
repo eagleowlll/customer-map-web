@@ -119,11 +119,14 @@ export default function AdminPage() {
 
   const fetchLogs = async () => {
     setLogLoading(true)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     const { data } = await supabase
       .from('download_logs')
       .select('*, engineers(name)')
+      .gte('downloaded_at', sevenDaysAgo.toISOString())
       .order('downloaded_at', { ascending: false })
-      .limit(100)
+      .limit(1000)
     setLogs(data || [])
     setLogLoading(false)
   }
@@ -510,7 +513,7 @@ export default function AdminPage() {
       {/* ── 다운로드 로그 모달 ── */}
       {showLogModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: CARD_BG, borderRadius: 18, padding: 24, width: '100%', maxWidth: 800, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: CARD_BG, borderRadius: 18, padding: 24, width: '100%', maxWidth: 1100, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: TEXT }}>📋 다운로드 로그</div>
               <button onClick={() => setShowLogModal(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -555,7 +558,7 @@ export default function AdminPage() {
                 </table>
               )}
             </div>
-            <div style={{ marginTop: 12, fontSize: 12, color: GRAY }}>* 최근 100건 표시</div>
+            <div style={{ marginTop: 12, fontSize: 12, color: GRAY }}>* 최근 7일 이내 · 최대 1000건 표시 / 전체 기록은 Supabase에 보관됩니다</div>
           </div>
         </div>
       )}
