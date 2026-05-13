@@ -352,14 +352,7 @@ export default function AddCustomerModal({
                       gap: 10,
                     }}
                   >
-                    <input
-                      value={device.install_engineer}
-                      onChange={(e) =>
-                        updateDeviceForm(index, 'install_engineer', e.target.value)
-                      }
-                      placeholder="설치 엔지니어(install_engineer)"
-                      style={inputStyle}
-                    />
+                   
 
                     <input
                       type="file"
