@@ -12,7 +12,7 @@ const TEXT_MUTED = '#9ca3af'
 const BLUE_BG = '#234ea2'
 const BLUE_TEXT = '#ffffff'
 
-const SERVICE_TYPES = ['신규SETUP', 'A/S(유상)', 'B/S(영업)', '이전SETUP', '유상교육']
+const SERVICE_TYPES = ['신규설치', '이전설치', 'A/S', 'B/S', '교육']
 const TEAM_OPTIONS = ['전체', '1팀', '2팀', '3팀', '4팀']
 
 type Engineer = {
@@ -20,6 +20,7 @@ type Engineer = {
   name: string
   position: string | null
   teams: string | null
+  email: string | null
 }
 
 type ActivityRow = {
@@ -32,10 +33,10 @@ type ServiceDetail = {
   service_id: number
   visit_date: string
   service_type: string
+  is_paid: boolean | null
   customer_name: string
   service_notes: string | null
 }
-
 export default function ActivityPage() {
   const supabase = createClient()
 
@@ -57,6 +58,7 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(false)
   const [activeBtn, setActiveBtn] = useState<string>('당월')
   const [selectedTeam, setSelectedTeam] = useState<string>('전체')
+  const [currentUser, setCurrentUser] = useState<Engineer | null>(null)
 
   // 상세 모달
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null)
@@ -67,10 +69,26 @@ export default function ActivityPage() {
   const fetchActivity = async (start: string, end: string) => {
     setLoading(true)
 
+    const { data: { user } } = await supabase.auth.getUser()
+
     const { data: engineers } = await supabase
       .from('engineers')
       .select('*')
       .order('engineer_id', { ascending: true })
+
+    // 현재 접속자 찾기
+    if (user && engineers) {
+      const me = (engineers as Engineer[]).find(e => e.email === user.email)
+      if (me && !currentUser) {
+        setCurrentUser(me)
+        // 임원/영업관리는 전체, 나머지는 본인 팀
+        if (me.teams && !['임원', '영업관리'].includes(me.teams)) {
+          setSelectedTeam(`${me.teams}팀`)
+        } else {
+          setSelectedTeam('전체')
+        }
+      }
+    }
 
     const { data: seData } = await supabase
       .from('service_engineers')
@@ -87,16 +105,16 @@ export default function ActivityPage() {
       shMap[sh.service_id] = { service_type: sh.service_type, visit_date: sh.visit_date }
     })
 
-   const positionOrder: Record<string, number> = { '수석': 0, '책임': 1, '선임': 2, '사원': 3 }
-const sortedEngineers = (engineers ?? [])
-  .filter((e: any) => !['임원', '영업관리'].includes(e.teams ?? ''))
-  .sort((a, b) => {
-    const aOrder = positionOrder[a.position ?? ''] ?? 99
-    const bOrder = positionOrder[b.position ?? ''] ?? 99
-    return aOrder - bOrder
-  })
+    const positionOrder: Record<string, number> = { '수석': 0, '책임': 1, '선임': 2, '사원': 3 }
+    const sortedEngineers = (engineers ?? [])
+      .filter((e: any) => !['임원', '영업관리'].includes(e.teams ?? ''))
+      .sort((a, b) => {
+        const aOrder = positionOrder[a.position ?? ''] ?? 99
+        const bOrder = positionOrder[b.position ?? ''] ?? 99
+        return aOrder - bOrder
+      })
 
-const result: ActivityRow[] = sortedEngineers.map((eng) => {
+    const result: ActivityRow[] = sortedEngineers.map((eng) => {
       const counts: Record<string, number> = {}
       SERVICE_TYPES.forEach((t) => { counts[t] = 0 })
 
@@ -137,7 +155,7 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
 
     const { data: shData } = await supabase
       .from('service_history')
-      .select('service_id, visit_date, service_type, service_notes, customer_id, customers(company_name)')
+      .select('service_id, visit_date, service_type, is_paid, service_notes, customer_id, customers(company_name)')
       .in('service_id', serviceIds)
       .gte('visit_date', startDate)
       .lte('visit_date', endDate)
@@ -147,6 +165,7 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
       service_id: sh.service_id,
       visit_date: sh.visit_date,
       service_type: sh.service_type,
+      is_paid: sh.is_paid,
       customer_name: sh.customers?.company_name ?? '-',
       service_notes: sh.service_notes,
     }))
@@ -226,22 +245,21 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
             </button>
           ))}
 
-
           {/* 팀 필터 버튼 */}
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-  {TEAM_OPTIONS.map(team => (
-    <button key={team} onClick={() => setSelectedTeam(team)}
-      style={{
-        padding: '8px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-        border: `1px solid ${selectedTeam === team ? BLUE_BG : INPUT_BORDER}`,
-        background: selectedTeam === team ? BLUE_BG : PAGE_BG,
-        color: selectedTeam === team ? BLUE_TEXT : TEXT_PRIMARY,
-      }}>
-      {team}
-    </button>
-  ))}
-</div>
-</div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            {TEAM_OPTIONS.map(team => (
+              <button key={team} onClick={() => setSelectedTeam(team)}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                  border: `1px solid ${selectedTeam === team ? BLUE_BG : INPUT_BORDER}`,
+                  background: selectedTeam === team ? BLUE_BG : PAGE_BG,
+                  color: selectedTeam === team ? BLUE_TEXT : TEXT_PRIMARY,
+                }}>
+                {team}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* 카드 그리드 */}
         {loading ? (
@@ -260,20 +278,20 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(35,78,162,0.15)')}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)')}
               >
-               <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-    <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
-    <div style={{ fontSize: 13, color: TEXT_MUTED }}>{row.engineer.position ?? ''}</div>
-  </div>
-  {row.engineer.teams && (
-    <span style={{
-      fontSize: 11, fontWeight: 700, padding: '2px 8px',
-      borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, flexShrink: 0,
-    }}>
-      {row.engineer.teams}팀
-    </span>
-  )}
-</div>
+                <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
+                    <div style={{ fontSize: 13, color: TEXT_MUTED }}>{row.engineer.position ?? ''}</div>
+                  </div>
+                  {row.engineer.teams && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, padding: '2px 8px',
+                      borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, flexShrink: 0,
+                    }}>
+                      {row.engineer.teams}팀
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
                   {SERVICE_TYPES.map((type) => (
                     <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -349,8 +367,8 @@ const result: ActivityRow[] = sortedEngineers.map((eng) => {
                       )}
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, marginBottom: 4 }}>
-                        {d.service_type}
+                   <div style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, marginBottom: 4 }}>
+                        {d.service_type}{d.is_paid !== null ? `(${d.is_paid ? '유상' : '무상'})` : ''}
                       </div>
                       <div style={{ fontSize: 12, color: TEXT_MUTED }}>{d.visit_date}</div>
                     </div>

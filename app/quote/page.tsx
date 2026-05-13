@@ -395,17 +395,18 @@ export default function QuotePage() {
   const debouncedRemarks = useDebounce(remarks, 600)
   const debouncedRows = useDebounce(rows, 600)
 
-  useEffect(() => {
+ useEffect(() => {
     if (!engineer) return
     const f = async () => {
       const { data } = await supabase
         .from('quote_sequence').select('seq')
         .eq('date_str', dateStr).eq('engineer_id', engineer.engineer_id)
         .order('seq', { ascending: false }).limit(1).single()
-      setSeqIndex(data ? data.seq : 0)
+      // 오늘 마지막으로 쓴 seq+1 로 시작 (없으면 0 = A)
+      setSeqIndex(data ? data.seq + 1 : 0)
     }
     f()
-  }, [engineer])
+  }, [engineer, dateStr])
 
   const quoteNo = `No.${(engineer?.initials || 'KJW').toUpperCase()}${dateStr}-${seqLetter}`
   const totalSupply = rows.reduce((s, r) => s + r.supply_price, 0)
@@ -447,46 +448,57 @@ export default function QuotePage() {
     setCompany('')
   }
 
-  const handleDownloadPDF = async () => {
-    const firstItem = rows.find(r => r.supply_price > 0)
+const handleDownloadPDF = async (
+    overrideCompany?: string,
+    overrideReceiver?: string,
+    overrideTitleItem?: string,
+    overrideRows?: QuoteRow[],
+    overrideRemarks?: string,
+    overrideQuoteNo?: string,
+  ) => {
+    const finalCompany = overrideCompany ?? (company || customerQuery)
+    const finalReceiver = overrideReceiver ?? receiver
+    const finalTitleItem = overrideTitleItem ?? titleItem
+    const finalRows = overrideRows ?? rows
+    const finalRemarks = overrideRemarks ?? remarks
+    const finalQuoteNo = overrideQuoteNo ?? quoteNo
+
+    const firstItem = finalRows.find(r => r.supply_price > 0)
     const itemName = firstItem
       ? (firstItem.selectedItem?.model_jp || firstItem.itemText || '').trim()
       : ''
-    const companyName = (company || customerQuery).trim()
-    const fileName = [quoteNo, companyName, '견적서', itemName]
+    const companyName = finalCompany.trim()
+    const fileName = [finalQuoteNo, companyName, '견적서', itemName]
       .filter(Boolean)
       .join('_')
       .replace(/[\\/:*?"<>|]/g, '') + '.pdf'
 
+    const finalTotalSupply = finalRows.reduce((s, r) => s + r.supply_price, 0)
+    const finalTotalTax = finalRows.reduce((s, r) => s + r.tax, 0)
+    const finalTotalAmount = finalTotalSupply + finalTotalTax
+
     const blob = await pdf(
       <QuotePDFDoc
-        company={company || customerQuery}
-        receiver={receiver}
-        quoteNo={quoteNo}
+        company={finalCompany}
+        receiver={finalReceiver}
+        quoteNo={finalQuoteNo}
         dateDisplay={dateDisplay}
-        titleItem={titleItem}
-        rows={rows}
-        remarks={remarks}
+        titleItem={finalTitleItem}
+        rows={finalRows}
+        remarks={finalRemarks}
         engineerName={engineerName}
-        totalSupply={totalSupply}
-        totalTax={totalTax}
-        totalAmount={totalAmount}
+        totalSupply={finalTotalSupply}
+        totalTax={finalTotalTax}
+        totalAmount={finalTotalAmount}
       />
     ).toBlob()
 
-    // ✅ Supabase Storage에 업로드
-    const engineerFolder = engineer?.name || 'unknown'
-    const yearFolder = new Date().getFullYear().toString() + '년'
-   const safeFileName = `${quoteNo}.pdf`
-    const storagePath = safeFileName
-    const { data: uploadData, error: uploadError } = await supabase.storage.from('quote-pdfs').upload(storagePath, blob, {
+    const safeFileName = `${finalQuoteNo}.pdf`
+    await supabase.storage.from('quote-pdfs').upload(safeFileName, blob, {
       contentType: 'application/pdf',
       upsert: true,
     })
-    console.log('upload data:', uploadData)
-    console.log('upload error:', uploadError)
 
-    // 로컬 다운로드
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -497,8 +509,8 @@ export default function QuotePage() {
     await supabase.from('download_logs').insert({
       engineer_id: engineer?.engineer_id ?? null,
       quote_id: null,
-      quote_number: quoteNo,
-      company_name: (company || customerQuery).trim(),
+      quote_number: finalQuoteNo,
+      company_name: companyName,
       action: 'download',
     })
   }
@@ -558,9 +570,7 @@ export default function QuotePage() {
         const { error: itemsError } = await supabase.from('quote_items').insert(items)
         if (itemsError) throw itemsError
       }
-
-      setSeqIndex(prev => prev + 1)
-      alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
+alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
     } catch (e) {
       console.error(e)
       alert('저장 중 오류가 발생했습니다.')
@@ -707,19 +717,23 @@ export default function QuotePage() {
             </div>
           </div>
 
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
-              <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
-            </div>
+          <div style={{ position: 'relative', overflow: 'hidden' }}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} style={{ position: 'absolute', top: `${i * 25}%`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
+                <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+              </div>
+            ))}
             <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} />
           </div>
 
           {/* 품목 */}
-          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative' }}>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06, borderRadius: 12, overflow: 'hidden' }}>
-              <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}>품목</div>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative', overflow: 'hidden' }}>
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{ position: 'absolute', top: `${i * 18}%`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
+                <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+              </div>
+            ))}
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}> 품목</div>
 
             {rows.map((row, rowIdx) => (
               <div key={row.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px', marginBottom: 10, border: '1px solid #e5e7eb' }}>
@@ -847,10 +861,8 @@ export default function QuotePage() {
                 {isSaving ? '저장 중...' : '견적 확정'}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 8px' }}>
-                <button onClick={() => setSeqIndex(prev => Math.max(0, prev - 1))} style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: '20px' }}>◀</button>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, minWidth: 20, textAlign: 'center' }}>{seqLetter}</span>
-                <button onClick={() => setSeqIndex(prev => Math.min(25, prev + 1))} style={{ width: 22, height: 22, border: 'none', borderRadius: 4, background: 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', fontSize: 13, lineHeight: '20px' }}>▶</button>
+             <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 12px' }}>
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>{seqLetter}</span>
               </div>
             </div>
 
@@ -910,10 +922,17 @@ export default function QuotePage() {
                 style={{ flex: 1, padding: '11px', background: '#f3f4f6', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 취소
               </button>
-       <button onClick={async () => {
+      <button onClick={async () => {
   setShowConfirmModal(false)
+  const snapshotCompany = company || customerQuery
+  const snapshotReceiver = receiver
+  const snapshotTitleItem = titleItem
+  const snapshotRows = [...rows]
+  const snapshotRemarks = remarks
+  const snapshotQuoteNo = quoteNo
   await handleSaveQuote()
-  await handleDownloadPDF()
+  await handleDownloadPDF(snapshotCompany, snapshotReceiver, snapshotTitleItem, snapshotRows, snapshotRemarks, snapshotQuoteNo)
+  setSeqIndex(prev => prev + 1)
 }}
                 style={{ flex: 1, padding: '11px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 확인

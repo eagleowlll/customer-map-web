@@ -176,8 +176,8 @@ export default function CustomerDetailPage() {
   const [showExtraEngineers, setShowExtraEngineers] = useState(false)
   const [showExtraEngineersEdit, setShowExtraEngineersEdit] = useState(false)
 
-  const [serviceForm, setServiceForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null as number | null, is_paid: true, work_hours: '' })
-  const [serviceEditForm, setServiceEditForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null as number | null, is_paid: true, work_hours: '' })
+  const [serviceForm, setServiceForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규설치', contact_id: null as number | null, is_paid: true, work_hours: '2' })
+  const [serviceEditForm, setServiceEditForm] = useState({ visit_date: '', service_notes: '', visitor: '', service_type: '신규설치', contact_id: null as number | null, is_paid: true, work_hours: '2' })
   const [customerEditForm, setCustomerEditForm] = useState({ company_name: '', address: '', agency: '', status: '활성' })
   const [contactForm, setContactForm] = useState({ name: '', department: '', position: '', phone: '' })
   const [contactEditForm, setContactEditForm] = useState({ name: '', department: '', position: '', phone: '' })
@@ -232,7 +232,9 @@ export default function CustomerDetailPage() {
 
   const handleOpenServiceModal = (deviceId: number) => {
     setSelectedDeviceId(deviceId)
-    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null, is_paid: true, work_hours: '' })
+   const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    setServiceForm({ visit_date: todayStr, service_notes: '', visitor: '', service_type: '신규설치', contact_id: null, is_paid: true, work_hours: '2' })
     setSelectedEngineerIds(currentUserEngineerId ? [currentUserEngineerId] : [])
     setShowExtraEngineers(false)
     setIsServiceModalOpen(true)
@@ -242,6 +244,7 @@ export default function CustomerDetailPage() {
     if (!selectedDeviceId) { alert('장비를 먼저 선택해주세요.'); return }
     if (!serviceForm.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
     if (!serviceForm.service_notes.trim()) { alert('서비스 내용을 입력해주세요.'); return }
+    if (!serviceForm.contact_id) { alert('고객 담당자를 선택해주세요.'); return }
     if (selectedEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
     const visitYear = serviceForm.visit_date.slice(0, 4)
     setIsSavingService(true)
@@ -259,7 +262,7 @@ export default function CustomerDetailPage() {
     setIsSavingService(false)
     if (engineerError) { alert(engineerError.message || '엔지니어 연결 저장 중 오류가 발생했습니다.'); return }
     alert('서비스 기록이 추가되었습니다.')
-    setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규SETUP', contact_id: null, is_paid: true, work_hours: '' })
+ setServiceForm({ visit_date: '', service_notes: '', visitor: '', service_type: '신규설치', contact_id: null, is_paid: true, work_hours: '2' })
  setSelectedEngineerIds(currentUserEngineerId ? [currentUserEngineerId] : [])
     setShowExtraEngineers(false)
     setIsServiceModalOpen(true)
@@ -277,8 +280,9 @@ const handleOpenEditServiceModal = (service: ServiceHistory) => {
 
   const handleUpdateService = async () => {
     if (!selectedService) return
-    if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
+if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
     if (!serviceEditForm.service_notes.trim()) { alert('서비스 내용을 입력해주세요.'); return }
+    if (!serviceEditForm.contact_id) { alert('고객 담당자를 선택해주세요.'); return }
     if (selectedEditEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
     const visitYear = serviceEditForm.visit_date.slice(0, 4)
     setIsSavingServiceEdit(true)
@@ -781,7 +785,7 @@ const handleOpenEditServiceModal = (service: ServiceHistory) => {
                   <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 6, color: TEXT_SECONDARY }}>S/N : {d.serial_number ?? '-'} &nbsp; | &nbsp; 프로그램 : {d.program ?? '-'}</div>
                   <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 4, color: TEXT_SECONDARY }}>설치 엔지니어 : {d.install_engineer ?? '-'}</div>
                   <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 12, color: TEXT_SECONDARY }}>납입연월 : {getInstallDisplay(d)}</div>
-                  <button onClick={() => handleOpenServiceModal(d.device_id)} style={{ width: '100%', padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, marginBottom: 14 }}>서비스 기록 추가</button>
+                  <button onClick={() => handleOpenServiceModal(d.device_id)} style={{ width: '100%', padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, marginBottom: 14 }}>서비스 레포트 추가</button>
                   <div style={{ display: 'grid', gap: 10 }}>
                     {deviceHistory.length === 0 ? (
                       <div style={{ width: '100%', background: INNER_CARD_BG, color: TEXT_PRIMARY, borderRadius: 12, padding: 14, fontSize: 14, border: `1px solid ${INPUT_BORDER}`, boxSizing: 'border-box' }}>
@@ -792,7 +796,14 @@ const handleOpenEditServiceModal = (service: ServiceHistory) => {
                     ) : deviceHistory.map((h) => (
                       <div key={`${d.device_id}-${h.service_id}`} style={{ width: '100%', background: INNER_CARD_BG, color: TEXT_PRIMARY, borderRadius: 12, padding: 14, fontSize: 14, border: `1px solid ${INPUT_BORDER}`, boxSizing: 'border-box' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-                          <div style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontWeight: 800 }}>{h.service_type ?? '-'}</span>
+                            {h.is_paid !== null && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: h.is_paid ? '#eff6ff' : '#f0fdf4', color: h.is_paid ? '#234ea2' : '#16a34a' }}>
+                                {h.is_paid ? '유상' : '무상'}
+                              </span>
+                            )}
+                          </div>
                          <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => handleOpenEditServiceModal(h)} style={{ padding: '6px 10px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>수정</button>
                             <button onClick={() => handlePrintReport(h, d)} style={{ padding: '6px 10px', background: '#16a34a', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>레포트</button>
@@ -1058,31 +1069,38 @@ const handleOpenEditServiceModal = (service: ServiceHistory) => {
         {isServiceModalOpen && (
           <div onClick={() => { setIsServiceModalOpen(false); setSelectedDeviceId(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 620, background: CARD_BG, borderRadius: 18, padding: 20, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 추가</div>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 레포트 추가</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <textarea value={serviceForm.service_notes} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.2fr', gap: 12 }}>
                   <select value={serviceForm.service_type} onChange={(e) => setServiceForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
-                    <option value="신규SETUP">신규 SETUP</option>
-                    <option value="A/S(유상)">A/S (유상)</option>
-                    <option value="B/S(영업)">B/S (영업)</option>
-                    <option value="이전SETUP">이전 SETUP</option>
-                    <option value="유상교육">유상교육</option>
+                    <option value="신규설치">신규 설치</option>
+                    <option value="이전설치">이전 설치</option>
+                    <option value="A/S">A/S</option>
+                    <option value="B/S">B/S</option>
+                    <option value="교육">교육</option>
+                  </select>
+                  <select value={serviceForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
+                    <option value="true">유상</option>
+                    <option value="false">무상</option>
                   </select>
                   <input type="date" value={serviceForm.visit_date} onChange={(e) => setServiceForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12, alignItems: 'center' }}>
                   <select value={serviceForm.contact_id ?? ''} onChange={(e) => setServiceForm((prev) => ({ ...prev, contact_id: e.target.value ? Number(e.target.value) : null }))} style={inputStyle}>
                     <option value="">고객 담당자 선택</option>
                     {contacts.map(c => (
                       <option key={c.contact_id} value={c.contact_id}>{c.name} {c.position ?? ''}</option>
                     ))}
                   </select>
-                  <select value={serviceForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
-                    <option value="true">유상</option>
-                    <option value="false">무상</option>
-                  </select>
-                  <input type="number" value={serviceForm.work_hours} onChange={(e) => setServiceForm((prev) => ({ ...prev, work_hours: e.target.value }))} placeholder="작업시간 (h)" step="0.5" min="0" style={inputStyle} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: '8px 14px' }}>
+                    <span style={{ fontSize: 12, color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>작업시간(h)</span>
+                    <button onClick={() => setServiceForm(prev => ({ ...prev, work_hours: String(Math.max(0, parseFloat(prev.work_hours || '2') - 0.5)) }))}
+                      style={{ width: 28, height: 28, border: `1px solid ${INPUT_BORDER}`, borderRadius: 6, background: '#f3f4f6', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>▼</button>
+                    <span style={{ minWidth: 32, textAlign: 'center', fontWeight: 700, fontSize: 15 }}>{serviceForm.work_hours || '2'}</span>
+                    <button onClick={() => setServiceForm(prev => ({ ...prev, work_hours: String(parseFloat(prev.work_hours || '2') + 0.5) }))}
+                      style={{ width: 28, height: 28, border: `1px solid ${INPUT_BORDER}`, borderRadius: 6, background: '#f3f4f6', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>▲</button>
+                  </div>
                 </div>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
                   <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어</div>
@@ -1136,28 +1154,35 @@ const handleOpenEditServiceModal = (service: ServiceHistory) => {
               <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16, color: TEXT_PRIMARY }}>서비스 기록 수정</div>
               <div style={{ display: 'grid', gap: 12 }}>
                 <textarea value={serviceEditForm.service_notes} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_notes: e.target.value }))} placeholder="서비스 내용" rows={8} style={textareaStyle} />
-             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.2fr', gap: 12 }}>
                   <select value={serviceEditForm.service_type} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, service_type: e.target.value }))} style={inputStyle}>
-                    <option value="신규SETUP">신규 SETUP</option>
-                    <option value="A/S(유상)">A/S (유상)</option>
-                    <option value="B/S(영업)">B/S (영업)</option>
-                    <option value="이전SETUP">이전 SETUP</option>
-                    <option value="유상교육">유상교육</option>
+                    <option value="신규설치">신규 설치</option>
+                    <option value="이전설치">이전 설치</option>
+                    <option value="A/S">A/S</option>
+                    <option value="B/S">B/S</option>
+                    <option value="교육">교육</option>
+                  </select>
+                  <select value={serviceEditForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
+                    <option value="true">유상</option>
+                    <option value="false">무상</option>
                   </select>
                   <input type="date" value={serviceEditForm.visit_date} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, visit_date: e.target.value }))} style={dateInputStyle} />
                 </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12, alignItems: 'center' }}>
                   <select value={serviceEditForm.contact_id ?? ''} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, contact_id: e.target.value ? Number(e.target.value) : null }))} style={inputStyle}>
                     <option value="">고객 담당자 선택</option>
                     {contacts.map(c => (
                       <option key={c.contact_id} value={c.contact_id}>{c.name} {c.position ?? ''}</option>
                     ))}
                   </select>
-                  <select value={serviceEditForm.is_paid ? 'true' : 'false'} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, is_paid: e.target.value === 'true' }))} style={inputStyle}>
-                    <option value="true">유상</option>
-                    <option value="false">무상</option>
-                  </select>
-                  <input type="number" value={serviceEditForm.work_hours} onChange={(e) => setServiceEditForm((prev) => ({ ...prev, work_hours: e.target.value }))} placeholder="작업시간 (h)" step="0.5" min="0" style={inputStyle} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: INPUT_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: '8px 14px' }}>
+                    <span style={{ fontSize: 12, color: TEXT_SECONDARY, whiteSpace: 'nowrap' }}>작업시간(h)</span>
+                    <button onClick={() => setServiceEditForm(prev => ({ ...prev, work_hours: String(Math.max(0, parseFloat(prev.work_hours || '2') - 0.5)) }))}
+                      style={{ width: 28, height: 28, border: `1px solid ${INPUT_BORDER}`, borderRadius: 6, background: '#f3f4f6', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>▼</button>
+                    <span style={{ minWidth: 32, textAlign: 'center', fontWeight: 700, fontSize: 15 }}>{serviceEditForm.work_hours || '2'}</span>
+                    <button onClick={() => setServiceEditForm(prev => ({ ...prev, work_hours: String(parseFloat(prev.work_hours || '2') + 0.5) }))}
+                      style={{ width: 28, height: 28, border: `1px solid ${INPUT_BORDER}`, borderRadius: 6, background: '#f3f4f6', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>▲</button>
+                  </div>
                 </div>
                 <div style={{ border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, padding: 12, background: INPUT_BG }}>
                   <div style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 10 }}>방문 엔지니어</div>
