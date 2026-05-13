@@ -615,7 +615,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
     await fetchDetail()
   }
 
-  const handleOpenAddDeviceModal = () => { setDeviceForm({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' }); setIsAddDeviceModalOpen(true) }
+  const handleOpenAddDeviceModal = () => { setDeviceForm({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', category: '20' }); setIsAddDeviceModalOpen(true) }
 
   const handleAddDevice = async () => {
     if (!deviceForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
@@ -630,7 +630,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
 
   const handleOpenEditDeviceModal = (device: Device) => {
     setSelectedDevice(device)
-    setDeviceEditForm({ device_name: device.device_name ?? '', device_name2: device.device_name2 ?? '', option: device.option ?? '', serial_number: device.serial_number ?? '', program: device.program ?? 'ACCTee', install_date: device.install_date ?? '', install_engineer: device.install_engineer ?? '', category: device.category ?? '20' })
+    setDeviceEditForm({ device_name: device.device_name ?? '', device_name2: device.device_name2 ?? '', option: device.option ?? '', serial_number: device.serial_number ?? '', program: device.program ?? 'ACCTee', install_date: device.install_date ?? '', category: device.category ?? '20' })
     setIsEditDeviceModalOpen(true)
   }
 
