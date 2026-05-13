@@ -14,14 +14,15 @@ export async function POST(req: Request) {
     email,
     password,
     email_confirm: true,
+    user_metadata: { name },
   })
 
   if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-  // 2. engineers 테이블에 직원 정보 저장
-  const { error: dbError } = await supabaseAdmin.from('engineers').insert({
+  // 이미 engineers 테이블에 있으면 update, 없으면 insert
+  const { error: dbError } = await supabaseAdmin.from('engineers').upsert({
     name, position, teams, initials, email,
-  })
+  }, { onConflict: 'email' })
 
   if (dbError) return NextResponse.json({ error: dbError.message }, { status: 400 })
 

@@ -88,11 +88,13 @@ export default function ActivityPage() {
     })
 
    const positionOrder: Record<string, number> = { '수석': 0, '책임': 1, '선임': 2, '사원': 3 }
-const sortedEngineers = (engineers ?? []).sort((a, b) => {
-  const aOrder = positionOrder[a.position ?? ''] ?? 99
-  const bOrder = positionOrder[b.position ?? ''] ?? 99
-  return aOrder - bOrder
-})
+const sortedEngineers = (engineers ?? [])
+  .filter((e: any) => !['임원', '영업관리'].includes(e.teams ?? ''))
+  .sort((a, b) => {
+    const aOrder = positionOrder[a.position ?? ''] ?? 99
+    const bOrder = positionOrder[b.position ?? ''] ?? 99
+    return aOrder - bOrder
+  })
 
 const result: ActivityRow[] = sortedEngineers.map((eng) => {
       const counts: Record<string, number> = {}

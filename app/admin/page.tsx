@@ -53,8 +53,8 @@ const POSITION_ORDER: Record<string, number> = {
   '총괄': 0, '관리자': 1, '수석': 2, '책임': 3, '선임': 4, '사원': 5,
 }
 
-const POSITIONS = ['총괄', '관리자', '수석', '책임', '선임', '사원']
-const TEAMS = ['1', '2', '3', '4']
+const POSITIONS = ['사장', '총괄', '수석', '책임', '선임', '사원']
+const TEAMS = ['임원', '영업관리', '1', '2', '3', '4']
 
 export default function AdminPage() {
   const supabase = createClient()
@@ -364,10 +364,11 @@ export default function AdminPage() {
               onClick={() => alert('준비 중입니다.')}>설정하기</button>
           </div>
 
-          <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}` }}>
+ <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 28, marginBottom: 12 }}>📋</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: TEXT, marginBottom: 8 }}>다운로드 로그</div>
             <div style={{ fontSize: 13, color: GRAY, marginBottom: 20, lineHeight: 1.6 }}>견적서 PDF 다운로드 이력을 조회합니다.</div>
+            <div style={{ flex: 1 }} />
             <button style={{ width: '100%', padding: '10px', background: BLUE, color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
               onClick={() => { setShowLogModal(true); fetchLogs() }}>조회하기</button>
           </div>
@@ -591,7 +592,9 @@ export default function AdminPage() {
   {eng.name}
 </td>
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{eng.position || '-'}</td>
-                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{eng.teams ? `${eng.teams}팀` : '-'}</td>
+                        <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+  {eng.teams ? (['임원', '영업관리'].includes(eng.teams) ? eng.teams : `${eng.teams}팀`) : '-'}
+</td>
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{eng.email || '-'}</td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{eng.initials || '-'}</td>
                         <td style={{ padding: '10px 12px' }}>
@@ -648,7 +651,7 @@ export default function AdminPage() {
                 <div>
                   <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>팀 *</div>
                   <select value={addForm.teams} onChange={e => setAddForm(p => ({ ...p, teams: e.target.value }))} style={inp}>
-                    {TEAMS.map(t => <option key={t} value={t}>{t}팀</option>)}
+                    {TEAMS.map(t => <option key={t} value={t}>{['임원', '영업관리'].includes(t) ? t : `${t}팀`}</option>)}
                   </select>
                 </div>
               </div>
@@ -698,7 +701,7 @@ export default function AdminPage() {
                 <div>
                   <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>팀</div>
                   <select value={editForm.teams} onChange={e => setEditForm(p => ({ ...p, teams: e.target.value }))} style={inp}>
-                    {TEAMS.map(t => <option key={t} value={t}>{t}팀</option>)}
+                    {TEAMS.map(t => <option key={t} value={t}>{['임원', '영업관리'].includes(t) ? t : `${t}팀`}</option>)}
                   </select>
                 </div>
               </div>

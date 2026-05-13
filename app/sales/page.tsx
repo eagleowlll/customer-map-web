@@ -740,7 +740,8 @@ export default function SalesPage() {
   const sortedEngineers = [...engineers].sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99))
 
   // 권한별 열람 가능 엔지니어 필터
-  const visibleEngineers = sortedEngineers.filter(e => {
+const visibleEngineers = sortedEngineers.filter(e => {
+    if (['임원', '영업관리'].includes(e.teams ?? '')) return false
     if (!currentEngineer) return false
     if (currentEngineer.permission_level === 'superadmin') return true
     if (currentEngineer.permission_level === 'manager') return e.teams === currentEngineer.teams
@@ -848,7 +849,7 @@ export default function SalesPage() {
             <div style={{ width: 1, height: 24, background: BORDER, margin: '0 4px' }} />
             <span style={{ fontSize: 12, color: GRAY, fontWeight: 700 }}>팀:</span>
             <button onClick={() => setTeamFilter(null)} style={{ padding: '4px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === null ? BLUE : '#f3f4f6', color: teamFilter === null ? '#fff' : TEXT }}>전체</button>
-            {teams.map(t => (
+            {teams.filter(t => !['임원', '영업관리'].includes(t)).map(t => (
               <button key={t} onClick={() => setTeamFilter(teamFilter === t ? null : t)} style={{ padding: '4px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === t ? (TEAM_COLORS[t]?.bar || BLUE) : '#f3f4f6', color: teamFilter === t ? '#fff' : TEXT }}>{t}팀</button>
             ))}
           </div>
@@ -907,10 +908,9 @@ export default function SalesPage() {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 12 }}>🏆 팀별 실적</div>
            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-              {teams.map(t => (
-                <TeamCard key={t} teamId={t} engineers={sortedEngineers} filteredQuotes={filteredQuotes} targets={targets} mode={mode} fy={fy} onCardClick={id => setTeamFilter(id === teamFilter ? null : id)} isSelected={teamFilter === t} />
-              ))}
-            </div>
+              {teams.filter(t => !['임원', '영업관리'].includes(t)).map(t => (
+              <TeamCard key={t} teamId={t} engineers={sortedEngineers} filteredQuotes={filteredQuotes} targets={targets} mode={mode} fy={fy} onCardClick={id => setTeamFilter(id === teamFilter ? null : id)} isSelected={teamFilter === t} />
+            ))}            </div>
           </div>
         )}
 
