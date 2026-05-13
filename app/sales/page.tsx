@@ -767,23 +767,24 @@ const visibleEngineers = sortedEngineers.filter(e => {
     return true
   }
 
+  const allEngineers = sortedEngineers.filter(e => !['임원', '영업관리'].includes(e.teams ?? ''))
+  const allEngineerIds = allEngineers.map(e => e.engineer_id)
   const filteredQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy) && (teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true))
-  const prevQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy - 1) && (teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true))
-  const revenueQuotes = filteredQuotes.filter(q => q.status === '매출완료')
-
-  const totalQuoteAmt = filteredQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
-  const totalOrderAmt = filteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
-  const totalRevenueAmt = revenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
-  const totalCostAmt = revenueQuotes.reduce((s, q) => s + (q.total_cost || 0), 0)
-  const totalProfitAmt = revenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
+  const allFilteredQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy) && allEngineerIds.includes(q.engineer_id))
+  const allRevenueQuotes = allFilteredQuotes.filter(q => q.status === '매출완료')
+  const totalQuoteAmt = allFilteredQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalOrderAmt = allFilteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalRevenueAmt = allRevenueQuotes.reduce((s, q) => s + (q.total_supply || 0), 0)
+  const totalCostAmt = allRevenueQuotes.reduce((s, q) => s + (q.total_cost || 0), 0)
+  const totalProfitAmt = allRevenueQuotes.reduce((s, q) => s + (q.total_profit || 0), 0)
   const totalProfitRate = totalRevenueAmt > 0 ? (totalProfitAmt / totalRevenueAmt * 100) : null
-  const totalQuoteCnt = filteredQuotes.length
-  const totalOrderCnt = filteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).length
+  const totalQuoteCnt = allFilteredQuotes.length
+  const totalOrderCnt = allFilteredQuotes.filter(q => ['수주', '매출완료'].includes(q.status)).length
   const convRate = totalQuoteCnt > 0 ? (totalOrderCnt / totalQuoteCnt * 100) : 0
-  const prevRevenue = prevQuotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
+  const allPrevQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy - 1) && allEngineerIds.includes(q.engineer_id))
+  const prevRevenue = allPrevQuotes.filter(q => q.status === '매출완료').reduce((s, q) => s + (q.total_supply || 0), 0)
   const yoyChange = prevRevenue > 0 ? ((totalRevenueAmt - prevRevenue) / prevRevenue * 100) : null
-
-  const totalYearTarget = filteredEngineers.reduce((s, e) => {
+  const totalYearTarget = allEngineers.reduce((s, e) => {
     const t = targets.find(t => t.engineer_id === e.engineer_id && t.year === fy && t.quarter === null)
     return s + (t?.target_amount || 0)
   }, 0)
@@ -903,12 +904,16 @@ const visibleEngineers = sortedEngineers.filter(e => {
           <PerformanceChart quotes={quotes} fy={fy} targets={targets} engineers={sortedEngineers} filteredEngineerIds={filteredEngineerIds} teamFilter={teamFilter} />
         </div>
 
-        {/* 팀별 실적 — superadmin과 manager만 표시 */}
-        {!teamFilter && teams.length > 0 && currentEngineer?.permission_level !== 'member' && (
+        {/* 팀별 실적 — superadmin과 각팀 manager, 해당 팀원에게만 표시 */}
+        {!teamFilter && teams.length > 0 && (currentEngineer?.permission_level === 'superadmin' || currentEngineer?.permission_level === 'manager') && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 12 }}>🏆 팀별 실적</div>
            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-              {teams.filter(t => !['임원', '영업관리'].includes(t)).map(t => (
+               {teams.filter(t => {
+                if (['임원', '영업관리'].includes(t)) return false
+                if (currentEngineer?.permission_level === 'manager') return t === currentEngineer.teams
+                return true
+              }).map(t => (
               <TeamCard key={t} teamId={t} engineers={sortedEngineers} filteredQuotes={filteredQuotes} targets={targets} mode={mode} fy={fy} onCardClick={id => setTeamFilter(id === teamFilter ? null : id)} isSelected={teamFilter === t} />
             ))}            </div>
           </div>

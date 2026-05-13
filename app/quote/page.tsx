@@ -297,7 +297,7 @@ function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRa
     <div style={{ background: '#fff', borderRadius: 12, border: `2px solid ${isGood ? '#16a34a' : '#dc2626'}`, marginBottom: 14, overflow: 'hidden' }}>
       <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#1C3557' }}>📊 수익 분석</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: '#1C3557' }}> 수익 분석</span>
           <span style={{ fontSize: 11, color: '#6b7280' }}>{exchangeRate ? `💱 ${exchangeRate.toFixed(4)}원` : '환율 로딩중...'}{rateUpdatedAt && ` (${rateUpdatedAt})`}</span>
           <button onClick={onFetchRate} disabled={rateLoading} style={{ padding: '2px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, color: '#374151' }}>{rateLoading ? '갱신중...' : '🔄'}</button>
         </div>
@@ -644,25 +644,6 @@ export default function QuotePage() {
 
         <div style={{ width: 420, flexShrink: 0 }}>
 
-          {/* 접속자 표시 */}
-          {engineer && (
-            <div style={{ background: '#1C3557', borderRadius: 10, padding: '8px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#234ea2', border: '2px solid #AACCFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff' }}>
-                  {engineer.initials || engineer.name.slice(0, 2)}
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{engineer.name} {engineer.position}</div>
-                  <div style={{ fontSize: 10, color: '#AACCFF' }}>{engineer.email}</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 10, color: '#AACCFF', textAlign: 'right' }}>
-                <div>견적번호</div>
-                <div style={{ fontWeight: 800, color: '#fff', fontSize: 12 }}>{quoteNo}</div>
-              </div>
-            </div>
-          )}
-
           {/* 기본 정보 */}
           <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', marginBottom: 14, border: '1px solid #e5e7eb' }}>
             <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}>기본 정보</div>
@@ -726,11 +707,19 @@ export default function QuotePage() {
             </div>
           </div>
 
-          <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
+              <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+            </div>
+            <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} />
+          </div>
 
           {/* 품목 */}
-          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}>📦 품목</div>
+          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06, borderRadius: 12, overflow: 'hidden' }}>
+              <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}>품목</div>
 
             {rows.map((row, rowIdx) => (
               <div key={row.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px', marginBottom: 10, border: '1px solid #e5e7eb' }}>
