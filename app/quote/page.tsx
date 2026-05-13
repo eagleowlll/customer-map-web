@@ -717,20 +717,20 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
             </div>
           </div>
 
-          <div style={{ position: 'relative', overflow: 'hidden' }}>
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} style={{ position: 'absolute', top: `${i * 25}%`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
-                <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+       <div style={{ position: 'relative', overflow: 'hidden' }}>
+            {[-1, 0, 1, 2].map(i => (
+              <div key={i} style={{ position: 'absolute', top: `${i * 140 + 60}px`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.05 }}>
+                <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
               </div>
             ))}
             <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} />
           </div>
 
           {/* 품목 */}
-          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative', overflow: 'hidden' }}>
-            {[0, 1, 2, 3, 4, 5].map(i => (
-              <div key={i} style={{ position: 'absolute', top: `${i * 18}%`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.06 }}>
-                <span style={{ fontSize: 48, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative', overflow: 'hidden' }}>
+            {Array.from({ length: 20 }, (_, i) => i).map(i => (
+              <div key={i} style={{ position: 'absolute', top: `${i * 140}px`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.05 }}>
+                <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
               </div>
             ))}
             <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}> 품목</div>
@@ -847,9 +847,8 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
           <div style={{ background: '#f4f5f7', borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e4e9', height: 'calc(100vh - 40px)', position: 'sticky', top: 20 }}>
 
             {/* 헤더 */}
-            <div style={{ background: '#234ea2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>📄 PDF 미리보기</span>
-
+         <div style={{ background: '#234ea2', padding: '10px 16px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ flex: 1 }} />
               <button
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isSaving}
@@ -860,9 +859,10 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                 }}>
                 {isSaving ? '저장 중...' : '견적 확정'}
               </button>
-
-             <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 12px' }}>
-                <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>{seqLetter}</span>
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 12px' }}>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>{seqLetter}</span>
+                </div>
               </div>
             </div>
 
