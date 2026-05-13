@@ -20,7 +20,6 @@ export type Device = {
   serial_number: string | null
   program: string | null
   install_date: string | null
-  install_engineer: string | null
   category: string | null
   packing_list_url: string | null
 }
@@ -46,7 +45,6 @@ export type NewDeviceForm = {
   serial_number: string
   program: string
   install_date: string
-  install_engineer: string
   category: string
   packing_file: File | null
 }
@@ -102,7 +100,6 @@ export function createEmptyDeviceForm(): NewDeviceForm {
     serial_number: '',
     program: 'ACCTee',
     install_date: '',
-    install_engineer: '',
     category: '20',
     packing_file: null,
   }

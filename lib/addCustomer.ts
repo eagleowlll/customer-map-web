@@ -93,7 +93,6 @@ export const addCustomer = async ({
       serial_number: d.serial_number.trim() || null,
       program: d.program,
       install_date: d.install_date || null,
-      install_engineer: d.install_engineer.trim() || null,
       category: d.category,
       packing_list_url: null,
     }))

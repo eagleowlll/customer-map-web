@@ -1,7 +1,7 @@
 //고객 상세 페이지
 'use client'
 import { Document, Page, Text, View, StyleSheet, Image, Font, pdf } from '@react-pdf/renderer'
-import { useEffect, useMemo, useState, useCallback, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef, type CSSProperties } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
@@ -25,7 +25,6 @@ type Device = {
   packing_list_url: string | null
   install_date: string | null
   install_year: string | number | null
-  install_engineer: string | null
   program: string | null
   image_url: string | null
   category: string | null
@@ -162,6 +161,14 @@ export default function CustomerDetailPage() {
   const [isSavingDeviceEdit, setIsSavingDeviceEdit] = useState(false)
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false)
   const [isSavingDeviceImage, setIsSavingDeviceImage] = useState(false)
+  const [isSignModalOpen, setIsSignModalOpen] = useState(false)
+  const [signStep, setSignStep] = useState(1)
+  const [pendingReportService, setPendingReportService] = useState<ServiceHistory | null>(null)
+  const [pendingReportDevice, setPendingReportDevice] = useState<Device | null>(null)
+  const engineerSignRef = useRef<HTMLCanvasElement>(null)
+  const customerSignRef = useRef<HTMLCanvasElement>(null)
+  const [engineerSigning, setEngineerSigning] = useState(false)
+  const [customerSigning, setCustomerSigning] = useState(false)
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null)
   const [selectedService, setSelectedService] = useState<ServiceHistory | null>(null)
@@ -181,8 +188,8 @@ export default function CustomerDetailPage() {
   const [customerEditForm, setCustomerEditForm] = useState({ company_name: '', address: '', agency: '', status: '활성' })
   const [contactForm, setContactForm] = useState({ name: '', department: '', position: '', phone: '' })
   const [contactEditForm, setContactEditForm] = useState({ name: '', department: '', position: '', phone: '' })
-  const [deviceForm, setDeviceForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
-  const [deviceEditForm, setDeviceEditForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', install_engineer: '', category: '20' })
+ const [deviceForm, setDeviceForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', category: '20' })
+  const [deviceEditForm, setDeviceEditForm] = useState({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', category: '20' })
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -319,7 +326,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
     await fetchDetail()
   }
 
-  const handlePrintReport = useCallback(async (service: ServiceHistory, device: Device) => {
+  const handlePrintReport = useCallback(async (service: ServiceHistory, device: Device, engineerSignDataUrl?: string, customerSignDataUrl?: string) => {
     const contact = contacts.find(c => c.contact_id === service.contact_id) ?? null
     const engineerNames = (service.service_engineers ?? []).map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
     const deviceTitle = `${device.device_name ?? ''} ${device.device_name2 ?? ''} ${device.option ?? ''}`.replace(/\s+/g, ' ').trim()
@@ -424,7 +431,9 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                  <View style={{ width: 28, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
                     <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'고\n객'}</Text>
                   </View>
-                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999' }} />
+                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
+                    {customerSignDataUrl ? <Image src={customerSignDataUrl} style={{ width: 80, height: 40, objectFit: 'contain' }} /> : null}
+                  </View>
                   <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
                     <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'서\n명'}</Text>
                   </View>
@@ -434,7 +443,9 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                 <View style={{ width: 28, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
                     <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'담\n당'}</Text>
                   </View>
-                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999' }} />
+                  <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
+                    {engineerSignDataUrl ? <Image src={engineerSignDataUrl} style={{ width: 80, height: 40, objectFit: 'contain' }} /> : null}
+                  </View>
                   <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
                     <Text style={{ fontSize: 8, fontFamily: 'NotoSansCJK', textAlign: 'center' }}>{'서\n명'}</Text>
                   </View>
@@ -609,7 +620,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
   const handleAddDevice = async () => {
     if (!deviceForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDevice(true)
-    const { error } = await supabase.from('devices').insert([{ customer_id: customerId, device_name: deviceForm.device_name.trim(), device_name2: deviceForm.device_name2.trim() || null, option: deviceForm.option.trim() || null, serial_number: deviceForm.serial_number.trim() || null, program: deviceForm.program, install_date: deviceForm.install_date || null, install_year: null, install_engineer: deviceForm.install_engineer.trim() || null, category: deviceForm.category }])
+    const { error } = await supabase.from('devices').insert([{ customer_id: customerId, device_name: deviceForm.device_name.trim(), device_name2: deviceForm.device_name2.trim() || null, option: deviceForm.option.trim() || null, serial_number: deviceForm.serial_number.trim() || null, program: deviceForm.program, install_date: deviceForm.install_date || null, install_year: null,  category: deviceForm.category }])
     setIsSavingDevice(false)
     if (error) { alert(error.message || '장비 추가 중 오류가 발생했습니다.'); return }
     alert('장비가 추가되었습니다.')
@@ -627,7 +638,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
     if (!selectedDevice) return
     if (!deviceEditForm.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
     setIsSavingDeviceEdit(true)
-    const { error } = await supabase.from('devices').update({ device_name: deviceEditForm.device_name.trim(), device_name2: deviceEditForm.device_name2.trim() || null, option: deviceEditForm.option.trim() || null, serial_number: deviceEditForm.serial_number.trim() || null, program: deviceEditForm.program, install_date: deviceEditForm.install_date || null, install_year: null, install_engineer: deviceEditForm.install_engineer.trim() || null, category: deviceEditForm.category }).eq('device_id', selectedDevice.device_id)
+    const { error } = await supabase.from('devices').update({ device_name: deviceEditForm.device_name.trim(), device_name2: deviceEditForm.device_name2.trim() || null, option: deviceEditForm.option.trim() || null, serial_number: deviceEditForm.serial_number.trim() || null, program: deviceEditForm.program, install_date: deviceEditForm.install_date || null, install_year: null,  category: deviceEditForm.category }).eq('device_id', selectedDevice.device_id)
     setIsSavingDeviceEdit(false)
     if (error) { alert(error.message || '장비 수정 중 오류가 발생했습니다.'); return }
     alert('장비 정보가 수정되었습니다.')
@@ -783,7 +794,6 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                     <div style={{ fontSize: 18, fontWeight: 700, color: TEXT_PRIMARY, textAlign: 'center', width: '100%', padding: '0 8px', boxSizing: 'border-box', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'keep-all' }} title={deviceTitle || '-'}>{deviceTitle || '-'}</div>
                   </div>
                   <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 6, color: TEXT_SECONDARY }}>S/N : {d.serial_number ?? '-'} &nbsp; | &nbsp; 프로그램 : {d.program ?? '-'}</div>
-                  <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 4, color: TEXT_SECONDARY }}>설치 엔지니어 : {d.install_engineer ?? '-'}</div>
                   <div style={{ textAlign: 'center', fontSize: 14, marginBottom: 12, color: TEXT_SECONDARY }}>납입연월 : {getInstallDisplay(d)}</div>
                   <button onClick={() => handleOpenServiceModal(d.device_id)} style={{ width: '100%', padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, marginBottom: 14 }}>서비스 레포트 추가</button>
                   <div style={{ display: 'grid', gap: 10 }}>
@@ -806,7 +816,12 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                           </div>
                          <div style={{ display: 'flex', gap: 6 }}>
                             <button onClick={() => handleOpenEditServiceModal(h)} style={{ padding: '6px 10px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>수정</button>
-                            <button onClick={() => handlePrintReport(h, d)} style={{ padding: '6px 10px', background: '#16a34a', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>레포트</button>
+                            <button onClick={() => {
+                              setPendingReportService(h)
+                              setPendingReportDevice(d)
+                              setSignStep(1)
+                              setIsSignModalOpen(true)
+                            }} style={{ padding: '6px 10px', background: '#16a34a', color: '#fff', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>레포트</button>
                           </div>
                         </div>
                         <div style={{ marginBottom: 18, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: TEXT_PRIMARY }}>{h.service_notes ?? '-'}</div>
@@ -1012,8 +1027,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                     <option value="83">구분: 83</option>
                     <option value="84">구분: 84</option>
                   </select>
-                </div>
-                <input value={deviceForm.install_engineer} onChange={(e) => setDeviceForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어" style={inputStyle} />
+                </div>            
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button onClick={() => setIsAddDeviceModalOpen(false)} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
@@ -1052,7 +1066,7 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                     <option value="84">구분: 84</option>
                   </select>
                 </div>
-                <input value={deviceEditForm.install_engineer} onChange={(e) => setDeviceEditForm((prev) => ({ ...prev, install_engineer: e.target.value }))} placeholder="설치 엔지니어" style={inputStyle} />
+              
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 20 }}>
                 <button onClick={handleDeleteDevice} disabled={isSavingDeviceEdit} style={{ padding: '10px 14px', background: DANGER_BG, color: '#fff', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingDeviceEdit ? 0.7 : 1 }}>삭제</button>
@@ -1224,6 +1238,107 @@ if (!serviceEditForm.visit_date.trim()) { alert('방문일자를 입력해주세
                   <button onClick={() => { setIsEditServiceModalOpen(false); setSelectedService(null) }} style={{ padding: '10px 14px', background: PANEL_BG, color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600 }}>취소</button>
                   <button onClick={handleUpdateService} disabled={isSavingServiceEdit} style={{ padding: '10px 14px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, opacity: isSavingServiceEdit ? 0.7 : 1 }}>{isSavingServiceEdit ? '저장 중...' : '저장'}</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 서명 모달 */}
+        {isSignModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+            <div style={{ width: '100%', maxWidth: 520, background: CARD_BG, borderRadius: 18, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
+
+              {/* 스텝 표시 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#234ea2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14 }}>1</div>
+                <div style={{ height: 2, flex: 1, background: signStep === 2 ? '#234ea2' : INPUT_BORDER, borderRadius: 2 }} />
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: signStep === 2 ? '#234ea2' : INPUT_BORDER, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14 }}>2</div>
+              </div>
+
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6, color: TEXT_PRIMARY }}>
+                {signStep === 1 ? '엔지니어 서명' : '고객 담당자 서명'}
+              </div>
+              <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 16 }}>
+                {signStep === 1 ? '아래 칸에 서명해주세요' : '고객 담당자분께 서명을 받아주세요'}
+              </div>
+
+              {/* 서명 캔버스 2개 — 항상 DOM에 존재, 보이는 것만 전환 */}
+              {[
+                { ref: engineerSignRef, step: 1, signing: engineerSigning, setSigning: setEngineerSigning },
+                { ref: customerSignRef, step: 2, signing: customerSigning, setSigning: setCustomerSigning },
+              ].map(({ ref, step, signing, setSigning }) => (
+                <canvas
+                  key={step}
+                  ref={ref}
+                  width={900}
+                  height={240}
+                  style={{ width: '100%', height: 200, border: `2px solid ${INPUT_BORDER}`, borderRadius: 12, background: '#fff', cursor: 'crosshair', touchAction: 'none', display: signStep === step ? 'block' : 'none' }}
+                  onPointerDown={(e) => {
+                    setSigning(true)
+                    const canvas = ref.current!
+                    const rect = canvas.getBoundingClientRect()
+                    const ctx = canvas.getContext('2d')!
+                    ctx.beginPath()
+                    ctx.moveTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
+                    canvas.setPointerCapture(e.pointerId)
+                  }}
+                  onPointerMove={(e) => {
+                    if (!signing) return
+                    const canvas = ref.current!
+                    const rect = canvas.getBoundingClientRect()
+                    const ctx = canvas.getContext('2d')!
+                    ctx.lineWidth = 3
+                    ctx.lineCap = 'round'
+                    ctx.lineJoin = 'round'
+                    ctx.strokeStyle = '#000'
+                    ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
+                    ctx.stroke()
+                  }}
+                  onPointerUp={() => setSigning(false)}
+                />
+              ))}
+
+              {/* 지우기 버튼 */}
+              <button onClick={() => {
+                const ref = signStep === 1 ? engineerSignRef : customerSignRef
+                const canvas = ref.current!
+                canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height)
+              }} style={{ marginTop: 10, padding: '6px 14px', background: '#f3f4f6', border: `1px solid ${INPUT_BORDER}`, borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                🗑 지우기
+              </button>
+
+              {/* 버튼 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, gap: 10 }}>
+                <button onClick={() => {
+                  if (signStep === 2) {
+                    setSignStep(1)
+                  } else {
+                    setIsSignModalOpen(false)
+                    setPendingReportService(null)
+                    setPendingReportDevice(null)
+                    setSignStep(1)
+                  }
+                }} style={{ padding: '11px 20px', background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                  {signStep === 2 ? '← 이전' : '취소'}
+                </button>
+
+                <button onClick={async () => {
+                  if (signStep === 1) {
+                    setSignStep(2)
+                  } else {
+                    const engineerSignDataUrl = engineerSignRef.current!.toDataURL('image/png')
+                    const customerSignDataUrl = customerSignRef.current!.toDataURL('image/png')
+                    setIsSignModalOpen(false)
+                    setSignStep(1)
+                    if (pendingReportService && pendingReportDevice) {
+                      await handlePrintReport(pendingReportService, pendingReportDevice, engineerSignDataUrl, customerSignDataUrl)
+                    }
+                    setPendingReportService(null)
+                    setPendingReportDevice(null)
+                  }
+                }} style={{ padding: '11px 28px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                  {signStep === 1 ? '다음 →' : '✓ PDF 생성'}
+                </button>
               </div>
             </div>
           </div>
