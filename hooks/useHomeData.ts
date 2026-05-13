@@ -26,7 +26,7 @@ export function useHomeData({
       supabase
         .from('devices')
         .select(
-          'device_id, customer_id, device_name, device_name2, option, serial_number, program, install_date, install_engineer, category, packing_list_url'
+          'device_id, customer_id, device_name, device_name2, option, serial_number, program, install_date, category, packing_list_url'
         )
         .range(0, 5000),
 
@@ -67,7 +67,6 @@ category: c.category ?? null,
           serial_number: d.serial_number ?? null,
           program: d.program ?? null,
           install_date: d.install_date ?? null,
-          install_engineer: d.install_engineer ?? null,
           category: d.category ?? null,
           packing_list_url: d.packing_list_url ?? null,
         }
