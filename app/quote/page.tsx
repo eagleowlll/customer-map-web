@@ -538,8 +538,7 @@ export default function QuotePage() {
               .replace(/[\\/:*?"<>|]/g, '') + '.pdf'
             const engineerFolder = engineer?.name || ''
             const yearFolder = new Date().getFullYear().toString() + '년'
-            const nasPath = `계측부/1. 계측 견적서 통합본/1. 계측_범용계측 (80)/견적서/${yearFolder}/${engineerFolder}/${fileName}`
-            return `https://accretech.synology.me:14506/${nasPath}`
+            return `quote-pdfs/견적서/${yearFolder}/${engineerFolder}/${fileName}`
           })(),
         }).select().single()
 

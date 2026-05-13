@@ -581,10 +581,27 @@ function EngineerQuoteModal({ engineer, quotes, onClose, onStatusSave }: {
                     <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}` }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
-                        {q.pdf_url
-                         ? <span onClick={() => window.open(q.pdf_url!, '_blank')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{q.quote_number} 📄</span>
-                          : q.quote_number}
+                     <td style={{ padding: '10px 12px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                        <span
+                          onClick={async () => {
+                            if (!q.pdf_url) return
+                            // NAS URL이면 그대로 열기
+                            if (q.pdf_url.includes('synology')) {
+                              window.open(q.pdf_url, '_blank')
+                              return
+                            }
+                            // Supabase Storage면 Signed URL 생성
+                          const path = q.pdf_url.startsWith('quote-pdfs/')
+                              ? q.pdf_url.replace('quote-pdfs/', '')
+                              : q.pdf_url.split('/quote-pdfs/')[1]
+                            if (!path) return
+                            const res = await fetch(`/api/quote-pdf?path=${encodeURIComponent(path)}`)
+                            const json = await res.json()
+                            if (json.signedUrl) window.open(json.signedUrl, '_blank')
+                          }}
+                          style={{ cursor: q.pdf_url ? 'pointer' : 'default', textDecoration: q.pdf_url ? 'underline' : 'none' }}>
+                          {q.quote_number} {q.pdf_url ? '📄' : ''}
+                        </span>
                       </td>
                       <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
                       <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
