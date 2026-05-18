@@ -131,6 +131,13 @@ if (navType.type !== 'back_forward') {
         setQuery(parsed.query)
       }
 
+      if (
+        Array.isArray(parsed.selectedStatuses) &&
+        parsed.selectedStatuses.every((item: unknown) => typeof item === 'string')
+      ) {
+        setSelectedStatuses(parsed.selectedStatuses)
+      }
+
      if (
   Array.isArray(parsed.selectedCategories) &&
   parsed.selectedCategories.every((item: unknown) => typeof item === 'string')

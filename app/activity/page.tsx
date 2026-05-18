@@ -194,6 +194,19 @@ export default function ActivityPage() {
     fetchActivity(s, e)
   }
 
+  const handleToday = () => {
+    const t = formatDate(thisYear, thisMonth, now.getDate())
+    setStartDate(t); setEndDate(t); setActiveBtn('금일')
+    fetchActivity(t, t)
+  }
+
+  const handleYesterday = () => {
+    const d = new Date(now); d.setDate(d.getDate() - 1)
+    const t = formatDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
+    setStartDate(t); setEndDate(t); setActiveBtn('작일')
+    fetchActivity(t, t)
+  }
+
   const handleSearch = () => {
     setActiveBtn('')
     fetchActivity(startDate, endDate)
@@ -232,7 +245,7 @@ export default function ActivityPage() {
 
           <div style={{ width: 1, height: 32, background: INPUT_BORDER, margin: '0 4px' }} />
 
-          {[{ label: '당월', fn: handleThisMonth }, { label: '전월', fn: handleLastMonth }].map(({ label, fn }) => (
+          {[{ label: '금일', fn: handleToday }, { label: '작일', fn: handleYesterday }, { label: '당월', fn: handleThisMonth }, { label: '전월', fn: handleLastMonth }].map(({ label, fn }) => (
             <button key={label} onClick={fn}
               style={{
                 padding: '8px 18px', borderRadius: 8,

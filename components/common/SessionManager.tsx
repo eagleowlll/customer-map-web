@@ -13,16 +13,24 @@ export default function SessionManager() {
       localStorage.setItem('lastActivity', Date.now().toString())
     }
 
-  localStorage.setItem('lastActivity', Date.now().toString())
+    let lastMouseMove = 0
+    const updateLastActivityThrottled = () => {
+      const now = Date.now()
+      if (now - lastMouseMove < 10000) return
+      lastMouseMove = now
+      updateLastActivity()
+    }
+
+    localStorage.setItem('lastActivity', Date.now().toString())
 
     window.addEventListener('click', updateLastActivity)
     window.addEventListener('keydown', updateLastActivity)
-    window.addEventListener('mousemove', updateLastActivity)
+    window.addEventListener('mousemove', updateLastActivityThrottled)
 
     return () => {
       window.removeEventListener('click', updateLastActivity)
       window.removeEventListener('keydown', updateLastActivity)
-      window.removeEventListener('mousemove', updateLastActivity)
+      window.removeEventListener('mousemove', updateLastActivityThrottled)
     }
   }, [])
 

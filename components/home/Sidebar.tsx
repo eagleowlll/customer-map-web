@@ -92,21 +92,6 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* 필터 + 버튼 */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 10,
-          marginBottom: 3,
-        }}
-      >
-       
-
-     
-      </div>
-
       {/* 리스트 */}
       <CustomerList
         customers={customers}
