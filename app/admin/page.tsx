@@ -43,6 +43,13 @@ type SalesTarget = {
   target_amount: number
 }
 
+type Team = {
+  id: number
+  name: string
+  is_special: boolean
+  display_order: number
+}
+
 const numKR = (n: number) => Math.round(n).toLocaleString('ko-KR')
 
 const STATUS_COLORS: Record<string, string> = {
@@ -54,7 +61,7 @@ const POSITION_ORDER: Record<string, number> = {
 }
 
 const POSITIONS = ['사장', '총괄', '수석', '책임', '선임', '사원']
-const TEAMS = ['임원', '영업관리', '1', '2', '3', '4']
+const TEAMS = ['임원', '영업관리', '1', '2', '3', '4', 'Apps.']
 
 export default function AdminPage() {
   const supabase = createClient()
@@ -92,6 +99,15 @@ export default function AdminPage() {
   const [deleteEngineer, setDeleteEngineer] = useState<Engineer | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [showLogModal, setShowLogModal] = useState(false)
+
+  // 팀 관리
+  const [showTeamModal, setShowTeamModal] = useState(false)
+  const [teamsList, setTeamsList] = useState<Team[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamIsSpecial, setNewTeamIsSpecial] = useState(false)
+  const [addTeamLoading, setAddTeamLoading] = useState(false)
+  const [deletingTeam, setDeletingTeam] = useState<number | null>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [logLoading, setLogLoading] = useState(false)
 
@@ -291,7 +307,57 @@ export default function AdminPage() {
     setDeleteLoading(false)
   }
 
+  // ── 팀 관리 ────────────────────────────────────────────────────────────────
+  const getTeamDisplay = (name: string, list: Team[] = teamsList) => {
+    if (!name) return '-'
+    const t = list.find(t => t.name === name)
+    if (t) return t.is_special ? t.name : t.name + '팀'
+    return ['임원', '영업관리', 'Apps.'].includes(name) ? name : name + '팀'
+  }
 
+  const fetchTeams = async () => {
+    setTeamLoading(true)
+    const { data } = await supabase.from('teams').select('*').order('display_order')
+    setTeamsList((data as Team[]) ?? [])
+    setTeamLoading(false)
+  }
+
+  const handleAddTeam = async () => {
+    if (!newTeamName.trim()) { alert('팀 이름을 입력해주세요.'); return }
+    setAddTeamLoading(true)
+    const maxOrder = teamsList.length > 0 ? Math.max(...teamsList.map(t => t.display_order)) : 0
+    const { error } = await supabase.from('teams').insert({
+      name: newTeamName.trim(),
+      is_special: newTeamIsSpecial,
+      display_order: maxOrder + 1,
+    })
+    setAddTeamLoading(false)
+    if (error) { alert(error.message); return }
+    setNewTeamName('')
+    setNewTeamIsSpecial(false)
+    fetchTeams()
+  }
+
+  const handleDeleteTeam = async (team: Team) => {
+    const { count } = await supabase
+      .from('engineers')
+      .select('engineer_id', { count: 'exact', head: true })
+      .eq('teams', team.name)
+    if (count && count > 0) {
+      alert(`이 팀에 ${count}명의 직원이 배정되어 있습니다. 먼저 직원 팀을 변경해주세요.`)
+      return
+    }
+    if (!confirm(`'${getTeamDisplay(team.name)}' 팀을 삭제하시겠습니까?`)) return
+    setDeletingTeam(team.id)
+    await supabase.from('teams').delete().eq('id', team.id)
+    setDeletingTeam(null)
+    fetchTeams()
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchTeams() }, [])
+
+  const teamsOptions = teamsList.length > 0 ? teamsList.map(t => t.name) : TEAMS
 
   const inp: React.CSSProperties = {
     padding: '8px 12px', border: `1px solid ${BORDER}`, borderRadius: 8,
@@ -346,17 +412,29 @@ export default function AdminPage() {
               onClick={() => { setShowQuoteModal(true); setSearchQuery(''); fetchQuotes() }}>관리하기</button>
           </div>
 
-         <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}` }}>
-  <div style={{ fontSize: 28, marginBottom: 12 }}>👥</div>
-  <div style={{ fontSize: 16, fontWeight: 800, color: TEXT, marginBottom: 8 }}>직원 관리</div>
-  <div style={{ fontSize: 13, color: GRAY, marginBottom: 20, lineHeight: 1.6 }}>직원 등록, 정보 수정, 관리자 권한, 계정 삭제를 관리합니다.</div>
-  <button
-    onClick={() => { setShowEngineerModal(true); fetchEngineers() }}
-    disabled={currentEngineer?.permission_level !== 'superadmin'}
-    style={{ width: '100%', padding: '10px', background: currentEngineer?.permission_level === 'superadmin' ? BLUE : '#9ca3af', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: currentEngineer?.permission_level === 'superadmin' ? 'pointer' : 'not-allowed' }}>
-    관리하기
-  </button>
-</div>
+          <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>👥</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: TEXT, marginBottom: 8 }}>직원 관리</div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20, lineHeight: 1.6 }}>직원 등록, 정보 수정, 관리자 권한, 계정 삭제를 관리합니다.</div>
+            <button
+              onClick={() => { setShowEngineerModal(true); fetchEngineers(); fetchTeams() }}
+              disabled={currentEngineer?.permission_level !== 'superadmin'}
+              style={{ width: '100%', padding: '10px', background: currentEngineer?.permission_level === 'superadmin' ? BLUE : '#9ca3af', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: currentEngineer?.permission_level === 'superadmin' ? 'pointer' : 'not-allowed' }}>
+              관리하기
+            </button>
+          </div>
+
+          <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>🏷️</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: TEXT, marginBottom: 8 }}>팀 관리</div>
+            <div style={{ fontSize: 13, color: GRAY, marginBottom: 20, lineHeight: 1.6 }}>팀을 추가하거나 삭제합니다. 직원 등록·수정 시 팀 목록에 즉시 반영됩니다.</div>
+            <button
+              onClick={() => { setShowTeamModal(true); fetchTeams() }}
+              disabled={currentEngineer?.permission_level !== 'superadmin'}
+              style={{ width: '100%', padding: '10px', background: currentEngineer?.permission_level === 'superadmin' ? BLUE : '#9ca3af', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: currentEngineer?.permission_level === 'superadmin' ? 'pointer' : 'not-allowed' }}>
+              관리하기
+            </button>
+          </div>
 
           <div style={{ background: CARD_BG, borderRadius: 16, padding: 24, border: `1px solid ${BORDER}` }}>
             <div style={{ fontSize: 28, marginBottom: 12 }}>📊</div>
@@ -603,8 +681,8 @@ export default function AdminPage() {
 </td>
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{eng.position || '-'}</td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-  {eng.teams ? (['임원', '영업관리'].includes(eng.teams) ? eng.teams : `${eng.teams}팀`) : '-'}
-</td>
+                          {eng.teams ? getTeamDisplay(eng.teams) : '-'}
+                        </td>
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{eng.email || '-'}</td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{eng.initials || '-'}</td>
                         <td style={{ padding: '10px 12px' }}>
@@ -661,7 +739,7 @@ export default function AdminPage() {
                 <div>
                   <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>팀 *</div>
                   <select value={addForm.teams} onChange={e => setAddForm(p => ({ ...p, teams: e.target.value }))} style={inp}>
-                    {TEAMS.map(t => <option key={t} value={t}>{['임원', '영업관리'].includes(t) ? t : `${t}팀`}</option>)}
+                    {teamsOptions.map(t => <option key={t} value={t}>{getTeamDisplay(t)}</option>)}
                   </select>
                 </div>
               </div>
@@ -711,7 +789,7 @@ export default function AdminPage() {
                 <div>
                   <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>팀</div>
                   <select value={editForm.teams} onChange={e => setEditForm(p => ({ ...p, teams: e.target.value }))} style={inp}>
-                    {TEAMS.map(t => <option key={t} value={t}>{['임원', '영업관리'].includes(t) ? t : `${t}팀`}</option>)}
+                    {teamsOptions.map(t => <option key={t} value={t}>{getTeamDisplay(t)}</option>)}
                   </select>
                 </div>
               </div>
@@ -739,6 +817,57 @@ export default function AdminPage() {
                 {editLoading ? '저장 중...' : '저장'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 팀 관리 모달 ── */}
+      {showTeamModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: CARD_BG, borderRadius: 18, padding: 24, width: '100%', maxWidth: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: TEXT }}>🏷️ 팀 관리</div>
+              <button onClick={() => setShowTeamModal(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            </div>
+
+            {/* 팀 추가 폼 */}
+            <div style={{ background: '#f8fafc', borderRadius: 12, padding: '14px 16px', marginBottom: 16, border: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: TEXT, marginBottom: 10 }}>새 팀 추가</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <input value={newTeamName} onChange={e => setNewTeamName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddTeam()}
+                  placeholder="팀 이름 (예: Apps., 5)" style={{ ...inp, flex: 1 }} />
+                <button onClick={handleAddTeam} disabled={addTeamLoading || !newTeamName.trim()}
+                  style={{ padding: '8px 18px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', opacity: (addTeamLoading || !newTeamName.trim()) ? 0.6 : 1 }}>
+                  {addTeamLoading ? '...' : '추가'}
+                </button>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: GRAY, cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" checked={newTeamIsSpecial} onChange={e => setNewTeamIsSpecial(e.target.checked)} />
+                "팀" 접미사 없이 표시 (임원, 영업관리 등 특수 팀에 사용)
+              </label>
+            </div>
+
+            {/* 팀 목록 */}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {teamLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: GRAY }}>불러오는 중...</div>
+              ) : teamsList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: GRAY }}>등록된 팀이 없습니다</div>
+              ) : teamsList.map(team => (
+                <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 4px', borderBottom: `1px solid ${BORDER}` }}>
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: TEXT }}>{getTeamDisplay(team.name)}</span>
+                    {team.is_special && <span style={{ fontSize: 11, color: GRAY, marginLeft: 6 }}>(접미사 없음)</span>}
+                  </div>
+                  <button onClick={() => handleDeleteTeam(team)} disabled={deletingTeam === team.id}
+                    style={{ padding: '4px 14px', background: DANGER, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: deletingTeam === team.id ? 0.6 : 1 }}>
+                    {deletingTeam === team.id ? '삭제 중...' : '삭제'}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 11, color: GRAY }}>* 직원이 배정된 팀은 삭제할 수 없습니다</div>
           </div>
         </div>
       )}
