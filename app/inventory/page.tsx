@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -93,7 +93,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   '반려':   { bg: '#fee2e2', color: RED },
 }
 
-export default function InventoryPage() {
+function InventoryPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
 
@@ -1093,5 +1093,13 @@ export default function InventoryPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <InventoryPage />
+    </Suspense>
   )
 }
