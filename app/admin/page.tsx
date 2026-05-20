@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const BLUE = '#234ea2'
+const GREEN = '#16a34a'
 const PAGE_BG = '#f4f5f7'
 const CARD_BG = '#ffffff'
 const BORDER = '#e5e7eb'
 const TEXT = '#111113'
 const GRAY = '#6b7280'
 const DANGER = '#dc2626'
+const PURPLE = '#7c3aed'
 
 type Quote = {
   quote_id: number
@@ -33,6 +35,7 @@ type Engineer = {
   initials: string | null
   is_admin: boolean
   permission_level: string
+  is_inventory_manager: boolean
 }
 
 type SalesTarget = {
@@ -94,7 +97,7 @@ export default function AdminPage() {
   const [addForm, setAddForm] = useState({ name: '', position: '사원', teams: '1', email: '', initials: '', password: '' })
   const [addLoading, setAddLoading] = useState(false)
   const [editEngineer, setEditEngineer] = useState<Engineer | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', position: '', teams: '', email: '', initials: '', permission_level: 'member' })
+  const [editForm, setEditForm] = useState({ name: '', position: '', teams: '', email: '', initials: '', permission_level: 'member', is_inventory_manager: false })
   const [editLoading, setEditLoading] = useState(false)
   const [deleteEngineer, setDeleteEngineer] = useState<Engineer | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -269,12 +272,13 @@ export default function AdminPage() {
     if (!editEngineer) return
     if (!editForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setEditLoading(true)
-   const updateData: any = {
+    const updateData: Record<string, unknown> = {
       name: editForm.name.trim(),
       position: editForm.position,
       teams: editForm.teams,
       email: editForm.email.trim(),
       initials: editForm.initials.trim().toUpperCase(),
+      is_inventory_manager: editForm.is_inventory_manager,
     }
     if (currentEngineer?.permission_level === 'superadmin') {
       updateData.permission_level = editForm.permission_level
@@ -686,23 +690,24 @@ export default function AdminPage() {
                         <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{eng.email || '-'}</td>
                         <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{eng.initials || '-'}</td>
                         <td style={{ padding: '10px 12px' }}>
-  {(() => {
-    const level = eng.permission_level || 'member'
-    const config: Record<string, { label: string; bg: string; color: string }> = {
-      superadmin: { label: '최고관리자', bg: '#faf5ff', color: '#7c3aed' },
-      manager:    { label: '팀장',     bg: '#eff6ff', color: BLUE },
-      member:     { label: '팀원',     bg: '#f3f4f6', color: GRAY },
-    }
-    const c = config[level] || config.member
-    return (
-      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: c.bg, color: c.color }}>
-        {c.label}
-      </span>
-    )
-  })()}
-</td>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {(() => {
+                              const level = eng.permission_level || 'member'
+                              const badges: { label: string; bg: string; color: string }[] = []
+                              if (level === 'superadmin') badges.push({ label: '최고관리자', bg: '#faf5ff', color: PURPLE })
+                              else if (level === 'manager') badges.push({ label: '팀장', bg: '#eff6ff', color: BLUE })
+                              else badges.push({ label: '팀원', bg: '#f3f4f6', color: GRAY })
+                              if (eng.is_inventory_manager) badges.push({ label: '재고관리자', bg: '#f0fdf4', color: GREEN })
+                              return badges.map(b => (
+                                <span key={b.label} style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: b.bg, color: b.color, whiteSpace: 'nowrap' }}>
+                                  {b.label}
+                                </span>
+                              ))
+                            })()}
+                          </div>
+                        </td>
                         <td style={{ padding: '10px 12px' }}>
-                          <button onClick={() => { setEditEngineer(eng); setEditForm({ name: eng.name, position: eng.position || '사원', teams: eng.teams || '1', email: eng.email || '', initials: eng.initials || '', permission_level: eng.permission_level || 'member' }) }}
+                          <button onClick={() => { setEditEngineer(eng); setEditForm({ name: eng.name, position: eng.position || '사원', teams: eng.teams || '1', email: eng.email || '', initials: eng.initials || '', permission_level: eng.permission_level || 'member', is_inventory_manager: eng.is_inventory_manager || false }) }}
                             style={{ padding: '4px 12px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>수정</button>
                         </td>
                         <td style={{ padding: '10px 12px' }}>
@@ -772,14 +777,14 @@ export default function AdminPage() {
       {/* ── 직원 수정 모달 ── */}
       {editEngineer && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: CARD_BG, borderRadius: 18, padding: 28, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: CARD_BG, borderRadius: 18, padding: 28, width: '100%', maxWidth: 640, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: TEXT, marginBottom: 20 }}>직원 정보 수정</div>
             <div style={{ display: 'grid', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>이름 *</div>
-                <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={inp} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>이름 *</div>
+                  <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={inp} />
+                </div>
                 <div>
                   <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>직책</div>
                   <select value={editForm.position} onChange={e => setEditForm(p => ({ ...p, position: e.target.value }))} style={inp}>
@@ -799,13 +804,40 @@ export default function AdminPage() {
               </div>
               {currentEngineer?.permission_level === 'superadmin' && (
                 <div>
-                  <div style={{ fontSize: 12, color: GRAY, marginBottom: 5 }}>권한</div>
-                  <select value={editForm.permission_level} onChange={e => setEditForm(p => ({ ...p, permission_level: e.target.value }))} style={inp}>
-                    <option value="member">팀원</option>
-                    <option value="manager">팀장</option>
-                    <option value="superadmin">최고관리자</option>
-                  </select>
-                  <div style={{ fontSize: 11, color: GRAY, marginTop: 3 }}>팀장은 본인 팀 전체 실적 조회 가능 / 최고관리자는 전체 조회 가능</div>
+                  <div style={{ fontSize: 12, color: GRAY, marginBottom: 8, fontWeight: 700 }}>권한</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {([
+                      { key: 'superadmin', label: '최고관리자', desc: '전체 조회 및 관리자 접근', color: PURPLE, bg: '#faf5ff', border: '#d8b4fe' },
+                      { key: 'manager',    label: '팀장',       desc: '본인 팀 전체 실적 조회', color: BLUE,   bg: '#eff6ff', border: '#bfdbfe' },
+                    ] as const).map(({ key, label, desc, color, bg, border }) => {
+                      const checked = editForm.permission_level === key
+                      return (
+                        <label key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', padding: '10px 12px', background: checked ? bg : '#f8fafc', borderRadius: 8, border: `1px solid ${checked ? border : BORDER}`, transition: 'all 0.15s' }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={e => setEditForm(p => ({ ...p, permission_level: e.target.checked ? key : 'member' }))}
+                            style={{ width: 15, height: 15, accentColor: color, cursor: 'pointer', marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: checked ? color : TEXT }}>{label}</div>
+                            <div style={{ fontSize: 11, color: GRAY, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                    {(() => {
+                      const checked = editForm.is_inventory_manager
+                      return (
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', padding: '10px 12px', background: checked ? '#f0fdf4' : '#f8fafc', borderRadius: 8, border: `1px solid ${checked ? '#86efac' : BORDER}`, transition: 'all 0.15s' }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={e => setEditForm(p => ({ ...p, is_inventory_manager: e.target.checked }))}
+                            style={{ width: 15, height: 15, accentColor: GREEN, cursor: 'pointer', marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: checked ? GREEN : TEXT }}>재고관리자</div>
+                            <div style={{ fontSize: 11, color: GRAY, marginTop: 2, lineHeight: 1.4 }}>출고 요청 승인·반려 가능</div>
+                          </div>
+                        </label>
+                      )
+                    })()}
+                  </div>
                 </div>
               )}
             </div>

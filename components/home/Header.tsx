@@ -205,7 +205,7 @@ export default function Header() {
                               {!notif.is_read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#234ea2', flexShrink: 0, display: 'inline-block' }} />}
                               {notif.title}
                             </div>
-                            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
                               {notif.message}
                             </div>
                           </div>
