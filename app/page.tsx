@@ -40,6 +40,7 @@ export default function HomePage() {
   const pendingListScrollTopRef = useRef<number | null>(null)
 
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [deviceMap, setDeviceMap] = useState<Map<number, Device[]>>(new Map())
   const [focusedCustomerId, setFocusedCustomerId] = useState<number | null>(null)
   const [latestServiceDateMap, setLatestServiceDateMap] = useState<Map<number, number>>(new Map())
@@ -81,6 +82,15 @@ const toggleCategory = (category: string) => {
   setDeviceMap,
   setLatestServiceDateMap,
 })
+
+  useEffect(() => {
+    if (customers.length > 0) setIsLoading(false)
+  }, [customers])
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 6000)
+    return () => clearTimeout(t)
+  }, [])
 
   const [contactForm, setContactForm] = useState<Contact>({
     name: '',
@@ -495,6 +505,7 @@ useEffect(() => {
             onDetailClick={saveHomeState}
             listScrollRef={listScrollRef}
             onScrollSave={saveHomeState}
+            isLoading={isLoading}
           />
           </div>
 

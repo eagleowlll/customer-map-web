@@ -7,7 +7,7 @@ import { loadKakaoMap } from '@/lib/loadKakaoMap'
 import { createClient } from '@/lib/supabase/client'
 
 import type { Customer, Device, Contact, ServiceHistory, Engineer, Quote, ServiceForm, DeviceForm, ContactForm, CustomerEditFormData } from '@/components/customer/types'
-import { PAGE_BG, TEXT_PRIMARY, TEXT_MUTED } from '@/components/customer/constants'
+import { PAGE_BG, TEXT_MUTED } from '@/components/customer/constants'
 
 import CustomerInfoPanel from '@/components/customer/CustomerInfoPanel'
 import ContactSection from '@/components/customer/ContactSection'
@@ -123,10 +123,15 @@ export default function CustomerDetailPage() {
     if (!selectedDeviceId) return
     setIsSavingService(true)
     const visitYear = form.visit_date.slice(0, 4)
+    const engineerSnapshot = engineerIds
+      .map(id => engineers.find(e => e.engineer_id === id))
+      .filter(Boolean)
+      .map(e => `${e!.name} ${e!.position ?? ''}`.trim())
+      .join(', ')
     const { data: newService, error } = await supabase.from('service_history').insert([{
       customer_id: customerId, device_id: selectedDeviceId, visit_year: visitYear,
       visit_date: form.visit_date.trim(), service_notes: form.service_notes.trim(),
-      visitor: form.visitor.trim() || null, service_type: form.service_type,
+      visitor: engineerSnapshot || null, service_type: form.service_type,
       contact_id: form.contact_id || null, is_paid: form.is_paid,
       work_hours: form.work_hours ? parseFloat(form.work_hours) : null,
     }]).select().single()
@@ -143,9 +148,14 @@ export default function CustomerDetailPage() {
     if (!selectedService) return
     setIsSavingServiceEdit(true)
     const visitYear = form.visit_date.slice(0, 4)
+    const engineerSnapshot = engineerIds
+      .map(id => engineers.find(e => e.engineer_id === id))
+      .filter(Boolean)
+      .map(e => `${e!.name} ${e!.position ?? ''}`.trim())
+      .join(', ')
     const { error } = await supabase.from('service_history').update({
       visit_year: visitYear, visit_date: form.visit_date.trim(),
-      service_notes: form.service_notes.trim(), visitor: form.visitor.trim() || null,
+      service_notes: form.service_notes.trim(), visitor: engineerSnapshot || null,
       service_type: form.service_type, contact_id: form.contact_id || null,
       is_paid: form.is_paid, work_hours: form.work_hours ? parseFloat(form.work_hours) : null,
     }).eq('service_id', selectedService.service_id)
@@ -235,7 +245,7 @@ export default function CustomerDetailPage() {
   // ── 담당자 CRUD ──
   const handleAddContact = async (form: ContactForm) => {
     setIsSavingContact(true)
-    const { error } = await supabase.from('contacts').insert([{ customer_id: customerId, name: form.name.trim(), department: form.department.trim() || null, position: form.position.trim() || null, phone: form.phone.trim() || null }])
+    const { error } = await supabase.from('contacts').insert([{ customer_id: customerId, name: form.name.trim(), department: form.department.trim() || null, position: form.position.trim() || null, phone: form.phone.trim() || null, email: form.email.trim() || null }])
     setIsSavingContact(false)
     if (error) { alert(error.message || '담당자 추가 중 오류가 발생했습니다.'); return }
     alert('담당자가 추가되었습니다.')
@@ -246,7 +256,7 @@ export default function CustomerDetailPage() {
   const handleUpdateContact = async (form: ContactForm) => {
     if (!selectedContact) return
     setIsSavingContactEdit(true)
-    const { error } = await supabase.from('contacts').update({ name: form.name.trim(), department: form.department.trim() || null, position: form.position.trim() || null, phone: form.phone.trim() || null }).eq('contact_id', selectedContact.contact_id)
+    const { error } = await supabase.from('contacts').update({ name: form.name.trim(), department: form.department.trim() || null, position: form.position.trim() || null, phone: form.phone.trim() || null, email: form.email.trim() || null }).eq('contact_id', selectedContact.contact_id)
     setIsSavingContactEdit(false)
     if (error) { alert(error.message || '담당자 수정 중 오류가 발생했습니다.'); return }
     alert('담당자 정보가 수정되었습니다.')
@@ -340,12 +350,36 @@ export default function CustomerDetailPage() {
     [quotes]
   )
 
+  const globalCss = `
+    html, body { background: ${PAGE_BG}; }
+    input::placeholder, textarea::placeholder { color: ${TEXT_MUTED}; opacity: 1; }
+    select { appearance: none; -webkit-appearance: none; -moz-appearance: none; }
+    input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+    input:focus, textarea:focus, select:focus {
+      border-color: #234ea2 !important;
+      box-shadow: 0 0 0 3px rgba(35,78,162,0.10) !important;
+      outline: none;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.97) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes sk-pulse { 0%,100% { opacity:1 } 50% { opacity:0.45 } }
+  `
+
   if (loading) {
     return (
       <>
-        <style jsx global>{`html, body { background: ${PAGE_BG}; }`}</style>
-        <main style={{ padding: 20, background: PAGE_BG, minHeight: '100vh', color: TEXT_PRIMARY }}>
-          <p style={{ marginTop: 16 }}>불러오는 중...</p>
+        <style jsx global>{globalCss}</style>
+        <main style={{ padding: 20, maxWidth: 1400, margin: '0 auto', background: PAGE_BG, minHeight: '100vh' }}>
+          {[{ h: 130, mb: 24 }, { h: 120, mb: 24 }, { h: 400, mb: 0 }].map(({ h, mb }, i) => (
+            <div key={i} style={{
+              background: '#ffffff', borderRadius: 20, height: h, marginBottom: mb,
+              border: '1px solid #e5e7eb',
+              animation: 'sk-pulse 1.6s ease-in-out infinite',
+              animationDelay: `${i * 0.15}s`,
+            }} />
+          ))}
         </main>
       </>
     )
@@ -353,12 +387,7 @@ export default function CustomerDetailPage() {
 
   return (
     <>
-      <style jsx global>{`
-        html, body { background: ${PAGE_BG}; }
-        input::placeholder, textarea::placeholder { color: ${TEXT_MUTED}; opacity: 1; }
-        select { appearance: none; -webkit-appearance: none; -moz-appearance: none; }
-        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
-      `}</style>
+      <style jsx global>{globalCss}</style>
 
       <main style={{ padding: 20, maxWidth: 1400, margin: '0 auto', background: PAGE_BG, minHeight: '100vh' }}>
 

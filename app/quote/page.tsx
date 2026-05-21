@@ -294,39 +294,61 @@ function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRa
   const profitPct = totalSupply > 0 ? (totalProfit / totalSupply) * 100 : 0
   const isGood = profitPct >= 40
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: `2px solid ${isGood ? '#16a34a' : '#dc2626'}`, marginBottom: 14, overflow: 'hidden' }}>
-      <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#1C3557' }}> 수익 분석</span>
-          <span style={{ fontSize: 11, color: '#6b7280' }}>{exchangeRate ? `💱 ${exchangeRate.toFixed(4)}원` : '환율 로딩중...'}{rateUpdatedAt && ` (${rateUpdatedAt})`}</span>
-          <button onClick={onFetchRate} disabled={rateLoading} style={{ padding: '2px 8px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, color: '#374151' }}>{rateLoading ? '갱신중...' : '🔄'}</button>
+    <div style={{ background: '#fff', borderRadius: 14, border: `1.5px solid ${isGood ? '#bbf7d0' : '#fecaca'}`, marginBottom: 14, overflow: 'hidden' }}>
+      <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${isGood ? '#dcfce7' : '#fee2e2'}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 3, height: 14, background: '#234ea2', borderRadius: 2, flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#111113', letterSpacing: '-0.2px' }}>수익 분석</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+              {exchangeRate ? `${exchangeRate.toFixed(4)}원` : '환율 로딩중...'}
+            </span>
+            {rateUpdatedAt && <span style={{ fontSize: 10, color: '#9ca3af' }}>({rateUpdatedAt})</span>}
+            <button
+              onClick={onFetchRate}
+              disabled={rateLoading}
+              style={{ width: 22, height: 22, borderRadius: '50%', background: '#fff', border: '1px solid #e2e4e9', cursor: rateLoading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s ease' }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={rateLoading ? '#9ca3af' : '#374151'} strokeWidth="2.5">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: isGood ? '#16a34a' : '#dc2626', color: '#fff' }}>{isGood ? '✓' : '⚠'} 이익률 {profitPct.toFixed(1)}%</span>
+        <span style={{ fontSize: 13, fontWeight: 800, padding: '5px 14px', borderRadius: 99, background: isGood ? '#16a34a' : '#dc2626', color: '#fff', letterSpacing: '-0.1px' }}>
+          {isGood ? '✓' : '!'} 이익률 {profitPct.toFixed(1)}%
+        </span>
       </div>
       <div style={{ padding: '12px 16px' }}>
         {rows.map((r, i) => r.supply_price > 0 && (
-          <div key={r.id} style={{ marginBottom: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8, fontWeight: 600 }}>품목 {i + 1} {r.itemText && `— ${r.itemText}`}{r.selectedItem && ` (${r.selectedItem.model_jp})`}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div key={r.id} style={{ marginBottom: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e8eaed' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#234ea2', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+              <span style={{ fontSize: 11, color: '#374151', fontWeight: 600 }}>{r.itemText && r.itemText}{r.selectedItem && ` (${r.selectedItem.model_jp})`}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               {r.selectedItem && (<>
-                <div style={{ background: '#fff', borderRadius: 6, padding: '6px 10px', border: '1px solid #e5e7eb' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>구입가</div><div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>¥{r.cost_price_jpy.toLocaleString()}</div></div>
-                <div style={{ background: '#fff', borderRadius: 6, padding: '6px 10px', border: '1px solid #e5e7eb' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>관세 × 환율</div><div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>×{r.tariff_rate} × {r.exchange_rate.toFixed(2)}</div></div>
-                <div style={{ background: '#fff', borderRadius: 6, padding: '6px 10px', border: '1px solid #e5e7eb' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>상품가 (원가)</div><div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>₩{numKR(r.product_price)}</div></div>
+                <div style={{ background: '#fff', borderRadius: 7, padding: '6px 9px', border: '1px solid #e8eaed' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>구입가</div><div style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>¥{r.cost_price_jpy.toLocaleString()}</div></div>
+                <div style={{ background: '#fff', borderRadius: 7, padding: '6px 9px', border: '1px solid #e8eaed' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>관세 × 환율</div><div style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>×{r.tariff_rate} × {r.exchange_rate.toFixed(2)}</div></div>
+                <div style={{ background: '#fff', borderRadius: 7, padding: '6px 9px', border: '1px solid #e8eaed' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>원가</div><div style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>₩{numKR(r.product_price)}</div></div>
               </>)}
-              <div style={{ background: '#fff', borderRadius: 6, padding: '6px 10px', border: '1px solid #e5e7eb' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>판매단가</div><div style={{ fontSize: 13, fontWeight: 700, color: '#1C3557' }}>₩{numKR(r.unit_price)}</div></div>
-              <div style={{ background: '#fff', borderRadius: 6, padding: '6px 10px', border: '1px solid #e5e7eb' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>공급가</div><div style={{ fontSize: 13, fontWeight: 700, color: '#1C3557' }}>₩{numKR(r.supply_price)}</div></div>
-              <div style={{ background: r.profit >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: 6, padding: '6px 10px', border: `1px solid ${r.profit >= 0 ? '#bbf7d0' : '#fecaca'}` }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>매출이익 ({r.profit_rate}%)</div><div style={{ fontSize: 13, fontWeight: 800, color: r.profit >= 0 ? '#16a34a' : '#dc2626' }}>₩{numKR(r.profit)}</div></div>
+              <div style={{ background: '#fff', borderRadius: 7, padding: '6px 9px', border: '1px solid #e8eaed' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>판매단가</div><div style={{ fontSize: 12, fontWeight: 700, color: '#234ea2' }}>₩{numKR(r.unit_price)}</div></div>
+              <div style={{ background: '#fff', borderRadius: 7, padding: '6px 9px', border: '1px solid #e8eaed' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>공급가</div><div style={{ fontSize: 12, fontWeight: 700, color: '#234ea2' }}>₩{numKR(r.supply_price)}</div></div>
+              <div style={{ background: r.profit >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: 7, padding: '6px 9px', border: `1px solid ${r.profit >= 0 ? '#bbf7d0' : '#fecaca'}` }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2, fontWeight: 500 }}>매출이익 ({r.profit_rate}%)</div><div style={{ fontSize: 12, fontWeight: 800, color: r.profit >= 0 ? '#16a34a' : '#dc2626' }}>₩{numKR(r.profit)}</div></div>
             </div>
           </div>
         ))}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4 }}>
-          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e5e7eb', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>공급가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#1C3557' }}>₩{numKR(totalSupply)}</div></div>
-          <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e5e7eb', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>원가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#374151' }}>₩{numKR(totalProduct)}</div></div>
-          <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', borderRadius: 8, padding: '10px 12px', border: `1px solid ${isGood ? '#bbf7d0' : '#fecaca'}`, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4 }}>매출이익 합계</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 4, paddingTop: 10, borderTop: '1px solid #e8eaed' }}>
+          <div style={{ background: '#eff4ff', borderRadius: 10, padding: '10px 12px', border: '1px solid #c7d7f8', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>공급가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#234ea2' }}>₩{numKR(totalSupply)}</div></div>
+          <div style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 12px', border: '1px solid #e8eaed', textAlign: 'center' }}><div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>원가 합계</div><div style={{ fontSize: 14, fontWeight: 800, color: '#374151' }}>₩{numKR(totalProduct)}</div></div>
+          <div style={{ background: isGood ? '#f0fdf4' : '#fef2f2', borderRadius: 10, padding: '10px 12px', border: `1px solid ${isGood ? '#bbf7d0' : '#fecaca'}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>매출이익 합계</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 14, fontWeight: 800, color: isGood ? '#16a34a' : '#dc2626' }}>₩{numKR(totalProfit)}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: isGood ? '#16a34a' : '#dc2626' }}>({profitPct.toFixed(1)}%)</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: isGood ? '#16a34a' : '#dc2626' }}>({profitPct.toFixed(1)}%)</span>
             </div>
           </div>
         </div>
@@ -377,6 +399,9 @@ export default function QuotePage() {
   const [searchQuery, setSearchQuery] = useState<Record<string, string>>({})
   const [searchResults, setSearchResults] = useState<Record<string, PriceItem[]>>({})
   const [searchOpen, setSearchOpen] = useState<Record<string, boolean>>({})
+  const [priceInputOpen, setPriceInputOpen] = useState<Record<string, boolean>>({})
+  const [editingProfitRate, setEditingProfitRate] = useState<Record<string, boolean>>({})
+  const [profitRateInput, setProfitRateInput] = useState<Record<string, string>>({})
 
   const today = new Date()
   const yyyy = today.getFullYear()
@@ -644,46 +669,62 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
     setRows(prev => prev.map(r => r.id !== rowId ? r : { ...r, subLines: r.subLines.filter((_, i) => i !== idx) }))
 
   const inp: React.CSSProperties = {
-    padding: '5px 8px', border: '1px solid #d1d5db', borderRadius: 5,
-    fontSize: 12, outline: 'none', background: '#fff', boxSizing: 'border-box',
+    padding: '8px 11px', border: '1.5px solid #e2e4e9', borderRadius: 9,
+    fontSize: 13, outline: 'none', background: '#fff', boxSizing: 'border-box',
+    color: '#111113', transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
   }
 
   return (
     <div style={{ background: '#eef0f4', minHeight: '100vh', fontFamily: 'Malgun Gothic, sans-serif' }}>
+      <style>{`
+        .q-input:focus {
+          border-color: #234ea2 !important;
+          box-shadow: 0 0 0 3px rgba(35,78,162,0.10) !important;
+          outline: none;
+        }
+        @keyframes modal-in {
+          from { opacity: 0; transform: scale(0.97) translateY(6px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: 20, display: 'flex', gap: 20 }}>
 
-        <div style={{ width: 420, flexShrink: 0 }}>
+        <div style={{ width: 430, flexShrink: 0 }}>
 
           {/* 기본 정보 */}
-          <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', marginBottom: 14, border: '1px solid #e5e7eb' }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}>기본 정보</div>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', marginBottom: 14, border: '1px solid #e2e4e9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 3, height: 14, background: '#234ea2', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#111113', letterSpacing: '-0.2px' }}>기본 정보</span>
+            </div>
 
             <div style={{ marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: '#374151', whiteSpace: 'nowrap', width: 60 }}>사명</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>사명</span>
                 <div style={{ position: 'relative', flex: 1 }}>
                   <input
+                    className="q-input"
                     value={customerQuery}
                     onChange={e => handleCustomerSearch(e.target.value)}
                     onFocus={() => customerResults.length > 0 && setCustomerSearchOpen(true)}
                     placeholder="업체명 검색 또는 직접 입력"
-                    style={{ ...inp, width: '100%', paddingRight: selectedCustomer ? 28 : 8 }}
+                    style={{ ...inp, width: '100%', paddingRight: selectedCustomer ? 32 : 11, border: customerSearchOpen ? '1.5px solid #234ea2' : '1.5px solid #e2e4e9' }}
                   />
                   {selectedCustomer && (
                     <button onClick={handleCustomerClear}
-                      style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#9ca3af', padding: 0 }}>
-                      ✕
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex', alignItems: 'center' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                   )}
                   {customerSearchOpen && customerResults.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 1000, background: '#fff', border: '1.5px solid #234ea2', borderRadius: 10, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px rgba(35,78,162,0.12)' }}>
                       {customerResults.map(c => (
                         <div key={c.customer_id} onClick={() => handleCustomerSelect(c)}
-                          style={{ padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: 12 }}
+                          style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: 12, transition: 'background 0.12s ease' }}
                           onMouseEnter={e => (e.currentTarget.style.background = '#f0f4ff')}
                           onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                           <div style={{ fontWeight: 700, color: '#234ea2' }}>{c.company_name}</div>
-                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{c.address ?? ''} {c.status ? `· ${c.status}` : ''}</div>
+                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{c.address ?? ''}{c.status ? ` · ${c.status}` : ''}</div>
                         </div>
                       ))}
                     </div>
@@ -691,29 +732,30 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                 </div>
               </div>
               {selectedCustomer && (
-                <div style={{ marginLeft: 66, padding: '4px 8px', background: '#eff6ff', borderRadius: 6, fontSize: 11, color: '#234ea2', fontWeight: 600 }}>
-                  ✓ {selectedCustomer.company_name} 연결됨
+                <div style={{ marginTop: 4, marginLeft: 64, padding: '3px 8px', background: '#eff4ff', borderRadius: 6, fontSize: 11, color: '#234ea2', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                  {selectedCustomer.company_name} 연결됨
                 </div>
               )}
               {!selectedCustomer && customerQuery && (
-                <div style={{ marginLeft: 66, fontSize: 11, color: '#9ca3af' }}>검색 결과 없으면 그대로 사용됩니다</div>
+                <div style={{ marginTop: 2, marginLeft: 64, fontSize: 11, color: '#9ca3af' }}>검색 결과 없으면 그대로 사용됩니다</div>
               )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#374151', whiteSpace: 'nowrap', width: 60 }}>수신인</span>
-              <input value={receiver} onChange={e => setReceiver(e.target.value)} placeholder="예: 홍길동 부장님" style={{ ...inp, flex: 1 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>수신인</span>
+              <input className="q-input" value={receiver} onChange={e => setReceiver(e.target.value)} placeholder="예: 홍길동 부장님" style={{ ...inp, flex: 1 }} />
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#374151', whiteSpace: 'nowrap', width: 60 }}>견적 내용</span>
-              <input value={titleItem} onChange={e => setTitleItem(e.target.value)} placeholder="예: 측정기 부품 견적의 건" style={{ ...inp, flex: 1 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>견적 내용</span>
+              <input className="q-input" value={titleItem} onChange={e => setTitleItem(e.target.value)} placeholder="예: 측정기 부품 견적의 건" style={{ ...inp, flex: 1 }} />
             </div>
 
             <div>
-              <div style={{ fontSize: 12, color: '#374151', marginBottom: 4 }}>비고</div>
-              <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={4}
-                style={{ ...inp, width: '100%', resize: 'vertical', lineHeight: 1.8 }} />
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4, display: 'block' }}>비고</label>
+              <textarea className="q-input" value={remarks} onChange={e => setRemarks(e.target.value)} rows={3}
+                style={{ ...inp, width: '100%', resize: 'vertical', lineHeight: 1.7 }} />
             </div>
           </div>
 
@@ -727,44 +769,53 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
           </div>
 
           {/* 품목 */}
-      <div style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', border: '1px solid #e5e7eb', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 20px', border: '1px solid #e2e4e9', position: 'relative', overflow: 'hidden' }}>
             {Array.from({ length: 20 }, (_, i) => i).map(i => (
               <div key={i} style={{ position: 'absolute', top: `${i * 140}px`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.05 }}>
                 <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
               </div>
             ))}
-            <div style={{ fontWeight: 800, fontSize: 13, color: '#1C3557', marginBottom: 10 }}> 품목</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 3, height: 16, background: '#234ea2', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#111113', letterSpacing: '-0.2px' }}>품목</span>
+              {rows.length > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#eff4ff', color: '#234ea2' }}>{rows.length}</span>
+              )}
+            </div>
 
             {rows.map((row, rowIdx) => (
-              <div key={row.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px', marginBottom: 10, border: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>품목 {rowIdx + 1}</span>
+              <div key={row.id} style={{ background: '#f8fafc', borderRadius: 12, padding: '14px', marginBottom: 10, border: '1px solid #e2e4e9' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#234ea2', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{rowIdx + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#111113' }}>품목</span>
+                  </div>
                   <button onClick={() => setRows(prev => prev.filter(r => r.id !== row.id))}
-                    style={{ padding: '2px 8px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>삭제</button>
+                    style={{ padding: '2px 0', background: 'none', color: '#dc2626', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>삭제</button>
                 </div>
 
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>품명 앞 내용</div>
-                  <input value={row.itemText} onChange={e => updateRow(row.id, 'itemText', e.target.value)} placeholder="예: 1. 스타일러스" style={{ ...inp, width: '100%' }} />
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, display: 'block' }}>품명</label>
+                  <input className="q-input" value={row.itemText} onChange={e => updateRow(row.id, 'itemText', e.target.value)} placeholder="예: 1. 스타일러스" style={{ ...inp, width: '100%' }} />
                 </div>
 
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>상품 검색{row.selectedItem && <span style={{ color: '#16a34a', fontWeight: 700 }}> ✓ 선택됨</span>}</div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, display: 'block' }}>
+                    상품 검색{row.selectedItem && <span style={{ color: '#16a34a', marginLeft: 6, fontWeight: 700 }}>✓ 선택됨</span>}
+                  </label>
                   <div style={{ position: 'relative' }}>
-                    <input value={searchQuery[row.id] || ''} onChange={e => handleSearch(row.id, e.target.value)}
+                    <input className="q-input" value={searchQuery[row.id] || ''} onChange={e => handleSearch(row.id, e.target.value)}
                       onFocus={() => setSearchOpen(prev => ({ ...prev, [row.id]: true }))}
                       placeholder="코드 또는 모델명 검색" style={{ ...inp, width: '100%' }} />
                     {searchOpen[row.id] && (searchResults[row.id] || []).length > 0 && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, background: '#fff', border: '1px solid #ccc', borderRadius: 6, maxHeight: 200, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999, background: '#fff', border: '1.5px solid #234ea2', borderRadius: 10, maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(35,78,162,0.12)' }}>
                         {searchResults[row.id].map(item => (
                           <div key={item.id} onClick={() => handleSelect(row.id, item)}
-                            style={{ padding: '7px 10px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: 11 }}
+                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: 11, transition: 'background 0.12s ease' }}
                             onMouseEnter={e => (e.currentTarget.style.background = '#f0f4ff')}
                             onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-                            <span style={{ fontWeight: 700, color: '#234ea2' }}>{item.item_code}</span>
-                            <span style={{ marginLeft: 6 }}>{item.item_name_jp}</span>
-                            <span style={{ marginLeft: 6, color: '#666' }}>({item.model_jp})</span>
-                            <div style={{ color: '#999', marginTop: 2 }}>정가:¥{item.price_jpy?.toLocaleString()} / 구입가:¥{item.cost_jpy?.toLocaleString()}</div>
+                            <div><span style={{ fontWeight: 700, color: '#234ea2' }}>{item.item_code}</span><span style={{ marginLeft: 6, color: '#374151' }}>{item.item_name_jp}</span><span style={{ marginLeft: 6, color: '#6b7280' }}>({item.model_jp})</span></div>
+                            <div style={{ color: '#9ca3af', marginTop: 2 }}>정가: ¥{item.price_jpy?.toLocaleString()} / 구입가: ¥{item.cost_jpy?.toLocaleString()}</div>
                           </div>
                         ))}
                       </div>
@@ -772,71 +823,107 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                   </div>
                   {row.selectedItem && (
                     <button onClick={() => clearItem(row.id)}
-                      style={{ marginTop: 4, padding: '2px 8px', background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>품목 해제</button>
+                      style={{ marginTop: 6, padding: '3px 10px', background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>품목 해제</button>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>수량</div>
+                {/* 스테퍼 — 통합 컨테이너 */}
+                <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e4e9', display: 'flex', marginBottom: !row.selectedItem && priceInputOpen[row.id] ? 0 : 10, overflow: 'hidden' }}>
+                  <div style={{ flex: 1, padding: '5px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2, fontWeight: 600 }}>수량</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <button onClick={() => updateRow(row.id, 'quantity', Math.max(1, row.quantity - 1))} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▼</button>
-                      <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{row.quantity}</span>
-                      <button onClick={() => updateRow(row.id, 'quantity', row.quantity + 1)} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▲</button>
+                      <button onClick={() => updateRow(row.id, 'quantity', Math.max(1, row.quantity - 1))} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>−</button>
+                      <span style={{ minWidth: 26, textAlign: 'center', fontWeight: 800, fontSize: 13, color: '#111113' }}>{row.quantity}</span>
+                      <button onClick={() => updateRow(row.id, 'quantity', row.quantity + 1)} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
                     </div>
                   </div>
-                  <div style={{ width: 1, height: 36, background: '#e5e7eb' }} />
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>이익률</div>
+                  <div style={{ width: 1, background: '#e2e4e9', flexShrink: 0 }} />
+                  <div style={{ flex: 1, padding: '5px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2, fontWeight: 600 }}>이익률</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <button onClick={() => updateRow(row.id, 'profit_rate', Math.max(0, row.profit_rate - 5))} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▼</button>
-                      <span style={{ minWidth: 36, textAlign: 'center', fontWeight: 800, fontSize: 13, color: row.profit_rate >= 40 ? '#16a34a' : '#dc2626' }}>{row.profit_rate}%</span>
-                      <button onClick={() => updateRow(row.id, 'profit_rate', Math.min(95, row.profit_rate + 5))} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▲</button>
+                      <button onClick={() => updateRow(row.id, 'profit_rate', Math.max(0, row.profit_rate - 5))} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>−</button>
+                      {editingProfitRate[row.id] ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={profitRateInput[row.id] ?? ''}
+                          onChange={e => setProfitRateInput(p => ({ ...p, [row.id]: e.target.value }))}
+                          onBlur={() => {
+                            const v = Math.min(95, Math.max(0, parseInt(profitRateInput[row.id] || '0') || 0))
+                            updateRow(row.id, 'profit_rate', v)
+                            setEditingProfitRate(p => ({ ...p, [row.id]: false }))
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                          }}
+                          style={{ width: 40, textAlign: 'center', fontWeight: 800, fontSize: 12, border: '1px solid #234ea2', borderRadius: 4, padding: '1px 2px', outline: 'none', color: '#111113' }}
+                        />
+                      ) : (
+                        <span
+                          onClick={() => { setEditingProfitRate(p => ({ ...p, [row.id]: true })); setProfitRateInput(p => ({ ...p, [row.id]: String(row.profit_rate) })) }}
+                          title="클릭하여 직접 입력"
+                          style={{ minWidth: 36, textAlign: 'center', fontWeight: 800, fontSize: 13, color: row.profit_rate >= 40 ? '#16a34a' : '#dc2626', cursor: 'text' }}
+                        >{row.profit_rate}%</span>
+                      )}
+                      <button onClick={() => updateRow(row.id, 'profit_rate', Math.min(95, row.profit_rate + 5))} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
                     </div>
                   </div>
-                  <div style={{ width: 1, height: 36, background: '#e5e7eb' }} />
-                  <div style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>관세율</div>
+                  <div style={{ width: 1, background: '#e2e4e9', flexShrink: 0 }} />
+                  <div style={{ flex: 1, padding: '5px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2, fontWeight: 600 }}>관세율</div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <button onClick={() => updateRow(row.id, 'tariff_rate', parseFloat((row.tariff_rate - 0.01).toFixed(2)))} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▼</button>
-                      <span style={{ minWidth: 36, textAlign: 'center', fontSize: 12 }}>×{row.tariff_rate.toFixed(2)}</span>
-                      <button onClick={() => updateRow(row.id, 'tariff_rate', parseFloat((row.tariff_rate + 0.01).toFixed(2)))} style={{ width: 22, height: 22, border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 11 }}>▲</button>
+                      <button onClick={() => updateRow(row.id, 'tariff_rate', parseFloat((row.tariff_rate - 0.01).toFixed(2)))} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>−</button>
+                      <span style={{ minWidth: 36, textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#374151' }}>×{row.tariff_rate.toFixed(2)}</span>
+                      <button onClick={() => updateRow(row.id, 'tariff_rate', parseFloat((row.tariff_rate + 0.01).toFixed(2)))} style={{ width: 20, height: 20, border: '1px solid #e2e4e9', borderRadius: 4, background: '#f8fafc', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
                     </div>
                   </div>
                   {!row.selectedItem && (
                     <>
-                      <div style={{ width: 1, height: 36, background: '#e5e7eb' }} />
-                      <div style={{ flex: 2 }}>
-                        <div style={{ fontSize: 9, color: '#6b7280', marginBottom: 2 }}>단가직접입력</div>
-                        <input type="number" value={row.manual_unit_price || ''}
-                          onChange={e => updateRow(row.id, 'manual_unit_price', parseInt(e.target.value) || 0)}
-                          placeholder="0" style={{ ...inp, width: '100%', textAlign: 'right', fontSize: 12 }} />
+                      <div style={{ width: 1, background: '#e2e4e9', flexShrink: 0 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' }}>
+                        <button
+                          onClick={() => setPriceInputOpen(p => ({ ...p, [row.id]: !p[row.id] }))}
+                          style={{ padding: '4px 10px', background: priceInputOpen[row.id] ? '#234ea2' : '#eff4ff', color: priceInputOpen[row.id] ? '#fff' : '#234ea2', border: '1px solid #c7d7f8', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', transition: 'all 0.15s ease' }}
+                        >₩ 단가</button>
                       </div>
                     </>
                   )}
                 </div>
+                {!row.selectedItem && priceInputOpen[row.id] && (
+                  <div style={{ background: '#fff', border: '1px solid #e2e4e9', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '8px 10px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>단가 직접입력</span>
+                    <input className="q-input" autoFocus type="number" value={row.manual_unit_price || ''}
+                      onChange={e => updateRow(row.id, 'manual_unit_price', parseInt(e.target.value) || 0)}
+                      placeholder="0" style={{ ...inp, flex: 1, textAlign: 'right', fontSize: 13 }} />
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>원</span>
+                  </div>
+                )}
 
                 <div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3 }}>세부항목</div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, display: 'block' }}>세부항목</label>
                   {row.subLines.map((line, li) => (
                     <div key={li} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-                      <input value={line} onChange={e => updateSubLine(row.id, li, e.target.value)} placeholder="예: - Leaf Spring 교체" style={{ ...inp, flex: 1, fontSize: 11 }} />
-                      <button onClick={() => removeSubLine(row.id, li)} style={{ padding: '2px 6px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}>−</button>
+                      <input className="q-input" value={line} onChange={e => updateSubLine(row.id, li, e.target.value)} placeholder="예: - Leaf Spring 교체" style={{ ...inp, flex: 1, fontSize: 11 }} />
+                      <button onClick={() => removeSubLine(row.id, li)} style={{ padding: '0 9px', background: 'none', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center' }}>−</button>
                     </div>
                   ))}
-                  <button onClick={() => addSubLine(row.id)} style={{ padding: '3px 10px', background: '#e0e7ff', color: '#234ea2', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>+ 세부항목 추가</button>
+                  <button onClick={() => addSubLine(row.id)} style={{ padding: '4px 12px', background: '#eff4ff', color: '#234ea2', border: '1px solid #c7d7f8', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>+ 세부항목 추가</button>
                 </div>
 
                 {row.supply_price > 0 && (
-                  <div style={{ marginTop: 8, padding: '6px 8px', background: '#f0fdf4', borderRadius: 6, fontSize: 11, color: '#166534' }}>
+                  <div style={{ marginTop: 10, padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, fontSize: 11, color: '#166534', borderLeft: '3px solid #16a34a' }}>
                     단가 ₩{numKR(row.unit_price)} × {row.quantity} = 공급가 <b>₩{numKR(row.supply_price)}</b> | 부가세 ₩{numKR(row.tax)}
                   </div>
                 )}
               </div>
             ))}
 
-            <button onClick={() => setRows(prev => [...prev, createRow()])}
-              style={{ width: '100%', padding: '10px', background: '#234ea2', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            <button
+              onClick={() => setRows(prev => [...prev, createRow()])}
+              style={{ width: '100%', padding: '11px', background: '#234ea2', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background 0.15s ease' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#1c3e87')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#234ea2')}
+            >
               + 품목 추가
             </button>
           </div>
@@ -844,26 +931,31 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
 
         {/* PDF 미리보기 */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ background: '#f4f5f7', borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e4e9', height: 'calc(100vh - 40px)', position: 'sticky', top: 20 }}>
+          <div style={{ background: '#f4f5f7', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e4e9', height: 'calc(100vh - 40px)', position: 'sticky', top: 20 }}>
 
             {/* 헤더 */}
-         <div style={{ background: '#234ea2', padding: '10px 16px', display: 'flex', alignItems: 'center' }}>
-              <div style={{ flex: 1 }} />
+            <div style={{ background: 'linear-gradient(135deg, #1c3e87 0%, #234ea2 100%)', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 500, marginBottom: 2 }}>견적 번호</div>
+                <div style={{ fontSize: 14, color: '#fff', fontWeight: 800, letterSpacing: '-0.2px' }}>{quoteNo}</div>
+              </div>
               <button
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isSaving}
                 style={{
-                  padding: '6px 24px', background: isSaving ? '#6b7280' : '#16a34a', color: '#fff',
-                  border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13,
-                  cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.8 : 1,
+                  padding: '8px 20px', background: isSaving ? 'rgba(255,255,255,0.15)' : '#16a34a', color: '#fff',
+                  border: 'none', borderRadius: 9, fontWeight: 700, fontSize: 13,
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  transition: 'background 0.15s ease',
                 }}>
+                {!isSaving && (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                )}
                 {isSaving ? '저장 중...' : '견적 확정'}
               </button>
-              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 12px' }}>
-                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>{seqLetter}</span>
-                </div>
-              </div>
             </div>
 
             {/* PDF — debounced 값 사용으로 깜빡임 방지 */}
@@ -892,49 +984,49 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
       {/* 견적 확정 확인 모달 */}
       {showConfirmModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#111113', marginBottom: 12 }}>견적 확정</div>
-            <div style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.9, marginBottom: 16 }}>
-              견적 확정 시에는 실적으로 기록이 되며<br />
-              <b>관리자의 승인 없이는 삭제가 불가능합니다.</b>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 32, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', animation: 'modal-in 0.18s ease' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#111113', marginBottom: 4, letterSpacing: '-0.3px' }}>견적 확정</div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20, fontWeight: 500 }}>{quoteNo}</div>
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.8 }}>
+                견적 확정 시 실적으로 기록되며, <b>관리자의 승인 없이는 삭제가 불가능합니다.</b>
+              </div>
             </div>
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid #e5e7eb' }}>
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, fontWeight: 700 }}>저장될 수익 정보</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>공급가</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#234ea2' }}>₩{numKR(totalSupply)}</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>원가</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>₩{numKR(totalCost)}</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>순이익</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: totalProfitRate >= 40 ? '#16a34a' : '#dc2626' }}>
-                    ₩{numKR(totalProfit)} ({totalProfitRate.toFixed(1)}%)
-                  </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 24 }}>
+              <div style={{ background: '#eff4ff', borderRadius: 10, padding: '12px 14px', border: '1px solid #c7d7f8', textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>공급가</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#234ea2' }}>₩{numKR(totalSupply)}</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 14px', border: '1px solid #e8eaed', textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>원가</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#374151' }}>₩{numKR(totalCost)}</div>
+              </div>
+              <div style={{ background: totalProfitRate >= 40 ? '#f0fdf4' : '#fef2f2', borderRadius: 10, padding: '12px 14px', border: `1px solid ${totalProfitRate >= 40 ? '#bbf7d0' : '#fecaca'}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 500 }}>순이익</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: totalProfitRate >= 40 ? '#16a34a' : '#dc2626' }}>
+                  ₩{numKR(totalProfit)}<br />
+                  <span style={{ fontSize: 11 }}>({totalProfitRate.toFixed(1)}%)</span>
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setShowConfirmModal(false)}
-                style={{ flex: 1, padding: '11px', background: '#f3f4f6', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '12px', background: '#f3f4f6', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer', color: '#374151' }}>
                 취소
               </button>
-      <button onClick={async () => {
-  setShowConfirmModal(false)
-  const snapshotCompany = company || customerQuery
-  const snapshotReceiver = receiver
-  const snapshotTitleItem = titleItem
-  const snapshotRows = [...rows]
-  const snapshotRemarks = remarks
-  const snapshotQuoteNo = quoteNo
-  await handleSaveQuote()
-  await handleDownloadPDF(snapshotCompany, snapshotReceiver, snapshotTitleItem, snapshotRows, snapshotRemarks, snapshotQuoteNo)
-  setSeqIndex(prev => prev + 1)
-}}
-                style={{ flex: 1, padding: '11px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+              <button onClick={async () => {
+                setShowConfirmModal(false)
+                const snapshotCompany = company || customerQuery
+                const snapshotReceiver = receiver
+                const snapshotTitleItem = titleItem
+                const snapshotRows = [...rows]
+                const snapshotRemarks = remarks
+                const snapshotQuoteNo = quoteNo
+                await handleSaveQuote()
+                await handleDownloadPDF(snapshotCompany, snapshotReceiver, snapshotTitleItem, snapshotRows, snapshotRemarks, snapshotQuoteNo)
+                setSeqIndex(prev => prev + 1)
+              }}
+                style={{ flex: 1, padding: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 확인
               </button>
             </div>

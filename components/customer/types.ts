@@ -28,6 +28,7 @@ export type Contact = {
   department: string | null
   position: string | null
   phone: string | null
+  email: string | null
 }
 
 export type ServiceHistory = {
@@ -94,6 +95,7 @@ export type ContactForm = {
   department: string
   position: string
   phone: string
+  email: string
 }
 
 export type CustomerEditFormData = {

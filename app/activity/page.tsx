@@ -3,17 +3,31 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+const BLUE = '#234ea2'
 const PAGE_BG = '#f4f5f7'
-const PANEL_BG = '#ffffff'
-const INPUT_BORDER = '#e2e4e9'
-const TEXT_PRIMARY = '#111113'
-const TEXT_SECONDARY = '#4b5563'
-const TEXT_MUTED = '#9ca3af'
-const BLUE_BG = '#234ea2'
-const BLUE_TEXT = '#ffffff'
+const CARD_BG = '#ffffff'
+const BORDER = '#e2e4e9'
+const TEXT = '#111113'
+const GRAY = '#6b7280'
+const MUTED = '#9ca3af'
 
 const SERVICE_TYPES = ['신규설치', '이전설치', 'A/S', 'B/S', '교육']
 const TEAM_OPTIONS = ['전체', '1팀', '2팀', '3팀', '4팀']
+
+const SERVICE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  '신규설치': { bg: '#eff4ff', text: '#234ea2', dot: '#234ea2' },
+  '이전설치': { bg: '#f0f9ff', text: '#0369a1', dot: '#0369a1' },
+  'A/S':     { bg: '#fffbeb', text: '#d97706', dot: '#d97706' },
+  'B/S':     { bg: '#fdf4ff', text: '#7c3aed', dot: '#7c3aed' },
+  '교육':    { bg: '#f0fdf4', text: '#059669', dot: '#059669' },
+}
+
+const TEAM_COLORS: Record<string, { bg: string; text: string }> = {
+  '1': { bg: '#eff4ff', text: '#234ea2' },
+  '2': { bg: '#f0f9ff', text: '#0369a1' },
+  '3': { bg: '#f0fdf4', text: '#15803d' },
+  '4': { bg: '#fdf4ff', text: '#7c3aed' },
+}
 
 type Engineer = {
   engineer_id: number
@@ -37,6 +51,31 @@ type ServiceDetail = {
   customer_name: string
   service_notes: string | null
 }
+
+function SkeletonCard() {
+  return (
+    <div style={{ background: CARD_BG, borderRadius: 14, padding: 18, border: `1px solid ${BORDER}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${BORDER}` }}>
+        <div>
+          <div style={{ width: 68, height: 16, background: '#e5e7eb', borderRadius: 6, marginBottom: 7, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: 36, height: 11, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        </div>
+        <div style={{ width: 34, height: 20, background: '#e5e7eb', borderRadius: 99, animation: 'pulse 1.5s ease-in-out infinite' }} />
+      </div>
+      {SERVICE_TYPES.map(t => (
+        <div key={t} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 9 }}>
+          <div style={{ width: 52, height: 11, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: 30, height: 11, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        </div>
+      ))}
+      <div style={{ marginTop: 12, background: '#f3f4f6', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ width: 24, height: 13, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ width: 44, height: 18, background: '#e5e7eb', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' }} />
+      </div>
+    </div>
+  )
+}
+
 export default function ActivityPage() {
   const supabase = createClient()
 
@@ -60,7 +99,6 @@ export default function ActivityPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('전체')
   const [currentUser, setCurrentUser] = useState<Engineer | null>(null)
 
-  // 상세 모달
   const [selectedEngineer, setSelectedEngineer] = useState<Engineer | null>(null)
   const [details, setDetails] = useState<ServiceDetail[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
@@ -76,12 +114,10 @@ export default function ActivityPage() {
       .select('*')
       .order('engineer_id', { ascending: true })
 
-    // 현재 접속자 찾기
     if (user && engineers) {
       const me = (engineers as Engineer[]).find(e => e.email === user.email)
       if (me && !currentUser) {
         setCurrentUser(me)
-        // 임원/영업관리는 전체, 나머지는 본인 팀
         if (me.teams && !['임원', '영업관리'].includes(me.teams)) {
           setSelectedTeam(`${me.teams}팀`)
         } else {
@@ -175,6 +211,7 @@ export default function ActivityPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchActivity(defaultStart, defaultEnd)
   }, [])
 
@@ -212,7 +249,6 @@ export default function ActivityPage() {
     fetchActivity(startDate, endDate)
   }
 
-  // 팀 필터 적용
   const filteredRows = selectedTeam === '전체'
     ? rows
     : rows.filter(row => row.engineer.teams === selectedTeam.replace('팀', ''))
@@ -221,172 +257,345 @@ export default function ActivityPage() {
     ? details
     : details.filter(d => d.service_type === filterType)
 
+  const inp: React.CSSProperties = {
+    padding: '7px 11px', border: `1.5px solid ${BORDER}`, borderRadius: 9,
+    background: CARD_BG, color: TEXT, fontSize: 13, outline: 'none',
+    fontFamily: 'inherit', colorScheme: 'light' as const,
+  }
+
   return (
-    <main style={{ padding: 24, background: PAGE_BG, minHeight: '100vh' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <main style={{ padding: '24px 28px', background: PAGE_BG, minHeight: '100vh', fontFamily: 'Malgun Gothic, sans-serif' }}>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.45; }
+        }
+        @keyframes modal-in {
+          from { opacity: 0; transform: scale(0.97) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
 
-        {/* 날짜 선택 + 팀 필터 카드 */}
+      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+
+        {/* 필터 카드 */}
         <div style={{
-          background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`,
-          borderRadius: 16, padding: '20px 24px', marginBottom: 24,
-          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 14,
+          padding: '13px 18px', marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}>
-          <input type="date" value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setActiveBtn('') }}
-            style={{ padding: '8px 12px', border: `1px solid ${INPUT_BORDER}`, borderRadius: 8, background: PAGE_BG, color: TEXT_PRIMARY, fontSize: 14, outline: 'none' }} />
-          <span style={{ color: TEXT_MUTED, fontWeight: 700 }}>~</span>
-          <input type="date" value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setActiveBtn('') }}
-            style={{ padding: '8px 12px', border: `1px solid ${INPUT_BORDER}`, borderRadius: 8, background: PAGE_BG, color: TEXT_PRIMARY, fontSize: 14, outline: 'none' }} />
-          <button onClick={handleSearch}
-            style={{ padding: '8px 20px', background: BLUE_BG, color: BLUE_TEXT, border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-            조회
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
 
-          <div style={{ width: 1, height: 32, background: INPUT_BORDER, margin: '0 4px' }} />
+            {/* 날짜 입력 */}
+            <input type="date" value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setActiveBtn('') }}
+              style={inp} />
+            <span style={{ color: MUTED, fontWeight: 600, fontSize: 13 }}>~</span>
+            <input type="date" value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setActiveBtn('') }}
+              style={inp} />
 
-          {[{ label: '금일', fn: handleToday }, { label: '작일', fn: handleYesterday }, { label: '당월', fn: handleThisMonth }, { label: '전월', fn: handleLastMonth }].map(({ label, fn }) => (
-            <button key={label} onClick={fn}
+            {/* 조회 버튼 */}
+            <button onClick={handleSearch}
               style={{
-                padding: '8px 18px', borderRadius: 8,
-                border: `1px solid ${activeBtn === label ? BLUE_BG : INPUT_BORDER}`,
-                background: activeBtn === label ? BLUE_BG : PAGE_BG,
-                color: activeBtn === label ? BLUE_TEXT : TEXT_PRIMARY,
-                fontWeight: 700, fontSize: 14, cursor: 'pointer',
-              }}>
-              {label}
+                padding: '7px 16px', background: BLUE, color: '#fff', border: 'none',
+                borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5, transition: 'background 0.15s ease',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#1c3e87'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = BLUE}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              조회
             </button>
-          ))}
 
-          {/* 팀 필터 버튼 */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {TEAM_OPTIONS.map(team => (
-              <button key={team} onClick={() => setSelectedTeam(team)}
-                style={{
-                  padding: '8px 18px', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                  border: `1px solid ${selectedTeam === team ? BLUE_BG : INPUT_BORDER}`,
-                  background: selectedTeam === team ? BLUE_BG : PAGE_BG,
-                  color: selectedTeam === team ? BLUE_TEXT : TEXT_PRIMARY,
-                }}>
-                {team}
-              </button>
-            ))}
+            {/* 빠른 날짜 선택 */}
+            <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 1 }}>
+              {([
+                { label: '금일', fn: handleToday },
+                { label: '작일', fn: handleYesterday },
+                { label: '당월', fn: handleThisMonth },
+                { label: '전월', fn: handleLastMonth },
+              ] as { label: string; fn: () => void }[]).map(({ label, fn }) => (
+                <button key={label} onClick={fn}
+                  style={{
+                    padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                    fontWeight: 700, fontSize: 12,
+                    background: activeBtn === label ? '#fff' : 'transparent',
+                    color: activeBtn === label ? TEXT : GRAY,
+                    boxShadow: activeBtn === label ? '0 1px 3px rgba(0,0,0,0.10)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* 팀 필터 */}
+            <div style={{ width: 1, height: 20, background: BORDER }} />
+            <span style={{ fontSize: 11, color: MUTED, fontWeight: 600, letterSpacing: '0.2px' }}>팀</span>
+            <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 1 }}>
+              {TEAM_OPTIONS.map(team => {
+                const tc = team !== '전체' ? TEAM_COLORS[team.replace('팀', '')] : null
+                const isActive = selectedTeam === team
+                return (
+                  <button key={team} onClick={() => setSelectedTeam(team)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                      fontWeight: 700, fontSize: 12,
+                      background: isActive ? '#fff' : 'transparent',
+                      color: isActive ? (tc?.text ?? TEXT) : GRAY,
+                      boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.10)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}>
+                    {team}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 
         {/* 카드 그리드 */}
-        {loading ? (
-          <p style={{ color: TEXT_SECONDARY }}>불러오는 중...</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-            {filteredRows.map((row) => (
-              <div key={row.engineer.engineer_id}
-                onClick={() => fetchDetails(row.engineer)}
-                style={{
-                  background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`,
-                  borderRadius: 16, padding: 20,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(35,78,162,0.15)')}
-                onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)')}
-              >
-                <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>{row.engineer.name}</div>
-                    <div style={{ fontSize: 13, color: TEXT_MUTED }}>{row.engineer.position ?? ''}</div>
-                  </div>
-                  {row.engineer.teams && (
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '2px 8px',
-                      borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, flexShrink: 0,
-                    }}>
-                      {row.engineer.teams}팀
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
-                  {SERVICE_TYPES.map((type) => (
-                    <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, color: TEXT_SECONDARY }}>{type}</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: row.counts[type] > 0 ? BLUE_BG : TEXT_MUTED }}>
-                        {row.counts[type]}건
-                      </span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
+          {loading
+            ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
+            : filteredRows.map((row) => {
+                const tc = TEAM_COLORS[row.engineer.teams ?? ''] ?? null
+                return (
+                  <div key={row.engineer.engineer_id}
+                    onClick={() => fetchDetails(row.engineer)}
+                    style={{
+                      background: CARD_BG, borderRadius: 14, padding: 18,
+                      border: `1px solid ${BORDER}`, cursor: 'pointer',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                      transition: 'box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease',
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLDivElement
+                      el.style.boxShadow = '0 8px 24px rgba(35,78,162,0.12)'
+                      el.style.transform = 'translateY(-2px)'
+                      el.style.borderColor = '#c7d7f8'
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLDivElement
+                      el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)'
+                      el.style.transform = ''
+                      el.style.borderColor = BORDER
+                    }}
+                  >
+                    {/* 이름 + 팀 뱃지 */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, paddingBottom: 12, borderBottom: `1px solid ${BORDER}` }}>
+                      <div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: TEXT, letterSpacing: '-0.3px', lineHeight: 1.2, marginBottom: 3 }}>
+                          {row.engineer.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: MUTED, fontWeight: 500 }}>
+                          {row.engineer.position ?? ''}
+                        </div>
+                      </div>
+                      {row.engineer.teams && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, flexShrink: 0,
+                          background: tc?.bg ?? '#f3f4f6',
+                          color: tc?.text ?? GRAY,
+                        }}>
+                          {row.engineer.teams}팀
+                        </span>
+                      )}
                     </div>
-                  ))}
-                </div>
-                <div style={{ paddingTop: 12, borderTop: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: TEXT_PRIMARY }}>합계</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: BLUE_BG }}>{row.total}건</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+
+                    {/* 서비스 타입별 건수 */}
+                    <div style={{ display: 'grid', gap: 7, marginBottom: 12 }}>
+                      {SERVICE_TYPES.map((type) => {
+                        const sc = SERVICE_COLORS[type]
+                        const cnt = row.counts[type]
+                        return (
+                          <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: cnt > 0 ? sc.dot : '#d1d5db', flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: cnt > 0 ? GRAY : MUTED, fontWeight: cnt > 0 ? 500 : 400 }}>{type}</span>
+                            </div>
+                            <span style={{
+                              fontSize: 12, fontWeight: cnt > 0 ? 700 : 400,
+                              color: cnt > 0 ? sc.text : MUTED,
+                              background: cnt > 0 ? sc.bg : 'transparent',
+                              padding: cnt > 0 ? '2px 8px' : '2px 0',
+                              borderRadius: 99,
+                            }}>
+                              {cnt}건
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* 합계 */}
+                    <div style={{
+                      background: row.total > 0 ? '#eff4ff' : '#f8fafc',
+                      borderRadius: 9, padding: '9px 12px',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: row.total > 0 ? '#6b8fce' : MUTED }}>합계</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: row.total > 0 ? BLUE : MUTED, letterSpacing: '-0.5px' }}>
+                          {row.total}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: row.total > 0 ? BLUE : MUTED }}>건</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+          }
+        </div>
       </div>
 
       {/* 상세 모달 */}
       {selectedEngineer && (
         <div onClick={() => setSelectedEngineer(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 680, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            style={{
+              background: CARD_BG, borderRadius: 20, width: '100%', maxWidth: 700,
+              maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.22)', border: `1px solid ${BORDER}`,
+              animation: 'modal-in 0.18s ease',
+            }}>
 
-            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: TEXT_PRIMARY }}>{selectedEngineer.name}</div>
-                  {selectedEngineer.teams && (
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#e0e7ff', color: BLUE_BG }}>
-                      {selectedEngineer.teams}팀
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 13, color: TEXT_MUTED }}>{selectedEngineer.position} · {startDate} ~ {endDate}</div>
-              </div>
-              <button onClick={() => setSelectedEngineer(null)}
-                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: TEXT_MUTED }}>✕</button>
-            </div>
-
-            <div style={{ padding: '12px 24px', borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {['전체', ...SERVICE_TYPES].map(type => (
-                <button key={type} onClick={() => setFilterType(type)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    border: `1px solid ${filterType === type ? BLUE_BG : INPUT_BORDER}`,
-                    background: filterType === type ? BLUE_BG : PAGE_BG,
-                    color: filterType === type ? BLUE_TEXT : TEXT_SECONDARY,
-                  }}>
-                  {type} ({type === '전체' ? details.length : details.filter(d => d.service_type === type).length})
-                </button>
-              ))}
-            </div>
-
-            <div style={{ overflowY: 'auto', flex: 1, padding: '8px 24px 24px' }}>
-              {detailLoading ? (
-                <p style={{ color: TEXT_MUTED, padding: '20px 0' }}>불러오는 중...</p>
-              ) : filteredDetails.length === 0 ? (
-                <p style={{ color: TEXT_MUTED, padding: '20px 0' }}>해당 기간 내 서비스 기록이 없습니다.</p>
-              ) : (
-                filteredDetails.map((d) => (
-                  <div key={d.service_id}
-                    style={{ padding: '14px 0', borderBottom: `1px solid ${INPUT_BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: TEXT_PRIMARY, marginBottom: 4 }}>
-                        {d.customer_name}
-                      </div>
-                      {d.service_notes && (
-                        <div style={{ fontSize: 12, color: TEXT_SECONDARY }}>{d.service_notes}</div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                   <div style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: '#e0e7ff', color: BLUE_BG, marginBottom: 4 }}>
-                        {d.service_type}{d.is_paid !== null ? `(${d.is_paid ? '유상' : '무상'})` : ''}
-                      </div>
-                      <div style={{ fontSize: 12, color: TEXT_MUTED }}>{d.visit_date}</div>
-                    </div>
+            {/* 모달 헤더 */}
+            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: TEXT, letterSpacing: '-0.3px' }}>{selectedEngineer.name}</span>
+                    <span style={{ fontSize: 12, color: GRAY, fontWeight: 500 }}>{selectedEngineer.position}</span>
+                    {selectedEngineer.teams && (() => {
+                      const c = TEAM_COLORS[selectedEngineer.teams ?? ''] ?? { bg: '#f3f4f6', text: GRAY }
+                      return (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: c.bg, color: c.text }}>
+                          {selectedEngineer.teams}팀
+                        </span>
+                      )
+                    })()}
                   </div>
-                ))
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: MUTED }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span>{startDate.replace(/-/g, '.')} ~ {endDate.replace(/-/g, '.')}</span>
+                    {!detailLoading && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 99, background: '#eff4ff', color: BLUE }}>
+                        총 {details.length}건
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setSelectedEngineer(null)}
+                  style={{
+                    width: 30, height: 30, borderRadius: '50%', background: '#f4f5f7', border: 'none',
+                    cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: GRAY, flexShrink: 0, transition: 'background 0.15s ease',
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#e5e7eb'}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#f4f5f7'}>
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* 서비스 타입 필터 */}
+            <div style={{ padding: '10px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {(['전체', ...SERVICE_TYPES] as string[]).map(type => {
+                const sc = type !== '전체' ? SERVICE_COLORS[type] : null
+                const cnt = type === '전체' ? details.length : details.filter(d => d.service_type === type).length
+                const isActive = filterType === type
+                return (
+                  <button key={type} onClick={() => setFilterType(type)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: `1px solid ${isActive ? (sc?.dot ?? BLUE) : BORDER}`,
+                      background: isActive ? (sc?.bg ?? '#eff4ff') : '#f8fafc',
+                      color: isActive ? (sc?.text ?? BLUE) : GRAY,
+                      transition: 'all 0.15s ease',
+                    }}>
+                    {type}
+                    <span style={{ marginLeft: 4, fontSize: 11, opacity: 0.75 }}>{cnt}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* 서비스 목록 */}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '4px 24px 24px' }}>
+              {detailLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingTop: 8 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: `1px solid ${BORDER}` }}>
+                      <div>
+                        <div style={{ width: 130, height: 14, background: '#e5e7eb', borderRadius: 6, marginBottom: 8, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                        <div style={{ width: 200, height: 11, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7 }}>
+                        <div style={{ width: 58, height: 20, background: '#e5e7eb', borderRadius: 99, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                        <div style={{ width: 72, height: 11, background: '#e5e7eb', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredDetails.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '52px 0', color: MUTED, gap: 10 }}>
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke={MUTED} strokeWidth="1.5">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+                  </svg>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: GRAY }}>서비스 기록이 없습니다</span>
+                  <span style={{ fontSize: 12, color: MUTED }}>해당 기간에 등록된 서비스가 없어요</span>
+                </div>
+              ) : (
+                filteredDetails.map((d, idx) => {
+                  const sc = SERVICE_COLORS[d.service_type] ?? { bg: '#f3f4f6', text: GRAY, dot: GRAY }
+                  return (
+                    <div key={d.service_id}
+                      style={{
+                        padding: '13px 0',
+                        borderBottom: idx < filteredDetails.length - 1 ? `1px solid ${BORDER}` : 'none',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14,
+                      }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: TEXT, marginBottom: 4, letterSpacing: '-0.2px' }}>
+                          {d.customer_name}
+                        </div>
+                        {d.service_notes && (
+                          <div style={{ fontSize: 12, color: GRAY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {d.service_notes}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', marginBottom: 5 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: sc.bg, color: sc.text }}>
+                            {d.service_type}
+                          </span>
+                          {d.is_paid !== null && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+                              background: d.is_paid ? '#f0fdf4' : '#f3f4f6',
+                              color: d.is_paid ? '#15803d' : GRAY,
+                            }}>
+                              {d.is_paid ? '유상' : '무상'}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>{d.visit_date.replace(/-/g, '.')}</div>
+                      </div>
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>

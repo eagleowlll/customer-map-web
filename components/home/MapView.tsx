@@ -69,45 +69,52 @@ export default function MapView({
     overlayContent.addEventListener('click', (e) => e.stopPropagation())
     overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
 
+    const statusColor = c.status === '활성' ? '#16a34a' : c.status === '잠재' ? '#f59e0b' : c.status === '이탈' ? '#ef4444' : '#9ca3af'
     overlayContent.innerHTML = `
       <div style="
-        width:320px;
-        padding:16px;
-        background:${CARD_BG};
-        color:${TEXT_PRIMARY};
-        border-radius:14px;
-        border:1px solid ${INPUT_BORDER};
+        width:300px;
+        background:#ffffff;
+        color:#111111;
+        border-radius:16px;
+        border:1px solid #e5e7eb;
         font-size:13px;
         line-height:1.6;
         box-sizing:border-box;
         word-break:break-word;
-        box-shadow:0 12px 30px rgba(0,0,0,0.5);
-        text-align:center;
-        position:relative;
+        box-shadow:0 16px 40px rgba(0,0,0,0.18);
+        overflow:hidden;
       ">
-        <div style="font-weight:700; font-size:15px; margin-bottom:8px; text-align:center; color:${TEXT_PRIMARY};">
-          ${c.company_name} <span style="font-weight:400; font-size:12px; color:${TEXT_SECONDARY};">(${c.status ?? '-'})</span>
+        <div style="
+          padding:14px 16px 12px;
+          border-bottom:1px solid #f3f4f6;
+        ">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+            <div style="font-weight:700; font-size:14px; color:#111111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+              ${c.company_name}
+            </div>
+            <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:99px; background:${statusColor}1a; color:${statusColor}; flex-shrink:0; white-space:nowrap;">
+              ${c.status ?? '-'}
+            </span>
+          </div>
+          <div style="font-size:12px; color:#6b7280; margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${c.address ?? '-'}
+          </div>
+          <div style="font-size:11px; color:#adb5bd;">대리점 ${c.agency ?? '-'}</div>
         </div>
-        <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
-          📍 ${c.address ?? '-'}
+        <div style="padding:10px 16px; border-bottom:1px solid #f3f4f6; display:flex; flex-wrap:wrap; gap:4px;">
+          ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${l}</span>`).join('')}
         </div>
-        <div style="font-size:12px; color:${TEXT_SECONDARY}; margin-bottom:6px; text-align:center;">
-          대리점: ${c.agency ?? '-'}
-        </div>
-        <div style="font-size:12px; color:${TEXT_PRIMARY}; margin-bottom:14px; text-align:center;">
-          ${deviceLines.join('<br/>')}
-        </div>
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:8px; padding:10px 12px;">
           <a href="/customer/${c.customer_id}"
-             style="flex:1;text-align:center;padding:9px 10px;background:${WHITE_BUTTON_BG};color:${WHITE_BUTTON_TEXT};border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;">
+             style="flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
             상세보기
           </a>
           <a href="${navUrlUlsan}" target="_blank" rel="noopener noreferrer"
-             style="flex:1;text-align:center;padding:9px 10px;background:#ffffff;color:#111111;border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;border:1px solid ${INPUT_BORDER};">
+             style="flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
             울산 출발
           </a>
           <a href="${navUrlDongtan}" target="_blank" rel="noopener noreferrer"
-             style="flex:1;text-align:center;padding:9px 10px;background:#ffffff;color:#111111;border-radius:10px;font-size:13px;text-decoration:none;font-weight:700;border:1px solid ${INPUT_BORDER};">
+             style="flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
             동탄 출발
           </a>
         </div>
@@ -366,72 +373,99 @@ useEffect(() => {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-     {/* 좌측 상단 필터 */}
-<div style={{ position: 'absolute', top: 16, left: 16, zIndex: 1000, display: 'flex', gap: 8, alignItems: 'center' }}>
-  {/* 상태 필터 */}
-  {['활성', '잠재', '이탈'].map((status) => {
-    const active = selectedStatuses.includes(status)
-    return (
-      <button key={status} onClick={() => toggleStatus(status)}
-        style={{
-          padding: '10px 14px', borderRadius: 12,
-          border: active ? 'none' : '1px solid #ddd',
-          background: active ? '#234ea2' : '#ffffff',
-          color: active ? '#ffffff' : '#111111',
-          fontWeight: 700, cursor: 'pointer',
-        }}>
-        {status}
-      </button>
-    )
-  })}
+      {/* 좌측 상단 필터 */}
+      <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 1000, display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* 상태 필터 */}
+        {([
+          { label: '활성', color: '#16a34a', shadow: 'rgba(22,163,74,0.30)' },
+          { label: '잠재', color: '#f59e0b', shadow: 'rgba(245,158,11,0.30)' },
+          { label: '이탈', color: '#ef4444', shadow: 'rgba(239,68,68,0.30)' },
+        ] as const).map(({ label, color, shadow }) => {
+          const active = selectedStatuses.includes(label)
+          return (
+            <button key={label} onClick={() => toggleStatus(label)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '7px 13px', borderRadius: 10, border: 'none',
+                background: active ? color : 'rgba(255,255,255,0.92)',
+                color: active ? '#ffffff' : '#1a1a2e',
+                fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                boxShadow: active
+                  ? `0 4px 12px ${shadow}`
+                  : '0 2px 8px rgba(0,0,0,0.10)',
+                backdropFilter: 'blur(6px)',
+                transition: 'background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease',
+              }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                background: active ? 'rgba(255,255,255,0.75)' : color,
+                transition: 'background 0.15s ease',
+              }} />
+              {label}
+            </button>
+          )
+        })}
 
-  {/* 구분 필터 — 계열 버튼 + 드롭다운 */}
-  <div style={{ position: 'relative' }}>
-    <button
-      onClick={() => setShowCategoryMenu(prev => !prev)}
-      style={{
-        padding: '10px 14px', borderRadius: 12, fontWeight: 700, cursor: 'pointer',
-        border: selectedCategories.length === 3 ? '1px solid #ddd' : 'none',
-        background: selectedCategories.length === 3 ? '#ffffff' : '#0891b2',
-        color: selectedCategories.length === 3 ? '#111111' : '#ffffff',
-      }}>
-      계열{selectedCategories.length < 3 ? ` (${selectedCategories.sort().join(',')})` : ''}
-    </button>
-   {showCategoryMenu && (
-  <div style={{
-    position: 'absolute', top: '110%', left: 0, zIndex: 2000,
-    background: '#fff', borderRadius: 10, padding: '6px',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-    display: 'flex', flexDirection: 'row', gap: 4,
-  }}>
-    {['81', '83', '84'].map(cat => {
-      const checked = selectedCategories.includes(cat)
-      return (
-        <button key={cat} onClick={() => toggleCategory(cat)}
-          style={{
-            padding: '7px 12px', borderRadius: 8, border: 'none',
-            cursor: 'pointer', fontWeight: 700, fontSize: 13,
-            background: checked ? '#234ea2' : '#f4f5f7',
-            color: checked ? '#fff' : '#555',
-          }}>
-          {cat}
-        </button>
-      )
-    })}
-  </div>
-)}
-  </div>
-</div>
+        {/* 계열 필터 드롭다운 */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowCategoryMenu(prev => !prev)}
+            style={{
+              padding: '7px 13px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              border: 'none',
+              background: selectedCategories.length === 3 ? 'rgba(255,255,255,0.92)' : '#0891b2',
+              color: selectedCategories.length === 3 ? '#1a1a2e' : '#ffffff',
+              boxShadow: selectedCategories.length === 3
+                ? '0 2px 8px rgba(0,0,0,0.10)'
+                : '0 4px 12px rgba(8,145,178,0.28)',
+              backdropFilter: 'blur(6px)',
+              transition: 'all 0.15s ease',
+            }}>
+            계열{selectedCategories.length < 3 ? ` (${selectedCategories.sort().join(',')})` : ''}
+          </button>
+          {showCategoryMenu && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 2000,
+              background: '#ffffff', borderRadius: 10, padding: '5px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              display: 'flex', flexDirection: 'row', gap: 4,
+            }}>
+              {['81', '83', '84'].map(cat => {
+                const checked = selectedCategories.includes(cat)
+                return (
+                  <button key={cat} onClick={() => toggleCategory(cat)}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, border: 'none',
+                      cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                      background: checked ? '#234ea2' : '#f4f5f7',
+                      color: checked ? '#fff' : '#555',
+                      transition: 'background 0.15s ease, color 0.15s ease',
+                    }}>
+                    {cat}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* 우측 상단 업체등록 */}
-      <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 1000 }}>
+      {/* 우측 상단 업체 등록 */}
+      <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 1000 }}>
         <button
           onClick={onAddClick}
           style={{
-            padding: '10px 16px', borderRadius: 12, border: 'none',
-            background: '#234ea2', color: '#ffffff', fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', borderRadius: 10, border: 'none',
+            background: '#234ea2', color: '#ffffff',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(35,78,162,0.35)',
           }}
         >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
           업체 등록
         </button>
       </div>

@@ -1,37 +1,28 @@
-//sidebar 컴포넌트
-
 'use client'
 
+import { useState } from 'react'
 import CustomerList from './CustomerList'
-import {
-  INPUT_BORDER,
-  PANEL_BG,
-  TEXT_MUTED,
-  TEXT_PRIMARY,
-  controlButtonStyle,
-  WHITE_BUTTON_BG,
-  WHITE_BUTTON_TEXT,
-  type Customer,
-  type Device,
-} from '@/lib/home'
+import { TEXT_MUTED, TEXT_PRIMARY, type Customer, type Device } from '@/lib/home'
+
+const STATUS_CONFIG = {
+  '활성': { color: '#16a34a', activeBg: '#16a34a' },
+  '잠재': { color: '#f59e0b', activeBg: '#f59e0b' },
+  '이탈': { color: '#ef4444', activeBg: '#ef4444' },
+} as const
 
 type Props = {
   query: string
   setQuery: (v: string) => void
-
   selectedStatuses: string[]
   toggleStatus: (status: string) => void
-
   onAddClick: () => void
-
   customers: Customer[]
   deviceMap: Map<number, Device[]>
-
   onMove: (customer: Customer) => void
   onDetailClick: () => void
-
   listScrollRef: React.RefObject<HTMLDivElement | null>
   onScrollSave: () => void
+  isLoading?: boolean
 }
 
 export default function Sidebar({
@@ -46,53 +37,73 @@ export default function Sidebar({
   onDetailClick,
   listScrollRef,
   onScrollSave,
+  isLoading = false,
 }: Props) {
+  const [searchFocused, setSearchFocused] = useState(false)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
-      {/* 검색 */}
-      <div style={{ position: 'relative', marginBottom: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%', gap: 10 }}>
+
+      {/* 검색창 */}
+      <div style={{ position: 'relative' }}>
+        <div style={{
+          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+          pointerEvents: 'none', display: 'flex', alignItems: 'center',
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+            stroke={searchFocused ? '#234ea2' : '#adb5bd'}
+            strokeWidth="2.2"
+            style={{ transition: 'stroke 0.15s ease' }}>
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="회사명 / 주소 / 상태 / 대리점 검색"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder="회사명, 주소, 대리점 검색"
           style={{
             width: '100%',
-            padding: '14px 42px 14px 14px',
-            border: `1px solid ${INPUT_BORDER}`,
-            borderRadius: 16,
-            background: PANEL_BG,
+            padding: '10px 36px 10px 34px',
+            border: `1.5px solid ${searchFocused ? '#234ea2' : '#e5e7eb'}`,
+            borderRadius: 12,
+            background: '#ffffff',
             color: TEXT_PRIMARY,
-            fontSize: 15,
+            fontSize: 14,
             boxSizing: 'border-box',
             outline: 'none',
+            boxShadow: searchFocused
+              ? '0 0 0 3px rgba(35,78,162,0.10)'
+              : '0 1px 2px rgba(0,0,0,0.04)',
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
           }}
         />
-
-        {query && (
+        {query ? (
           <button
             onClick={() => setQuery('')}
             style={{
-              position: 'absolute',
-              right: 12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: 24,
-              height: 24,
-              borderRadius: '50%',
-              border: 'none',
-              background: TEXT_MUTED,
-              color: PANEL_BG,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              width: 20, height: 20, borderRadius: '50%', border: 'none',
+              background: '#e5e7eb', color: '#6b7280',
+              fontSize: 10, fontWeight: 800, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
             ✕
           </button>
+        ) : (
+          <span style={{
+            position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 12, color: '#adb5bd', fontWeight: 600, pointerEvents: 'none',
+          }}>
+            {isLoading ? '-' : `${customers.length}개`}
+          </span>
         )}
       </div>
 
-      {/* 리스트 */}
+      {/* 고객 리스트 */}
       <CustomerList
         customers={customers}
         deviceMap={deviceMap}
@@ -100,6 +111,7 @@ export default function Sidebar({
         onDetailClick={onDetailClick}
         listScrollRef={listScrollRef}
         onScrollSave={onScrollSave}
+        isLoading={isLoading}
       />
     </div>
   )

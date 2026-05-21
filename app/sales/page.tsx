@@ -7,10 +7,11 @@ import { createClient } from '@/lib/supabase/client'
 const BLUE = '#234ea2'
 const PAGE_BG = '#f4f5f7'
 const CARD_BG = '#ffffff'
-const BORDER = '#e5e7eb'
+const BORDER = '#e2e4e9'
 const TEXT = '#111113'
 const GRAY = '#6b7280'
-const ORANGE = '#f97316'
+const MUTED = '#9ca3af'
+const ORANGE = '#d97706'
 
 type Quote = {
   quote_id: number
@@ -52,15 +53,18 @@ type SalesTarget = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  '견적중': '#f59e0b', '수주': '#3b82f6', '매출완료': '#16a34a', '실패': '#dc2626', '보류': '#9ca3af',
+  '견적중': '#d97706', '수주': '#2563eb', '매출완료': '#15803d', '실패': '#b91c1c', '보류': '#6b7280',
 }
 
 const TEAM_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
-  '1': { bg: '#f5f3ff', text: '#7c6ff7', bar: '#7c6ff7' },
-  '2': { bg: '#f0f9ff', text: '#0891b2', bar: '#0891b2' },
-  '3': { bg: '#f0fdf4', text: '#16a34a', bar: '#16a34a' },
-  '4': { bg: '#fffbeb', text: '#b45309', bar: '#d97706' },
+  '1': { bg: '#eff4ff', text: '#234ea2', bar: '#234ea2' },
+  '2': { bg: '#f0f9ff', text: '#0369a1', bar: '#0369a1' },
+  '3': { bg: '#f0fdf4', text: '#15803d', bar: '#15803d' },
+  '4': { bg: '#fdf4ff', text: '#7e22ce', bar: '#7e22ce' },
 }
+
+const RANK_MEDAL = ['#b8860b', '#64748b', '#92400e'] as const
+const RANK_MEDAL_BG = ['#fffbeb', '#f1f5f9', '#fff7ed'] as const
 
 const POSITION_ORDER: Record<string, number> = {
   '총괄': 0, '관리자': 1, '수석': 2, '책임': 3, '선임': 4, '사원': 5,
@@ -256,14 +260,15 @@ function PerformanceChart({ quotes, fy, targets, engineers, filteredEngineerIds,
   return (
     <div style={{ background: CARD_BG, borderRadius: 14, padding: '20px 22px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
-          📊 실적 추이
-          <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 8 }}>FY{fy}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 3, height: 16, background: BLUE, borderRadius: 2 }} />
+          <span style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>실적 추이</span>
+          <span style={{ fontSize: 12, color: MUTED, fontWeight: 400 }}>FY{fy}</span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 1 }}>
           {([['quarterly', '분기별'], ['monthly', '월별'], ['yearly', '연도별']] as [ChartViewType, string][]).map(([v, label]) => (
             <button key={v} onClick={() => setChartView(v)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${BORDER}`, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: chartView === v ? BLUE : '#f8fafc', color: chartView === v ? '#fff' : GRAY }}>
+              style={{ padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: chartView === v ? '#fff' : 'transparent', color: chartView === v ? TEXT : GRAY, boxShadow: chartView === v ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s ease' }}>
               {label}
             </button>
           ))}
@@ -279,11 +284,11 @@ function PerformanceChart({ quotes, fy, targets, engineers, filteredEngineerIds,
           const barW = 36
           return (
             <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: GRAY, marginBottom: 1, whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 10, color: MUTED, marginBottom: 1, whiteSpace: 'nowrap' }}>
                 {d.revenueAmt > 0 ? numM(d.revenueAmt) : ''}
               </div>
               {profitRate !== null && d.revenueAmt > 0 && (
-                <div style={{ fontSize: 9, color: '#16a34a', fontWeight: 700, marginBottom: 2 }}>{profitRate.toFixed(0)}%</div>
+                <div style={{ fontSize: 9, color: '#15803d', fontWeight: 700, marginBottom: 2 }}>{profitRate.toFixed(0)}%</div>
               )}
               <div style={{ position: 'relative', height: BAR_H, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                 <div style={{ width: barW, height: Math.max(2, (Math.max(d.revenueAmt, d.targetAmt * 0.1) / maxAmt) * BAR_H) || 2, background: '#f1f5f9', borderRadius: '4px 4px 0 0', position: 'absolute', bottom: 0 }} />
@@ -293,11 +298,11 @@ function PerformanceChart({ quotes, fy, targets, engineers, filteredEngineerIds,
                 )}
               </div>
               <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: chartView === 'monthly' ? 10 : 12, fontWeight: 800, color: d.isCurrent ? BLUE : TEXT, whiteSpace: 'nowrap' }}>{d.label || d.key}</div>
-                {chartView === 'quarterly' && <div style={{ fontSize: 10, color: GRAY }}>{d.desc}</div>}
-                {d.isCurrent && <div style={{ fontSize: 9, color: BLUE, fontWeight: 700, marginTop: 1 }}>◀ 현재</div>}
+                <div style={{ fontSize: chartView === 'monthly' ? 10 : 12, fontWeight: 700, color: d.isCurrent ? BLUE : TEXT, whiteSpace: 'nowrap' }}>{d.label || d.key}</div>
+                {chartView === 'quarterly' && <div style={{ fontSize: 10, color: MUTED }}>{d.desc}</div>}
+                {d.isCurrent && <div style={{ fontSize: 9, color: BLUE, fontWeight: 700, marginTop: 1 }}>● 현재</div>}
                 {achievePct !== null && d.revenueAmt > 0 && (
-                  <div style={{ fontSize: 9, color: achievePct >= 100 ? '#16a34a' : achievePct >= 70 ? ORANGE : '#dc2626', fontWeight: 700 }}>{achievePct.toFixed(0)}%</div>
+                  <div style={{ fontSize: 9, color: achievePct >= 100 ? '#15803d' : achievePct >= 70 ? ORANGE : '#b91c1c', fontWeight: 700 }}>{achievePct.toFixed(0)}%</div>
                 )}
               </div>
             </div>
@@ -305,11 +310,11 @@ function PerformanceChart({ quotes, fy, targets, engineers, filteredEngineerIds,
         })}
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginTop: 14, fontSize: 11, color: GRAY, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 12, height: 12, background: '#94a3b8', borderRadius: 2 }} />매출 완료</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 16, height: 2, background: ORANGE, borderRadius: 1 }} />목표</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 12, height: 12, background: '#16a34a', borderRadius: 2 }} />순이익률</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 12, height: 12, background: BLUE, borderRadius: 2 }} />현재 기간</div>
+      <div style={{ display: 'flex', gap: 14, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BORDER}`, fontSize: 11, color: MUTED, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 10, height: 10, background: '#94a3b8', borderRadius: 2 }} />매출 완료</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 14, height: 2, background: ORANGE, borderRadius: 1 }} />목표</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 10, height: 10, background: '#15803d', borderRadius: 2 }} />순이익률</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 10, height: 10, background: BLUE, borderRadius: 2 }} />현재 기간</div>
       </div>
     </div>
   )
@@ -436,50 +441,49 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
 
   return (
     <div onClick={() => onCardClick(teamId)} style={{
-      background: CARD_BG, borderRadius: 16, padding: '18px 20px',
-      border: isSelected ? `2px solid ${tc.bar}` : `1px solid ${BORDER}`,
-      borderLeft: `4px solid ${tc.bar}`,
-      cursor: 'pointer', transition: 'all 0.2s',
-      boxShadow: isSelected ? `0 4px 20px ${tc.bar}33` : 'none',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      background: CARD_BG, borderRadius: 14, padding: '16px 18px',
+      border: `1px solid ${isSelected ? tc.bar : BORDER}`,
+      borderLeft: `3px solid ${tc.bar}`,
+      cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease',
+      boxShadow: isSelected ? `0 4px 18px rgba(0,0,0,0.10)` : '0 1px 3px rgba(0,0,0,0.04)',
+    }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = isSelected ? '0 4px 18px rgba(0,0,0,0.10)' : '0 1px 3px rgba(0,0,0,0.04)'; (e.currentTarget as HTMLDivElement).style.transform = 'none' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 17, fontWeight: 800, color: TEXT }}>{teamId}팀</span>
-          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: tc.bg, color: tc.text, fontWeight: 700 }}>{teamEngIds.length}명</span>
+          <span style={{ fontSize: 16, fontWeight: 800, color: TEXT, letterSpacing: '-0.3px' }}>{teamId}팀</span>
+          <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 99, background: tc.bg, color: tc.text, fontWeight: 700 }}>{teamEngIds.length}명</span>
         </div>
-        {achieve !== null && <span style={{ fontSize: 13, fontWeight: 800, color: achieveColor }}>{achieve.toFixed(1)}%</span>}
+        {achieve !== null && (
+          <span style={{ fontSize: 13, fontWeight: 800, color: achieveColor, background: achieveColor + '12', padding: '2px 8px', borderRadius: 99 }}>
+            {achieve.toFixed(1)}%
+          </span>
+        )}
       </div>
 
-     {/* 2x2 그리드 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-        <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: GRAY, marginBottom: 3 }}>포캐스트</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>₩{numKR(quoteAmt)}</div>
-        </div>
-        <div style={{ background: '#f0f7ff', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: GRAY, marginBottom: 3 }}>수주</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6' }}>₩{numKR(orderAmt)}</div>
-        </div>
-        <div style={{ background: '#f0f4ff', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: GRAY, marginBottom: 3 }}>매출완료</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: tc.bar }}>₩{numKR(revenueAmt)}</div>
-        </div>
-        <div style={{ background: profitAmt > 0 ? '#f0fdf4' : '#f8fafc', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: GRAY, marginBottom: 3 }}>순이익</div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: profitAmt > 0 ? '#16a34a' : GRAY }}>
-            {profitAmt > 0 ? `₩${numKR(profitAmt)}` : '-'}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
+        {[
+          { label: '포캐스트', value: `₩${numKR(quoteAmt)}`, color: TEXT },
+          { label: '수주', value: `₩${numKR(orderAmt)}`, color: TEXT },
+          { label: '매출완료', value: `₩${numKR(revenueAmt)}`, color: BLUE },
+          { label: '순이익', value: profitAmt > 0 ? `₩${numKR(profitAmt)}` : '-', color: profitAmt > 0 ? '#15803d' : MUTED, sub: profitRate !== null && profitAmt > 0 ? `${profitRate.toFixed(1)}%` : undefined },
+        ].map(({ label, value, color, sub }) => (
+          <div key={label} style={{ background: '#f8fafc', borderRadius: 9, padding: '9px 11px', border: `1px solid ${BORDER}` }}>
+            <div style={{ fontSize: 10, color: MUTED, marginBottom: 3, fontWeight: 500 }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color }}>{value}</div>
+            {sub && <div style={{ fontSize: 10, color: '#15803d', fontWeight: 700, marginTop: 1 }}>{sub}</div>}
           </div>
-          {profitRate !== null && <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700 }}>{profitRate.toFixed(1)}%</div>}
-        </div>
+        ))}
       </div>
 
       {periodTarget > 0 && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11, color: GRAY }}>
-            <span>달성률</span>
-            <span style={{ color: achieveColor, fontWeight: 700 }}>목표 ₩{numKR(periodTarget)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
+            <span style={{ color: MUTED }}>달성률</span>
+            <span style={{ color: achieveColor, fontWeight: 700 }}>₩{numKR(periodTarget)}</span>
           </div>
-          <AnimatedGauge pct={achieve || 0} color={achieveColor} height={8} delay={200} />
+          <AnimatedGauge pct={achieve || 0} color={achieveColor} height={7} delay={200} />
         </>
       )}
     </div>
@@ -568,9 +572,9 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 900 }}>
               <thead style={{ position: 'sticky', top: 0, background: CARD_BG, zIndex: 1 }}>
-                <tr style={{ borderBottom: `2px solid ${BORDER}` }}>
+                <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
                   {['견적번호', '날짜', '고객사', '내용', '품목', '매출액', '순이익', '이익률', '상태', '관리'].map(h => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: GRAY, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap', background: '#f8fafc', letterSpacing: '0.2px' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -581,10 +585,10 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                     ? q.quote_items.map(i => i.price_list?.model_jp || i.product_name).filter(Boolean).join(', ')
                     : '-'
                   return (
-                    <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}` }}
+                    <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.12s ease' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                     <td style={{ padding: '10px 12px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
                         <span
                           onClick={async () => {
                             if (!q.pdf_url) return
@@ -611,27 +615,31 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                               })
                             }
                           }}
-                          style={{ cursor: q.pdf_url ? 'pointer' : 'default', textDecoration: q.pdf_url ? 'underline' : 'none' }}>
-                          {q.quote_number} {q.pdf_url ? '📄' : ''}
+                          style={{ cursor: q.pdf_url ? 'pointer' : 'default' }}>
+                          {q.quote_number}
+                          {q.pdf_url && <span style={{ marginLeft: 5, fontSize: 10, color: MUTED }}>PDF</span>}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', color: GRAY, whiteSpace: 'nowrap' }}>{q.quote_date}</td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
-                      <td style={{ padding: '10px 12px', color: GRAY, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
-                      <td style={{ padding: '10px 12px', color: GRAY, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                        {hasProfit ? <span style={{ fontWeight: 700, color: '#16a34a' }}>₩{numKR(q.total_profit!)}</span> : <span style={{ color: '#d1d5db' }}>-</span>}
+                      <td style={{ padding: '10px 14px', color: MUTED, whiteSpace: 'nowrap', fontSize: 12 }}>{q.quote_date}</td>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
+                      <td style={{ padding: '10px 14px', color: GRAY, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
+                      <td style={{ padding: '10px 14px', color: GRAY, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
+                      <td style={{ padding: '10px 14px', fontWeight: 700, whiteSpace: 'nowrap', color: TEXT }}>₩{numKR(q.total_supply)}</td>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        {hasProfit ? <span style={{ fontWeight: 700, color: '#15803d' }}>₩{numKR(q.total_profit!)}</span> : <span style={{ color: BORDER }}>—</span>}
                       </td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                        {hasProfit ? <span style={{ fontWeight: 700, color: (q.profit_rate || 0) >= 40 ? '#16a34a' : '#f59e0b' }}>{q.profit_rate?.toFixed(1)}%</span> : <span style={{ color: '#d1d5db' }}>-</span>}
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        {hasProfit ? <span style={{ fontWeight: 700, color: (q.profit_rate || 0) >= 40 ? '#15803d' : ORANGE }}>{q.profit_rate?.toFixed(1)}%</span> : <span style={{ color: BORDER }}>—</span>}
                       </td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                        <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '22', color: STATUS_COLORS[q.status] || GRAY }}>{q.status}</span>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                        <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY }}>{q.status}</span>
                       </td>
-                      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                         <button onClick={() => { setEditQuote(q); setEditStatus(q.status); setEditOrderDate(q.order_date || ''); setEditRevenueDate(q.revenue_date || ''); setEditFailReason(q.fail_reason || '') }}
-                          style={{ padding: '4px 10px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                          style={{ padding: '4px 10px', background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: GRAY, transition: 'all 0.15s ease' }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff4ff'; (e.currentTarget as HTMLButtonElement).style.color = BLUE; (e.currentTarget as HTMLButtonElement).style.borderColor = '#c7d7f8' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; (e.currentTarget as HTMLButtonElement).style.color = GRAY; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER }}
+                        >
                           상태변경
                         </button>
                       </td>
@@ -810,6 +818,11 @@ const visibleEngineers = sortedEngineers.filter(e => {
     return { ...eng, quotedAmt, orderedAmt, revenueAmt, profitAmt, profitRate, quotedCnt, orderedCnt, targetAmt, achieve }
   })
 
+  const rankedByRevenue = [...engineerStats].sort((a, b) => b.revenueAmt - a.revenueAmt)
+  const revenueRankMap = new Map(
+    rankedByRevenue.filter(e => e.revenueAmt > 0).map((e, i) => [e.engineer_id, i])
+  )
+
   const handleStatusSave = async (q: Quote, status: string, orderDate: string, revenueDate: string, failReason: string) => {
     await supabase.from('quotes').update({ status, order_date: orderDate || null, revenue_date: revenueDate || null, fail_reason: failReason || null }).eq('quote_id', q.quote_id)
     await fetchAll()
@@ -827,74 +840,84 @@ const visibleEngineers = sortedEngineers.filter(e => {
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
 
         {/* 필터 */}
-        <div style={{ background: CARD_BG, borderRadius: 14, padding: '14px 18px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
+        <div style={{ background: CARD_BG, borderRadius: 14, padding: '12px 16px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select value={fy} onChange={e => setFy(Number(e.target.value))} style={{ ...inp, width: 110 }}>
+            <select value={fy} onChange={e => setFy(Number(e.target.value))} style={{ ...inp, width: 100, fontWeight: 700 }}>
               {[currentFY + 1, currentFY, currentFY - 1].map(y => <option key={y} value={y}>FY{y}</option>)}
             </select>
-            {(['year', 'q1', 'q2', 'q3', 'q4', 'month'] as const).map(m => (
-              <button key={m} onClick={() => setMode(m)} style={{ padding: '6px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: mode === m ? BLUE : '#f3f4f6', color: mode === m ? '#fff' : TEXT }}>
-                {m === 'year' ? '연간' : m === 'month' ? '월별' : m.toUpperCase()}
-              </button>
-            ))}
+            <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 1 }}>
+              {(['year', 'q1', 'q2', 'q3', 'q4', 'month'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)}
+                  style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: mode === m ? '#fff' : 'transparent', color: mode === m ? TEXT : GRAY, boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s ease', whiteSpace: 'nowrap' }}>
+                  {m === 'year' ? '연간' : m === 'month' ? '월별' : m.toUpperCase()}
+                </button>
+              ))}
+            </div>
             {mode === 'month' && (
-              <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...inp, width: 80 }}>
+              <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...inp, width: 76, fontWeight: 700 }}>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
               </select>
             )}
-            <span style={{ fontSize: 12, color: GRAY }}>{getPeriodLabel(mode, fy, month)}</span>
+            <span style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>{getPeriodLabel(mode, fy, month)}</span>
             {remainingLabel && (
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '3px 10px', borderRadius: 20 }}>⏱ {remainingLabel}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', background: '#fef2f2', padding: '3px 10px', borderRadius: 99, border: '1px solid #fecaca' }}>{remainingLabel}</span>
             )}
             <div style={{ flex: 1 }} />
-            <div style={{ width: 1, height: 24, background: BORDER, margin: '0 4px' }} />
-            <span style={{ fontSize: 12, color: GRAY, fontWeight: 700 }}>팀:</span>
-            <button onClick={() => setTeamFilter(null)} style={{ padding: '4px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === null ? BLUE : '#f3f4f6', color: teamFilter === null ? '#fff' : TEXT }}>전체</button>
-            {teams.filter(t => !['임원', '영업관리'].includes(t)).map(t => (
-              <button key={t} onClick={() => setTeamFilter(teamFilter === t ? null : t)} style={{ padding: '4px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === t ? (TEAM_COLORS[t]?.bar || BLUE) : '#f3f4f6', color: teamFilter === t ? '#fff' : TEXT }}>{t}팀</button>
-            ))}
+            <div style={{ width: 1, height: 20, background: BORDER }} />
+            <span style={{ fontSize: 11, color: MUTED, fontWeight: 600, letterSpacing: '0.2px' }}>팀</span>
+            <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 10, padding: 3, gap: 1 }}>
+              <button onClick={() => setTeamFilter(null)}
+                style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === null ? '#fff' : 'transparent', color: teamFilter === null ? TEXT : GRAY, boxShadow: teamFilter === null ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s ease' }}>전체</button>
+              {teams.filter(t => !['임원', '영업관리'].includes(t)).map(t => (
+                <button key={t} onClick={() => setTeamFilter(teamFilter === t ? null : t)}
+                  style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: teamFilter === t ? '#fff' : 'transparent', color: teamFilter === t ? TEAM_COLORS[t]?.bar || BLUE : GRAY, boxShadow: teamFilter === t ? '0 1px 3px rgba(0,0,0,0.10)' : 'none', transition: 'all 0.15s ease' }}>{t}팀</button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* 사업부 전체 요약 */}
         <div style={{ background: CARD_BG, borderRadius: 14, padding: '20px 22px', marginBottom: 20, border: `1px solid ${BORDER}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-              {teamFilter ? `🏢 ${teamFilter}팀` : '🏢 계측부 전체'}
-              <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 8 }}>{getPeriodLabel(mode, fy, month)}</span>
-              {remainingLabel && <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 700, marginLeft: 8 }}>· {remainingLabel}</span>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 3, height: 18, background: BLUE, borderRadius: 2 }} />
+              <span style={{ fontSize: 15, fontWeight: 800, color: TEXT, letterSpacing: '-0.3px' }}>
+                {teamFilter ? `${teamFilter}팀` : '계측부 전체'}
+              </span>
+              <span style={{ fontSize: 12, color: MUTED, fontWeight: 400 }}>{getPeriodLabel(mode, fy, month)}</span>
             </div>
             <button onClick={() => setShowChart(p => !p)}
-              style={{ padding: '6px 16px', borderRadius: 20, border: `1px solid ${showChart ? BLUE : BORDER}`, background: showChart ? '#eff6ff' : '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: showChart ? BLUE : GRAY, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-              📊 실적 추이 {showChart ? '▲' : '▼'}
+              style={{ padding: '6px 14px', borderRadius: 9, border: `1px solid ${showChart ? '#c7d7f8' : BORDER}`, background: showChart ? '#eff4ff' : '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: showChart ? BLUE : GRAY, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, transition: 'all 0.15s ease' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              실적 추이
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(138px, 1fr))', gap: 10, marginBottom: 18 }}>
             {[
               { label: '포캐스트', value: `₩${numKR(totalQuoteAmt)}`, sub: `${totalQuoteCnt}건` },
               { label: '수주액', value: `₩${numKR(totalOrderAmt)}`, sub: `${totalOrderCnt}건` },
-              { label: '매출 완료액', value: `₩${numKR(totalRevenueAmt)}`, highlight: true },
-              { label: '원가 합계', value: totalCostAmt > 0 ? `₩${numKR(totalCostAmt)}` : '-', sub: '매출완료 기준' },
-              { label: '순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '-', sub: totalProfitRate !== null && totalProfitAmt > 0 ? `이익률 ${totalProfitRate.toFixed(1)}%` : null, color: '#16a34a' },
-              { label: '수주 전환율', value: `${convRate.toFixed(1)}%`, sub: `${totalOrderCnt}/${totalQuoteCnt}건` },
-              { label: '전년 동기 대비', value: yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange.toFixed(1)}%` : '-', color: yoyChange !== null ? (yoyChange >= 0 ? '#16a34a' : '#dc2626') : GRAY },
-             { label: '목표 달성률', value: totalAchieve !== null ? `${totalAchieve.toFixed(1)}%` : '목표 미설정', sub: totalTargetAmt > 0 ? `목표 ₩${numKR(totalTargetAmt)}` : null, color: totalAchieveColor },
-            ].map(({ label, value, sub, highlight, color }: any) => (
-              <div key={label} style={{ background: highlight ? '#eff6ff' : '#f8fafc', borderRadius: 10, padding: '12px 14px', border: `1px solid ${highlight ? '#bfdbfe' : BORDER}` }}>
-                <div style={{ fontSize: 11, color: GRAY, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: color || (highlight ? BLUE : TEXT) }}>{value}</div>
-                {sub && <div style={{ fontSize: 10, color: GRAY, marginTop: 2 }}>{sub}</div>}
+              { label: '매출 완료액', value: `₩${numKR(totalRevenueAmt)}`, accent: true },
+              { label: '원가 합계', value: totalCostAmt > 0 ? `₩${numKR(totalCostAmt)}` : '—', sub: '매출완료 기준' },
+              { label: '순이익', value: totalProfitAmt > 0 ? `₩${numKR(totalProfitAmt)}` : '—', sub: totalProfitRate !== null && totalProfitAmt > 0 ? `이익률 ${totalProfitRate.toFixed(1)}%` : null, color: '#15803d' },
+              { label: '수주 전환율', value: `${convRate.toFixed(1)}%`, sub: `${totalOrderCnt} / ${totalQuoteCnt}건` },
+              { label: '전년 동기 대비', value: yoyChange !== null ? `${yoyChange >= 0 ? '+' : ''}${yoyChange.toFixed(1)}%` : '—', color: yoyChange !== null ? (yoyChange >= 0 ? '#15803d' : '#b91c1c') : GRAY },
+              { label: '목표 달성률', value: totalAchieve !== null ? `${totalAchieve.toFixed(1)}%` : '미설정', sub: totalTargetAmt > 0 ? `목표 ₩${numKR(totalTargetAmt)}` : null, color: totalAchieveColor },
+            ].map(({ label, value, sub, accent, color }: any) => (
+              <div key={label} style={{ background: accent ? '#eff4ff' : '#f8fafc', borderRadius: 11, padding: '13px 15px', border: `1px solid ${accent ? '#c7d7f8' : BORDER}` }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: MUTED, marginBottom: 5, letterSpacing: '0.2px' }}>{label}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: color || (accent ? BLUE : TEXT), letterSpacing: '-0.3px', lineHeight: 1 }}>{value}</div>
+                {sub && <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>{sub}</div>}
               </div>
             ))}
           </div>
           {totalTargetAmt > 0 && (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
-                <span style={{ color: GRAY }}>사업부 목표 달성률</span>
+                <span style={{ color: MUTED, fontWeight: 500 }}>사업부 목표 달성률</span>
                 <span style={{ fontWeight: 700, color: totalAchieveColor }}>₩{numKR(totalRevenueAmt)} / ₩{numKR(totalTargetAmt)} ({totalAchieve?.toFixed(1)}%)</span>
               </div>
-              <AnimatedGauge pct={totalAchieve || 0} color={totalAchieveColor} height={14} delay={100} />
+              <AnimatedGauge pct={totalAchieve || 0} color={totalAchieveColor} height={12} delay={100} />
             </>
           )}
         </div>
@@ -907,7 +930,10 @@ const visibleEngineers = sortedEngineers.filter(e => {
         {/* 팀별 실적 — superadmin과 각팀 manager, 해당 팀원에게만 표시 */}
         {!teamFilter && teams.length > 0 && (currentEngineer?.permission_level === 'superadmin' || currentEngineer?.permission_level === 'manager') && (
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 12 }}>🏆 팀별 실적</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 3, height: 16, background: BLUE, borderRadius: 2 }} />
+              <span style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>팀별 실적</span>
+            </div>
            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
                {teams.filter(t => {
                 if (['임원', '영업관리'].includes(t)) return false
@@ -921,27 +947,36 @@ const visibleEngineers = sortedEngineers.filter(e => {
 
         {/* 개인 실적 */}
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: TEXT, marginBottom: 12 }}>
-            👤 개인 실적
-            <span style={{ fontSize: 12, color: GRAY, fontWeight: 400, marginLeft: 8 }}>({filteredEngineers.length}명) · 카드 클릭 시 견적 목록 · 📊 클릭 시 월별 차트</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 16, background: BLUE, borderRadius: 2 }} />
+            <span style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>개인 실적</span>
+            <span style={{ fontSize: 12, color: MUTED, fontWeight: 400 }}>({filteredEngineers.length}명) · 카드 클릭 시 견적 목록</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
             {engineerStats.map((eng, idx) => {
               const tc = TEAM_COLORS[eng.teams ?? ''] || { bg: '#f3f4f6', text: BLUE, bar: BLUE }
               const achieveColor = eng.achieve === null ? GRAY : eng.achieve >= 100 ? '#16a34a' : eng.achieve >= 70 ? '#f59e0b' : '#dc2626'
+              const rank = revenueRankMap.get(eng.engineer_id)
               return (
                 <div key={eng.engineer_id}
                   onClick={() => setSelectedEngineer(eng)}
-                  style={{ background: CARD_BG, borderRadius: 14, padding: '16px 18px', border: `1px solid ${BORDER}`, cursor: 'pointer', transition: 'all 0.15s', position: 'relative' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.transform = 'none' }}>
+                  style={{ background: CARD_BG, borderRadius: 14, padding: '16px 18px', border: `1px solid ${rank !== undefined && rank < 3 ? RANK_MEDAL[rank] + '50' : BORDER}`, cursor: 'pointer', transition: 'box-shadow 0.15s ease, transform 0.15s ease', position: 'relative' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.10)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = '' }}>
 
                   <button onClick={e => { e.stopPropagation(); setChartEngineer(eng) }} title="월별 실적 차트"
-                    style={{ position: 'absolute', top: 14, right: 14, width: 26, height: 26, borderRadius: '50%', background: '#f0f4ff', border: `1px solid ${BORDER}`, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: BLUE }}>
-                    📊
+                    style={{ position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: '50%', background: '#f8fafc', border: `1px solid ${BORDER}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: BLUE, transition: 'all 0.15s ease' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff4ff'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#c7d7f8' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                   </button>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingRight: 32 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingRight: 36 }}>
+                    {rank !== undefined && rank < 3 && (
+                      <div style={{ width: 22, height: 22, borderRadius: '50%', background: RANK_MEDAL_BG[rank], border: `1.5px solid ${RANK_MEDAL[rank]}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 800, color: RANK_MEDAL[rank] }}>
+                        {rank + 1}
+                      </div>
+                    )}
                     <div>
                       <span style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>{eng.name}</span>
                       <span style={{ fontSize: 12, color: GRAY, marginLeft: 6 }}>{eng.position}</span>
@@ -951,30 +986,30 @@ const visibleEngineers = sortedEngineers.filter(e => {
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                      <div style={{ fontSize: 10, color: GRAY }}>포캐스트</div>
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px', border: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 10, color: MUTED, marginBottom: 2, fontWeight: 500 }}>포캐스트</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>₩{numKR(eng.quotedAmt)}</div>
-                      <div style={{ fontSize: 10, color: GRAY }}>{eng.quotedCnt}건</div>
+                      <div style={{ fontSize: 10, color: MUTED }}>{eng.quotedCnt}건</div>
                     </div>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                      <div style={{ fontSize: 10, color: GRAY }}>수주</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#3b82f6' }}>₩{numKR(eng.orderedAmt)}</div>
-                      <div style={{ fontSize: 10, color: GRAY }}>{eng.orderedCnt}건</div>
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px', border: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 10, color: MUTED, marginBottom: 2, fontWeight: 500 }}>수주</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>₩{numKR(eng.orderedAmt)}</div>
+                      <div style={{ fontSize: 10, color: MUTED }}>{eng.orderedCnt}건</div>
                     </div>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                      <div style={{ fontSize: 10, color: GRAY }}>매출 완료</div>
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px', border: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 10, color: MUTED, marginBottom: 2, fontWeight: 500 }}>매출 완료</div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: BLUE }}>₩{numKR(eng.revenueAmt)}</div>
                     </div>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
-                      <div style={{ fontSize: 10, color: GRAY }}>순이익</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: eng.profitAmt > 0 ? '#16a34a' : GRAY }}>{eng.profitAmt > 0 ? `₩${numKR(eng.profitAmt)}` : '-'}</div>
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: '8px 10px', border: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 10, color: MUTED, marginBottom: 2, fontWeight: 500 }}>순이익</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: eng.profitAmt > 0 ? '#16a34a' : MUTED }}>{eng.profitAmt > 0 ? `₩${numKR(eng.profitAmt)}` : '-'}</div>
                       {eng.profitRate !== null && eng.profitAmt > 0 && <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700 }}>{eng.profitRate.toFixed(1)}%</div>}
                     </div>
                   </div>
                   {eng.targetAmt > 0 && (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11, color: GRAY }}>
-                        <span>목표 달성률</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
+                        <span style={{ color: MUTED }}>목표 달성률</span>
                         <span style={{ color: achieveColor, fontWeight: 700 }}>{eng.achieve?.toFixed(0)}% · 목표 {numKR(eng.targetAmt)}</span>
                       </div>
                       <AnimatedGauge pct={eng.achieve || 0} color={achieveColor} height={7} delay={80 + idx * 40} />

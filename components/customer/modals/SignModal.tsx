@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { CARD_BG, INPUT_BORDER, PANEL_BG, TEXT_MUTED, TEXT_PRIMARY, WHITE_BUTTON_BG, WHITE_BUTTON_TEXT, modalOverlayStyle } from '../constants'
+import { INPUT_BORDER, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, WHITE_BUTTON_BG, WHITE_BUTTON_TEXT, modalOverlayStyle } from '../constants'
 
 type Props = {
   isOpen: boolean
@@ -45,20 +45,45 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
 
   return (
     <div style={modalOverlayStyle}>
-      <div style={{ width: '100%', maxWidth: 520, background: CARD_BG, borderRadius: 18, padding: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.35)', border: `1px solid ${INPUT_BORDER}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#234ea2', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14 }}>1</div>
-          <div style={{ height: 2, flex: 1, background: signStep === 2 ? '#234ea2' : INPUT_BORDER, borderRadius: 2 }} />
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: signStep === 2 ? '#234ea2' : INPUT_BORDER, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14 }}>2</div>
+      <div style={{
+        width: '100%', maxWidth: 520, background: '#ffffff', borderRadius: 20, padding: 28,
+        boxShadow: '0 16px 48px rgba(0,0,0,0.22)', border: `1px solid ${INPUT_BORDER}`,
+        animation: 'modal-in 0.18s ease',
+      }}>
+        {/* 스텝 인디케이터 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
+          {[1, 2].map((step) => (
+            <div key={step} style={{ display: 'flex', alignItems: 'center', flex: step === 1 ? 'none' : 1 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%',
+                background: step <= signStep ? WHITE_BUTTON_BG : '#e5e7eb',
+                color: step <= signStep ? '#fff' : TEXT_MUTED,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: 13, flexShrink: 0,
+                transition: 'all 0.2s ease',
+              }}>
+                {step}
+              </div>
+              {step === 1 && (
+                <div style={{
+                  height: 2, flex: 1, margin: '0 8px',
+                  background: signStep === 2 ? WHITE_BUTTON_BG : '#e5e7eb',
+                  borderRadius: 2, transition: 'background 0.2s ease',
+                }} />
+              )}
+            </div>
+          ))}
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6, color: TEXT_PRIMARY }}>
+        {/* 타이틀 */}
+        <div style={{ fontSize: 17, fontWeight: 800, color: TEXT_PRIMARY, marginBottom: 4 }}>
           {signStep === 1 ? '엔지니어 서명' : '고객 담당자 서명'}
         </div>
-        <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 18 }}>
           {signStep === 1 ? '아래 칸에 서명해주세요' : '고객 담당자분께 서명을 받아주세요'}
         </div>
 
+        {/* 서명 캔버스 */}
         {[
           { ref: engineerSignRef, step: 1, signing: engineerSigning, setSigning: setEngineerSigning },
           { ref: customerSignRef, step: 2, signing: customerSigning, setSigning: setCustomerSigning },
@@ -68,7 +93,11 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
             ref={ref}
             width={900}
             height={240}
-            style={{ width: '100%', height: 200, border: `2px solid ${INPUT_BORDER}`, borderRadius: 12, background: '#fff', cursor: 'crosshair', touchAction: 'none', display: signStep === step ? 'block' : 'none' }}
+            style={{
+              width: '100%', height: 200, borderRadius: 12, background: '#fafafa',
+              border: `2px solid ${INPUT_BORDER}`, cursor: 'crosshair', touchAction: 'none',
+              display: signStep === step ? 'block' : 'none',
+            }}
             onPointerDown={(e) => {
               setSigning(true)
               const canvas = ref.current!
@@ -86,7 +115,7 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
               ctx.lineWidth = 3
               ctx.lineCap = 'round'
               ctx.lineJoin = 'round'
-              ctx.strokeStyle = '#000'
+              ctx.strokeStyle = '#111'
               ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
               ctx.stroke()
             }}
@@ -94,16 +123,35 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
           />
         ))}
 
-        <button onClick={clearCanvas} style={{ marginTop: 10, padding: '6px 14px', background: '#f3f4f6', border: `1px solid ${INPUT_BORDER}`, borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-          🗑 지우기
+        <button
+          onClick={clearCanvas}
+          style={{
+            marginTop: 10, padding: '5px 13px',
+            background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`,
+            borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: TEXT_SECONDARY,
+          }}
+        >
+          지우기
         </button>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, gap: 10 }}>
-          <button onClick={handleBack} style={{ padding: '11px 20px', background: PANEL_BG, border: `1px solid ${INPUT_BORDER}`, borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, gap: 10 }}>
+          <button
+            onClick={handleBack}
+            style={{
+              padding: '11px 20px', background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`,
+              borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14, color: TEXT_PRIMARY,
+            }}
+          >
             {signStep === 2 ? '← 이전' : '취소'}
           </button>
-          <button onClick={handleNext} style={{ padding: '11px 28px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
-            {signStep === 1 ? '다음 →' : '✓ PDF 생성'}
+          <button
+            onClick={handleNext}
+            style={{
+              padding: '11px 28px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT,
+              border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14,
+            }}
+          >
+            {signStep === 1 ? '다음 →' : 'PDF 생성'}
           </button>
         </div>
       </div>
