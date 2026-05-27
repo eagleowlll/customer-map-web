@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item \"c:\\\\Users\\\\admin\\\\customer-map-web\\\\middleware.ts\" -Force)",
+      "Bash(Get-ChildItem -Path \"app\" -Name \"*.tsx\" -Recurse)",
+      "Bash(Select-Object -First 20)"
+    ]
+  }
+}

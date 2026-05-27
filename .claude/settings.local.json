@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(npx next *)",
-      "Bash(node -e \"require\\('xlsx'\\)\")"
+      "Bash(node -e \"require\\('xlsx'\\)\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\admin\\\\customer-map-web\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ]
   }
 }

@@ -354,6 +354,13 @@ useEffect(() => {
   }
 
   const uploadPackingList = async (file: File, customerId: number, index: number) => {
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new Error('JPG, PNG, WEBP, GIF, PDF 형식만 업로드 가능합니다.')
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      throw new Error('파일 크기는 20MB 이하여야 합니다.')
+    }
     const fileExt = file.name.split('.').pop()
     const fileName = `customer-${customerId}-device-${index + 1}-${Date.now()}.${fileExt}`
 

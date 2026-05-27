@@ -90,6 +90,17 @@ export default function AccountPage() {
 
     // 프로필 사진 업로드
     if (profileImageFile) {
+      const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      if (!ALLOWED_IMAGE_TYPES.includes(profileImageFile.type)) {
+        setProfileMessage({ type: 'error', text: 'JPG, PNG, WEBP, GIF 형식의 이미지만 업로드 가능합니다.' })
+        setIsSavingProfile(false)
+        return
+      }
+      if (profileImageFile.size > 5 * 1024 * 1024) {
+        setProfileMessage({ type: 'error', text: '파일 크기는 5MB 이하여야 합니다.' })
+        setIsSavingProfile(false)
+        return
+      }
       const fileExt = profileImageFile.name.split('.').pop()
       const fileName = `profile-${engineer.engineer_id}-${Date.now()}.${fileExt}`
 

@@ -27,6 +27,8 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [engineerId, setEngineerId] = useState<number | null>(null)
+  const [engineerTeams, setEngineerTeams] = useState<string | null>(null)
+  const [permissionLevel, setPermissionLevel] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
 
@@ -47,11 +49,13 @@ export default function Header() {
       if (data.user?.email) {
         const { data: eng } = await supabase
           .from('engineers')
-          .select('engineer_id')
+          .select('engineer_id, teams, permission_level')
           .eq('email', data.user.email)
           .single()
         if (eng) {
           setEngineerId(eng.engineer_id)
+          setEngineerTeams(eng.teams ?? null)
+          setPermissionLevel(eng.permission_level ?? null)
           fetchNotifications(eng.engineer_id)
         }
       }
@@ -101,6 +105,7 @@ export default function Header() {
   }
 
   const isAdmin = user?.email === ADMIN_EMAIL
+  const isPurchaseManager = permissionLevel === 'superadmin' || engineerTeams === '영업관리'
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   const menuItems = [
@@ -110,6 +115,7 @@ export default function Header() {
     { label: '실적 현황', onClick: () => router.push('/sales'), path: '/sales' },
     { label: '재고 관리', onClick: () => router.push('/inventory'), path: '/inventory' },
     { label: '자료실', onClick: () => router.push('/library'), path: '/library' },
+    ...(isPurchaseManager ? [{ label: '발주 관리', onClick: () => router.push('/purchase'), path: '/purchase' }] : []),
     ...(isAdmin ? [{ label: '관리자', onClick: () => router.push('/admin'), path: '/admin' }] : []),
   ]
 

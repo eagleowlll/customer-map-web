@@ -34,6 +34,11 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // API 라우트는 각 핸들러에서 인증 처리 — 여기서 리다이렉트하면 JSON 대신 HTML 응답 반환됨
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
+
   if (!user && pathname !== '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
@@ -46,7 +51,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return supabaseResponse  // response → supabaseResponse
+  return supabaseResponse
 }
 
 export const config = {

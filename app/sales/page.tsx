@@ -1,7 +1,7 @@
 //실적현황 페이지
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const BLUE = '#234ea2'
@@ -32,8 +32,19 @@ type Quote = {
   subject: string | null
   engineer_id: number
   customer_id: number | null
+  dealer_id: number | null
+  delivery_info: string | null
+  purchase_order_url?: string | null
+  purchase_order_at?: string | null
+  shipping_date?: string | null
+  order_memo?: string | null
+  order_completed_at?: string | null
+  tax_invoice_date?: string | null
+  tax_invoice_requested_at?: string | null
+  delivery_method?: string | null
   engineers?: { name: string; position: string | null }
   customers?: { company_name: string } | null
+  dealer?: { company_name: string } | null
   quote_items?: { product_name: string | null; price_list?: { model_jp: string | null } | null }[]
 }
 type Engineer = {
@@ -54,6 +65,7 @@ type SalesTarget = {
 
 const STATUS_COLORS: Record<string, string> = {
   '견적중': '#d97706', '수주': '#2563eb', '매출완료': '#15803d', '실패': '#b91c1c', '보류': '#6b7280',
+  '발주(주문 대기)': '#7c3aed', '주문완료': '#0369a1', '세금계산서 요청': '#b45309', '취소요청': '#be123c',
 }
 
 const TEAM_COLORS: Record<string, { bg: string; text: string; bar: string }> = {
@@ -509,6 +521,19 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
   const [editRevenueDate, setEditRevenueDate] = useState('')
   const [editFailReason, setEditFailReason] = useState('')
   const [saving, setSaving] = useState(false)
+  // 발주서 등록
+  const [poQuote, setPoQuote] = useState<Quote | null>(null)
+  const [poFile, setPoFile] = useState<File | null>(null)
+  const [poDelivery, setPoDelivery] = useState<'직납' | '택배발송'>('직납')
+  const [poUploading, setPoUploading] = useState(false)
+  const [poIsDragging, setPoIsDragging] = useState(false)
+  const poFileRef = useRef<HTMLInputElement>(null)
+  // 세금계산서 요청
+  const [taxQuote, setTaxQuote] = useState<Quote | null>(null)
+  const [taxDate, setTaxDate] = useState('')
+  const [taxSending, setTaxSending] = useState(false)
+  // 메모 툴팁
+  const [hoveredMemoId, setHoveredMemoId] = useState<number | null>(null)
   const tc = TEAM_COLORS[engineer.teams ?? ''] || { bg: '#f3f4f6', text: BLUE, bar: BLUE }
   const achieveColor = engineer.achieve === null ? GRAY : engineer.achieve >= 100 ? '#16a34a' : engineer.achieve >= 70 ? '#f59e0b' : '#dc2626'
   const filtered = quotes.filter(q => {
@@ -528,6 +553,47 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     setSaving(false)
     setEditQuote(null)
   }
+
+  const handlePoUpload = async () => {
+    if (!poQuote || !poFile) return
+    setPoUploading(true)
+    const fd = new FormData()
+    fd.append('quoteId', String(poQuote.quote_id))
+    fd.append('quoteNumber', poQuote.quote_number)
+    fd.append('action', 'upload')
+    fd.append('file', poFile)
+    fd.append('deliveryMethod', poDelivery)
+    const res = await fetch('/api/purchase-order', { method: 'POST', body: fd })
+    const json = await res.json().catch(() => ({}))
+    setPoUploading(false)
+    if (!res.ok) {
+      alert(`발주서 등록 실패: ${json.error || res.status}`)
+      return
+    }
+    setPoQuote(null)
+    setPoFile(null)
+    await onStatusSave(poQuote, '발주(주문 대기)', '', '', '')
+  }
+
+  const handleTaxRequest = async () => {
+    if (!taxQuote) return
+    setTaxSending(true)
+    const fd = new FormData()
+    fd.append('quoteId', String(taxQuote.quote_id))
+    fd.append('action', 'request_tax')
+    if (taxDate) fd.append('taxDate', taxDate)
+    const res = await fetch('/api/purchase-order', { method: 'POST', body: fd })
+    const json = await res.json().catch(() => ({}))
+    setTaxSending(false)
+    if (!res.ok) {
+      alert(`세금계산서 요청 실패: ${json.error || res.status}`)
+      return
+    }
+    setTaxQuote(null)
+    setTaxDate('')
+    await onStatusSave(taxQuote, '세금계산서 요청', '', '', '')
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: CARD_BG, borderRadius: 18, width: '100%', minWidth: 900, maxWidth: 1200, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', position: 'relative' }}>
@@ -556,92 +622,143 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
             </div>
             <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#f3f4f6', border: 'none', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
           </div>
+          {/* 대리점별 현황 */}
+          {(() => {
+            const dealerMap: Record<string, { name: string; supply: number; count: number }> = {}
+            quotes.forEach(q => {
+              if (!q.dealer_id || !q.dealer?.company_name) return
+              const key = String(q.dealer_id)
+              if (!dealerMap[key]) dealerMap[key] = { name: q.dealer.company_name, supply: 0, count: 0 }
+              dealerMap[key].supply += q.total_supply
+              dealerMap[key].count += 1
+            })
+            const dealers = Object.values(dealerMap).sort((a, b) => b.supply - a.supply)
+            if (dealers.length === 0) return null
+            return (
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: '#fff7ed', borderRadius: 10, border: '1px solid #fed7aa' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#c2410c', marginBottom: 6 }}>대리점별 현황</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {dealers.map(d => (
+                    <div key={d.name} style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 7, padding: '4px 10px', fontSize: 11 }}>
+                      <span style={{ fontWeight: 700, color: '#c2410c' }}>{d.name}</span>
+                      <span style={{ color: GRAY, marginLeft: 6 }}>₩{numKR(d.supply)}</span>
+                      <span style={{ color: MUTED, marginLeft: 4, fontSize: 10 }}>({d.count}건)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="견적번호 / 고객사 / 내용 검색" style={{ ...inp, flex: 1, minWidth: 200 }} />
-            {['전체', '견적중', '수주', '매출완료', '실패', '보류'].map(s => (
+            {['전체', '견적중', '발주(주문 대기)', '주문완료', '세금계산서 요청', '매출완료', '취소요청', '실패'].map(s => (
               <button key={s} onClick={() => { setStatusFilter(s); setPage(1) }}
-                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, background: statusFilter === s ? (STATUS_COLORS[s] || BLUE) : '#f3f4f6', color: statusFilter === s ? '#fff' : TEXT }}>
+                style={{ padding: '5px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap', background: statusFilter === s ? (STATUS_COLORS[s] || BLUE) : '#f3f4f6', color: statusFilter === s ? '#fff' : TEXT }}>
                 {s}
               </button>
             ))}
           </div>
         </div>
-        <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
           {paged.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: GRAY }}>견적이 없습니다</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 900 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead style={{ position: 'sticky', top: 0, background: CARD_BG, zIndex: 1 }}>
                 <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                  {['견적번호', '날짜', '고객사', '내용', '품목', '매출액', '순이익', '이익률', '상태', '관리'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap', background: '#f8fafc', letterSpacing: '0.2px' }}>{h}</th>
+                  {['견적번호', '날짜', '대리점', '고객사', '품목', '매출액', '순이익', '상태', '관리'].map(h => (
+                    <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap', background: '#f8fafc' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map(q => {
-                  const hasProfit = q.status === '매출완료' && q.total_profit != null
+                  const hasProfit = q.total_profit != null && q.total_profit !== 0
+                  const profitConfirmed = ['발주(주문 대기)', '주문완료', '세금계산서 요청', '매출완료'].includes(q.status)
+                  const profitColor = profitConfirmed ? '#15803d' : TEXT
+                  const profitRateColor = profitConfirmed ? ((q.profit_rate || 0) >= 40 ? '#15803d' : ORANGE) : GRAY
                   const itemNames = q.quote_items && q.quote_items.length > 0
                     ? q.quote_items.map(i => i.price_list?.model_jp || i.product_name).filter(Boolean).join(', ')
                     : '-'
+                  const showOrderInfo = ['주문완료', '세금계산서 요청', '매출완료'].includes(q.status)
                   return (
                     <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.12s ease' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '10px 14px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
                         <span
                           onClick={async () => {
                             if (!q.pdf_url) return
-                            // NAS URL이면 그대로 열기
-                            if (q.pdf_url.includes('synology')) {
-                              window.open(q.pdf_url, '_blank')
-                              return
-                            }
-                            // Supabase Storage면 Signed URL 생성
-                          const path = q.pdf_url.startsWith('quote-pdfs/')
-                              ? q.pdf_url.replace('quote-pdfs/', '')
-                              : q.pdf_url.split('/quote-pdfs/')[1]
+                            if (q.pdf_url.includes('synology')) { window.open(q.pdf_url, '_blank'); return }
+                            const path = q.pdf_url.startsWith('quote-pdfs/') ? q.pdf_url.replace('quote-pdfs/', '') : q.pdf_url.split('/quote-pdfs/')[1]
                             if (!path) return
                             const res = await fetch(`/api/quote-pdf?path=${encodeURIComponent(path)}`)
                             const json = await res.json()
                             if (json.signedUrl) {
                               window.open(json.signedUrl, '_blank')
-                              await supabase.from('download_logs').insert({
-                                engineer_id: currentEngineerId,
-                                quote_id: q.quote_id,
-                                quote_number: q.quote_number,
-                                company_name: q.customers?.company_name ?? null,
-                                action: 'view',
-                              })
+                              await supabase.from('download_logs').insert({ engineer_id: currentEngineerId, quote_id: q.quote_id, quote_number: q.quote_number, company_name: q.customers?.company_name ?? null, action: 'view' })
                             }
                           }}
                           style={{ cursor: q.pdf_url ? 'pointer' : 'default' }}>
                           {q.quote_number}
-                          {q.pdf_url && <span style={{ marginLeft: 5, fontSize: 10, color: MUTED }}>PDF</span>}
+                          {q.pdf_url && <span style={{ marginLeft: 4, fontSize: 9, color: MUTED }}>PDF</span>}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', color: MUTED, whiteSpace: 'nowrap', fontSize: 12 }}>{q.quote_date}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: 600, whiteSpace: 'nowrap' }}>{q.customers?.company_name || '-'}</td>
-                      <td style={{ padding: '10px 14px', color: GRAY, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.subject || '-'}</td>
-                      <td style={{ padding: '10px 14px', color: GRAY, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: 700, whiteSpace: 'nowrap', color: TEXT }}>₩{numKR(q.total_supply)}</td>
-                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                        {hasProfit ? <span style={{ fontWeight: 700, color: '#15803d' }}>₩{numKR(q.total_profit!)}</span> : <span style={{ color: BORDER }}>—</span>}
+                      <td style={{ padding: '8px 10px', color: MUTED, whiteSpace: 'nowrap', fontSize: 11 }}>{q.quote_date}</td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        {q.dealer?.company_name
+                          ? <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fff7ed', color: '#c2410c', fontWeight: 700, border: '1px solid #fed7aa' }}>{q.dealer.company_name}</span>
+                          : <span style={{ fontSize: 11, color: MUTED }}>직판</span>}
                       </td>
-                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                        {hasProfit ? <span style={{ fontWeight: 700, color: (q.profit_rate || 0) >= 40 ? '#15803d' : ORANGE }}>{q.profit_rate?.toFixed(1)}%</span> : <span style={{ color: BORDER }}>—</span>}
+                      <td style={{ padding: '8px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.customers?.company_name || '-'}</td>
+                      <td style={{ padding: '8px 10px', color: GRAY, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', color: TEXT }}>₩{numKR(q.total_supply)}</td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        {hasProfit ? <span style={{ fontWeight: 700, color: profitColor, fontSize: 11 }}>₩{numKR(q.total_profit!)}<span style={{ color: profitRateColor, marginLeft: 4 }}>{q.profit_rate?.toFixed(0)}%</span></span> : <span style={{ color: BORDER }}>—</span>}
                       </td>
-                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                        <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY }}>{q.status}</span>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                          <span style={{ padding: '3px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY, whiteSpace: 'nowrap' }}>{q.status}</span>
+                          {showOrderInfo && (q.shipping_date || q.order_memo) && (
+                            <div style={{ position: 'relative' }}
+                              onMouseEnter={() => q.order_memo ? setHoveredMemoId(q.quote_id) : undefined}
+                              onMouseLeave={() => setHoveredMemoId(null)}>
+                              <span style={{ fontSize: 10, color: '#0369a1', fontWeight: 600, cursor: q.order_memo ? 'help' : 'default', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                {q.shipping_date || '날짜미정'}
+                                {q.order_memo && <span style={{ fontSize: 9 }}>📋</span>}
+                              </span>
+                              {hoveredMemoId === q.quote_id && q.order_memo && (
+                                <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 9999, background: '#1e293b', color: '#e2e8f0', borderRadius: 9, padding: '8px 12px', fontSize: 11, minWidth: 160, maxWidth: 240, lineHeight: 1.6, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', pointerEvents: 'none' }}>
+                                  <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3, fontWeight: 700 }}>담당자 메모</div>
+                                  {q.order_memo}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => { setEditQuote(q); setEditStatus(q.status); setEditOrderDate(q.order_date || ''); setEditRevenueDate(q.revenue_date || ''); setEditFailReason(q.fail_reason || '') }}
-                          style={{ padding: '4px 10px', background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: GRAY, transition: 'all 0.15s ease' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#eff4ff'; (e.currentTarget as HTMLButtonElement).style.color = BLUE; (e.currentTarget as HTMLButtonElement).style.borderColor = '#c7d7f8' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; (e.currentTarget as HTMLButtonElement).style.color = GRAY; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER }}
-                        >
-                          상태변경
-                        </button>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {q.status === '견적중' && (
+                            <button onClick={() => { setPoQuote(q); setPoFile(null) }}
+                              style={{ padding: '3px 7px', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>
+                              발주서 등록
+                            </button>
+                          )}
+                          {q.status === '주문완료' && (
+                            <button onClick={() => { setTaxQuote(q); setTaxDate(q.tax_invoice_date || '') }}
+                              style={{ padding: '3px 7px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#b45309' }}>
+                              계산서 요청
+                            </button>
+                          )}
+                          <button onClick={() => { setEditQuote(q); setEditStatus('취소요청'); setEditFailReason(q.fail_reason || '') }}
+                            style={{ padding: '3px 7px', background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 600, color: GRAY }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#be123c'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#fecdd3' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; (e.currentTarget as HTMLButtonElement).style.color = GRAY; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER }}
+                          >
+                            취소/실패
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -660,42 +777,118 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
             <span style={{ fontSize: 12, color: GRAY, marginLeft: 8 }}>{filtered.length}건 중 {(page - 1) * PAGE_SIZE + 1}~{Math.min(page * PAGE_SIZE, filtered.length)}건</span>
           </div>
         )}
-        {editQuote && (
+        {/* 발주서 등록 모달 */}
+        {poQuote && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: 360, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 6 }}>발주서 등록</div>
+              <div style={{ fontSize: 12, color: GRAY, marginBottom: 16 }}>{poQuote.quote_number}</div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>배송 방법</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['직납', '택배발송'] as const).map(m => (
+                    <button key={m} onClick={() => setPoDelivery(m)}
+                      style={{ flex: 1, padding: '8px 0', borderRadius: 8, border: `1.5px solid ${poDelivery === m ? '#7c3aed' : BORDER}`, cursor: 'pointer', fontWeight: 700, fontSize: 13, background: poDelivery === m ? '#f5f3ff' : '#f9fafb', color: poDelivery === m ? '#7c3aed' : GRAY, transition: 'all 0.12s' }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>발주서 PDF</div>
+                <div
+                  onDragOver={e => { e.preventDefault(); setPoIsDragging(true) }}
+                  onDragLeave={() => setPoIsDragging(false)}
+                  onDrop={e => {
+                    e.preventDefault()
+                    setPoIsDragging(false)
+                    const f = e.dataTransfer.files[0]
+                    if (f && f.type === 'application/pdf') setPoFile(f)
+                  }}
+                  onClick={() => poFileRef.current?.click()}
+                  style={{ border: `2px dashed ${poIsDragging ? '#7c3aed' : poFile ? '#7c3aed' : BORDER}`, borderRadius: 10, padding: '18px 12px', textAlign: 'center', cursor: 'pointer', background: poIsDragging ? '#f5f3ff' : poFile ? '#faf5ff' : '#fafafa', transition: 'all 0.15s' }}>
+                  {poFile ? (
+                    <>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>📄</div>
+                      <div style={{ fontSize: 12, color: '#7c3aed', fontWeight: 700 }}>{poFile.name}</div>
+                      <div style={{ fontSize: 10, color: MUTED, marginTop: 3 }}>클릭하여 다시 선택</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 22, marginBottom: 6 }}>📁</div>
+                      <div style={{ fontSize: 12, color: GRAY, fontWeight: 600 }}>PDF를 여기에 드래그하거나</div>
+                      <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>클릭하여 파일 선택</div>
+                    </>
+                  )}
+                  <input ref={poFileRef} type="file" accept="application/pdf"
+                    onChange={e => setPoFile(e.target.files?.[0] || null)}
+                    style={{ display: 'none' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setPoQuote(null); setPoFile(null) }} disabled={poUploading}
+                  style={{ flex: 1, padding: 9, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>취소</button>
+                <button onClick={handlePoUpload} disabled={poUploading || !poFile}
+                  style={{ flex: 1, padding: 9, background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, opacity: (poUploading || !poFile) ? 0.6 : 1 }}>
+                  {poUploading ? '업로드 중...' : '등록'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 세금계산서 요청 모달 */}
+        {taxQuote && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: 340, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 12 }}>상태 변경</div>
-              <div style={{ fontSize: 12, color: GRAY, marginBottom: 14 }}>{editQuote.quote_number}</div>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, color: GRAY, marginBottom: 5 }}>상태</div>
-                <select value={editStatus} onChange={e => setEditStatus(e.target.value)} style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none' }}>
-                  {['견적중', '수주', '매출완료', '실패', '보류'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+              <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 6 }}>세금계산서 발행 요청</div>
+              <div style={{ fontSize: 12, color: GRAY, marginBottom: 16 }}>{taxQuote.quote_number}</div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>요청 발행일 (선택)</div>
+                <input type="date" value={taxDate} onChange={e => setTaxDate(e.target.value)}
+                  style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none', colorScheme: 'light', boxSizing: 'border-box' }} />
               </div>
-              {['수주', '매출완료'].includes(editStatus) && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: GRAY, marginBottom: 5 }}>수주 확정일</div>
-                  <input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none', colorScheme: 'light' }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setTaxQuote(null); setTaxDate('') }} disabled={taxSending}
+                  style={{ flex: 1, padding: 9, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>취소</button>
+                <button onClick={handleTaxRequest} disabled={taxSending}
+                  style={{ flex: 1, padding: 9, background: '#b45309', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, opacity: taxSending ? 0.6 : 1 }}>
+                  {taxSending ? '요청 중...' : '발행 요청'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {editQuote && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: 360, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 4 }}>취소 / 실패 처리</div>
+              <div style={{ fontSize: 12, color: GRAY, marginBottom: 16 }}>{editQuote.quote_number} · {editQuote.customers?.company_name || ''}</div>
+
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {(['취소요청', '실패'] as const).map(s => (
+                  <button key={s} onClick={() => setEditStatus(s)}
+                    style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: `1.5px solid ${editStatus === s ? STATUS_COLORS[s] : BORDER}`, cursor: 'pointer', fontWeight: 700, fontSize: 13, background: editStatus === s ? STATUS_COLORS[s] + '14' : '#f9fafb', color: editStatus === s ? STATUS_COLORS[s] : GRAY, transition: 'all 0.12s' }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 5, fontWeight: 600 }}>
+                  {editStatus === '취소요청' ? '취소 사유' : '실패 사유'}
                 </div>
-              )}
-              {editStatus === '매출완료' && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: GRAY, marginBottom: 5 }}>매출 인식일</div>
-                  <input type="date" value={editRevenueDate} onChange={e => setEditRevenueDate(e.target.value)} style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none', colorScheme: 'light' }} />
-                </div>
-              )}
-              {editStatus === '실패' && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: GRAY, marginBottom: 5 }}>실패 사유</div>
-                  <select value={editFailReason} onChange={e => setEditFailReason(e.target.value)} style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none' }}>
-                    <option value="">선택</option>
-                    {['가격', '경쟁사', '예산동결', '일정연기', '기타'].map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button onClick={() => setEditQuote(null)} style={{ flex: 1, padding: '9px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>취소</button>
-                <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: '9px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-                  {saving ? '저장 중...' : '저장'}
+                <textarea value={editFailReason} onChange={e => setEditFailReason(e.target.value)} rows={3}
+                  placeholder={editStatus === '취소요청' ? '취소 요청 사유를 입력하세요' : '실패 사유를 입력하세요'}
+                  style={{ width: '100%', padding: '8px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none', resize: 'vertical', lineHeight: 1.5, boxSizing: 'border-box' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <button onClick={() => setEditQuote(null)} style={{ flex: 1, padding: '9px', background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>닫기</button>
+                <button onClick={handleSave} disabled={saving}
+                  style={{ flex: 1, padding: '9px', background: STATUS_COLORS[editStatus] || BLUE, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
+                  {saving ? '처리 중...' : `${editStatus} 확정`}
                 </button>
               </div>
             </div>
@@ -728,16 +921,25 @@ export default function SalesPage() {
 
   const fetchAll = async () => {
     setLoading(true)
+    await fetch('/api/auto-fail', { method: 'POST' }).catch(() => {})
     const { data: userData } = await supabase.auth.getUser()
-    const [{ data: qData }, { data: eData }, { data: tData }, { data: meData }] = await Promise.all([
+    const [{ data: qData }, { data: eData }, { data: tData }, { data: meData }, { data: custData }] = await Promise.all([
       supabase.from('quotes')
-        .select('*, engineers(name, position), customers(company_name), quote_items(product_name, price_list(model_jp))')
+        .select('*, engineers(name, position), quote_items(product_name, price_list(model_jp))')
         .order('quote_date', { ascending: false }).order('quote_number', { ascending: false }),
       supabase.from('engineers').select('engineer_id, name, position, teams, permission_level').order('engineer_id'),
       supabase.from('sales_targets').select('*'),
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
+      supabase.from('customers').select('customer_id, company_name'),
     ])
-    setQuotes((qData as Quote[]) || [])
+    const custMap: Record<number, string> = {}
+    for (const c of custData || []) custMap[c.customer_id] = c.company_name
+    const merged = (qData || []).map((q: any) => ({
+      ...q,
+      customers: q.customer_id ? { company_name: custMap[q.customer_id] ?? null } : null,
+      dealer: q.dealer_id ? { company_name: custMap[q.dealer_id] ?? null } : null,
+    }))
+    setQuotes(merged as Quote[])
     setEngineers(eData || [])
     setTargets(tData || [])
     setCurrentEngineer(meData || null)

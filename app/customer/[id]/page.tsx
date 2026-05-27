@@ -313,6 +313,15 @@ export default function CustomerDetailPage() {
   // ── 장비 사진 업로드 ──
   const handleUploadDeviceImage = async (file: File) => {
     if (!selectedImageDevice) return
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert('JPG, PNG, WEBP, GIF 형식의 이미지만 업로드 가능합니다.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('파일 크기는 10MB 이하여야 합니다.')
+      return
+    }
     setIsSavingDeviceImage(true)
     try {
       const fileExt = file.name.split('.').pop()

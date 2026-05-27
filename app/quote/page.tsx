@@ -29,6 +29,8 @@ type PriceItem = {
   model_en: string | null
   price_jpy: number | null
   cost_jpy: number | null
+  delivery_time: string | null
+  stock_quantity: number | null
 }
 
 type CustomerResult = {
@@ -387,13 +389,21 @@ export default function QuotePage() {
   const [company, setCompany] = useState('')
   const [receiver, setReceiver] = useState('')
   const [titleItem, setTitleItem] = useState('')
-  const [remarks, setRemarks] = useState('* 납기 : \n* E.U  : \n* 발주 진행 시 팩스 또는 메일로 발주서 회신 요망\n   (FAX : 031-786-4090)')
+  const [remarks, setRemarks] = useState('* 발주 진행 시 팩스 또는 메일로 발주서 회신 요망\n   (FAX : 031-786-4090)')
+  const [delivery, setDelivery] = useState('')
+  const [isDealer, setIsDealer] = useState(false)
 
   const [customerId, setCustomerId] = useState<number | null>(null)
   const [customerQuery, setCustomerQuery] = useState('')
   const [customerResults, setCustomerResults] = useState<CustomerResult[]>([])
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null)
+
+  const [euCustomerId, setEuCustomerId] = useState<number | null>(null)
+  const [euQuery, setEuQuery] = useState('')
+  const [euResults, setEuResults] = useState<CustomerResult[]>([])
+  const [euSearchOpen, setEuSearchOpen] = useState(false)
+  const [selectedEU, setSelectedEU] = useState<CustomerResult | null>(null)
 
   const [rows, setRows] = useState<QuoteRow[]>([createRow()])
   const [searchQuery, setSearchQuery] = useState<Record<string, string>>({})
@@ -417,8 +427,16 @@ export default function QuotePage() {
   const debouncedCompany = useDebounce(company || customerQuery, 600)
   const debouncedReceiver = useDebounce(receiver, 600)
   const debouncedTitleItem = useDebounce(titleItem, 600)
-  const debouncedRemarks = useDebounce(remarks, 600)
   const debouncedRows = useDebounce(rows, 600)
+
+  const finalRemarksForPDF = (() => {
+    const parts: string[] = []
+    if (delivery.trim()) parts.push(`* 납기 : 발주 후 ${delivery.trim()}`)
+    if (isDealer && euQuery.trim()) parts.push(`* E.U  : ${euQuery.trim()}`)
+    if (remarks.trim()) parts.push(remarks.trim())
+    return parts.join('\n')
+  })()
+  const debouncedFinalRemarks = useDebounce(finalRemarksForPDF, 600)
 
  useEffect(() => {
     if (!engineer) return
@@ -473,6 +491,30 @@ export default function QuotePage() {
     setCompany('')
   }
 
+  const handleEUSearch = async (q: string) => {
+    setEuQuery(q)
+    if (!q.trim()) { setEuResults([]); return }
+    const { data } = await supabase
+      .from('customers').select('customer_id, company_name, address, status')
+      .ilike('company_name', `%${q}%`).limit(10)
+    setEuResults(data || [])
+    setEuSearchOpen(true)
+  }
+
+  const handleEUSelect = (c: CustomerResult) => {
+    setSelectedEU(c)
+    setEuCustomerId(c.customer_id)
+    setEuQuery(c.company_name)
+    setEuSearchOpen(false)
+    setEuResults([])
+  }
+
+  const handleEUClear = () => {
+    setSelectedEU(null)
+    setEuCustomerId(null)
+    setEuQuery('')
+  }
+
 const handleDownloadPDF = async (
     overrideCompany?: string,
     overrideReceiver?: string,
@@ -485,7 +527,7 @@ const handleDownloadPDF = async (
     const finalReceiver = overrideReceiver ?? receiver
     const finalTitleItem = overrideTitleItem ?? titleItem
     const finalRows = overrideRows ?? rows
-    const finalRemarks = overrideRemarks ?? remarks
+    const finalRemarks = overrideRemarks ?? finalRemarksForPDF
     const finalQuoteNo = overrideQuoteNo ?? quoteNo
 
     const firstItem = finalRows.find(r => r.supply_price > 0)
@@ -554,7 +596,9 @@ const handleDownloadPDF = async (
       const { data: quoteData, error: quoteError } = await supabase
         .from('quotes').insert({
           quote_number: quoteNo,
-          customer_id: customerId,
+          customer_id: isDealer ? euCustomerId : customerId,
+          dealer_id: isDealer ? customerId : null,
+          delivery_info: delivery.trim() || null,
           engineer_id: engineer.engineer_id,
           quote_date: `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`,
           total_supply: totalSupply,
@@ -566,10 +610,8 @@ const handleDownloadPDF = async (
           status: '견적중',
           recipient: receiver,
           subject: titleItem,
-          note: remarks,
-          pdf_url: (() => {
-         return `quote-pdfs/${quoteNo}.pdf`
-          })(),
+          note: finalRemarksForPDF,
+          pdf_url: `quote-pdfs/${quoteNo}.pdf`,
         }).select().single()
 
       if (quoteError) throw quoteError
@@ -650,6 +692,9 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
     setRows(prev => prev.map(r => r.id !== rowId ? r : calcRow({ ...r, selectedItem: item }, exchangeRate)))
     setSearchOpen(prev => ({ ...prev, [rowId]: false }))
     setSearchQuery(prev => ({ ...prev, [rowId]: item.model_jp || item.item_code }))
+    if (item.delivery_time && delivery === '') {
+      setDelivery(item.delivery_time + '주')
+    }
   }
 
   const updateRow = (rowId: string, field: keyof QuoteRow, value: any) =>
@@ -698,6 +743,7 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
               <span style={{ fontWeight: 800, fontSize: 13, color: '#111113', letterSpacing: '-0.2px' }}>기본 정보</span>
             </div>
 
+            {/* 사명 + 대리점 체크박스 */}
             <div style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>사명</span>
@@ -730,17 +776,76 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                     </div>
                   )}
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={isDealer}
+                    onChange={e => {
+                      setIsDealer(e.target.checked)
+                      if (!e.target.checked) { handleEUClear() }
+                    }}
+                    style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#234ea2' }}
+                  />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isDealer ? '#234ea2' : '#6b7280' }}>대리점</span>
+                </label>
               </div>
               {selectedCustomer && (
-                <div style={{ marginTop: 4, marginLeft: 64, padding: '3px 8px', background: '#eff4ff', borderRadius: 6, fontSize: 11, color: '#234ea2', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ marginTop: 4, marginLeft: 64, padding: '3px 8px', background: isDealer ? '#fff7ed' : '#eff4ff', borderRadius: 6, fontSize: 11, color: isDealer ? '#c2410c' : '#234ea2', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                  {selectedCustomer.company_name} 연결됨
+                  {selectedCustomer.company_name} {isDealer ? '(대리점)' : '연결됨'}
                 </div>
               )}
               {!selectedCustomer && customerQuery && (
                 <div style={{ marginTop: 2, marginLeft: 64, fontSize: 11, color: '#9ca3af' }}>검색 결과 없으면 그대로 사용됩니다</div>
               )}
             </div>
+
+            {/* E.U 필드 (대리점 체크 시 표시) */}
+            {isDealer && (
+              <div style={{ marginBottom: 8, animation: 'modal-in 0.15s ease' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>E.U</span>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                      className="q-input"
+                      value={euQuery}
+                      onChange={e => handleEUSearch(e.target.value)}
+                      onFocus={() => euResults.length > 0 && setEuSearchOpen(true)}
+                      placeholder="최종 사용 업체 검색 또는 직접 입력"
+                      style={{ ...inp, width: '100%', paddingRight: selectedEU ? 32 : 11, border: euSearchOpen ? '1.5px solid #c2410c' : '1.5px solid #fed7aa' }}
+                    />
+                    {selectedEU && (
+                      <button onClick={handleEUClear}
+                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex', alignItems: 'center' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    )}
+                    {euSearchOpen && euResults.length > 0 && (
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 1000, background: '#fff', border: '1.5px solid #c2410c', borderRadius: 10, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px rgba(194,65,12,0.12)' }}>
+                        {euResults.map(c => (
+                          <div key={c.customer_id} onClick={() => handleEUSelect(c)}
+                            style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: 12, transition: 'background 0.12s ease' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = '#fff7ed')}
+                            onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                            <div style={{ fontWeight: 700, color: '#c2410c' }}>{c.company_name}</div>
+                            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{c.address ?? ''}{c.status ? ` · ${c.status}` : ''}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {selectedEU && (
+                  <div style={{ marginTop: 4, marginLeft: 64, padding: '3px 8px', background: '#fff7ed', borderRadius: 6, fontSize: 11, color: '#c2410c', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    {selectedEU.company_name} 연결됨 (거래이력 연동)
+                  </div>
+                )}
+                {!selectedEU && euQuery && (
+                  <div style={{ marginTop: 2, marginLeft: 64, fontSize: 11, color: '#9ca3af' }}>검색 결과 없으면 그대로 사용됩니다</div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>수신인</span>
@@ -750,6 +855,17 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>견적 내용</span>
               <input className="q-input" value={titleItem} onChange={e => setTitleItem(e.target.value)} placeholder="예: 측정기 부품 견적의 건" style={{ ...inp, flex: 1 }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap', width: 56, flexShrink: 0 }}>납기</span>
+              <input
+                className="q-input"
+                value={delivery}
+                onChange={e => setDelivery(e.target.value)}
+                placeholder="품목 선택 후 납기 정보가 없을 시 입력"
+                style={{ ...inp, flex: 1 }}
+              />
             </div>
 
             <div>
@@ -815,7 +931,21 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                             onMouseEnter={e => (e.currentTarget.style.background = '#f0f4ff')}
                             onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                             <div><span style={{ fontWeight: 700, color: '#234ea2' }}>{item.item_code}</span><span style={{ marginLeft: 6, color: '#374151' }}>{item.item_name_jp}</span><span style={{ marginLeft: 6, color: '#6b7280' }}>({item.model_jp})</span></div>
-                            <div style={{ color: '#9ca3af', marginTop: 2 }}>정가: ¥{item.price_jpy?.toLocaleString()} / 구입가: ¥{item.cost_jpy?.toLocaleString()}</div>
+                            <div style={{ color: '#9ca3af', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span>정가: ¥{item.price_jpy?.toLocaleString()} / 구입가: ¥{item.cost_jpy?.toLocaleString()}</span>
+                              {(item.stock_quantity != null || item.delivery_time != null) && (
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
+                                  ...(item.stock_quantity && item.stock_quantity > 0
+                                    ? { background: '#dcfce7', color: '#15803d' }
+                                    : { background: '#fef9c3', color: '#854d0e' })
+                                }}>
+                                  {item.stock_quantity && item.stock_quantity > 0
+                                    ? `재고 ${item.stock_quantity}개`
+                                    : `발주 후 ${item.delivery_time ?? '-'}주`}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -968,7 +1098,7 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                   dateDisplay={dateDisplay}
                   titleItem={debouncedTitleItem}
                   rows={debouncedRows}
-                  remarks={debouncedRemarks}
+                  remarks={debouncedFinalRemarks}
                   engineerName={engineerName}
                   totalSupply={pdfTotalSupply}
                   totalTax={pdfTotalTax}
@@ -1020,7 +1150,7 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                 const snapshotReceiver = receiver
                 const snapshotTitleItem = titleItem
                 const snapshotRows = [...rows]
-                const snapshotRemarks = remarks
+                const snapshotRemarks = finalRemarksForPDF
                 const snapshotQuoteNo = quoteNo
                 await handleSaveQuote()
                 await handleDownloadPDF(snapshotCompany, snapshotReceiver, snapshotTitleItem, snapshotRows, snapshotRemarks, snapshotQuoteNo)

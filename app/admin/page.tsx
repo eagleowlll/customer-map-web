@@ -22,6 +22,7 @@ type Quote = {
   status: string
   subject: string | null
   pdf_url?: string | null
+  customer_id?: number | null
   engineers?: { name: string } | null
   customers?: { company_name: string } | null
 }
@@ -125,14 +126,7 @@ export default function AdminPage() {
         .eq('email', data.user.email)
         .single()
 
-     const params = new URLSearchParams(window.location.search)
-      const backdoorKey = params.get('key')
-      const BACKDOOR = 'acctU1024' // 원하는 비밀 코드로 바꾸세요
-
-      if (engData && (
-        ['superadmin', 'manager'].includes(engData.permission_level) ||
-        backdoorKey === BACKDOOR
-      )) {
+      if (engData && ['superadmin', 'manager'].includes(engData.permission_level)) {
         setCurrentEngineer(engData)
         setAuthorized(true)
       } else {
@@ -159,10 +153,21 @@ export default function AdminPage() {
   // ── 견적서 ──────────────────────────────────────────────────────────────────
   const fetchQuotes = async (q?: string) => {
     setQuoteLoading(true)
-    let query = supabase.from('quotes').select('*, engineers(name), customers(company_name)').order('quote_date', { ascending: false }).limit(50)
+    let query = supabase.from('quotes').select('*, engineers(name)').order('quote_date', { ascending: false }).limit(50)
     if (q && q.trim()) query = query.or(`quote_number.ilike.%${q}%,subject.ilike.%${q}%`)
-    const { data } = await query
-    setQuotes((data as Quote[]) || [])
+    const { data: qData } = await query
+    const rows = (qData || []) as Quote[]
+    const customerIds = [...new Set(rows.map(r => r.customer_id).filter((id): id is number => id != null))]
+    const { data: custData } = customerIds.length > 0
+      ? await supabase.from('customers').select('customer_id, company_name').in('customer_id', customerIds)
+      : { data: [] }
+    const custMap: Record<number, string> = {}
+    for (const c of custData || []) custMap[c.customer_id] = c.company_name
+    const merged = rows.map(r => ({
+      ...r,
+      customers: r.customer_id ? { company_name: custMap[r.customer_id] ?? null } : null,
+    }))
+    setQuotes(merged)
     setQuoteLoading(false)
   }
 
@@ -256,6 +261,12 @@ export default function AdminPage() {
           initials: addForm.initials.trim().toUpperCase(),
         }),
       })
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({ error: `서버 오류 (${res.status})` }))
+        alert(`오류: ${result.error ?? '알 수 없는 오류'}`)
+        setAddLoading(false)
+        return
+      }
       const result = await res.json()
       if (result.error) { alert(`오류: ${result.error}`); setAddLoading(false); return }
       alert(`✅ ${addForm.name} 직원이 등록되었습니다!`)
@@ -300,6 +311,12 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ engineer_id: deleteEngineer.engineer_id, email: deleteEngineer.email }),
       })
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({ error: `서버 오류 (${res.status})` }))
+        alert(`오류: ${result.error ?? '알 수 없는 오류'}`)
+        setDeleteLoading(false)
+        return
+      }
       const result = await res.json()
       if (result.error) { alert(`오류: ${result.error}`); setDeleteLoading(false); return }
       alert(`${deleteEngineer.name} 직원이 삭제되었습니다.`)
