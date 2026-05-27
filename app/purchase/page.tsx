@@ -87,7 +87,7 @@ export default function PurchasePage() {
     const [{ data: meData }, { data: qData }, { data: custData }] = await Promise.all([
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
       supabase.from('quotes')
-        .select('quote_id, quote_number, quote_date, total_supply, status, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, delivery_info, subject, engineer_id, customer_id, engineers(name)')
+        .select('quote_id, quote_number, quote_date, total_supply, status, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, delivery_info, delivery_method, subject, engineer_id, customer_id, engineers(name)')
         .in('status', ['발주(주문 대기)', '주문완료', '세금계산서 요청', '매출완료'])
         .order('purchase_order_at', { ascending: false }),
       supabase.from('customers').select('customer_id, company_name'),
@@ -170,16 +170,10 @@ export default function PurchasePage() {
     <div style={{ background: PAGE_BG, minHeight: '100vh', padding: '24px 28px', fontFamily: 'Malgun Gothic, sans-serif' }}>
       <div style={{ maxWidth: 1600, margin: '0 auto' }}>
 
-        {/* 헤더 */}
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: TEXT, margin: 0, marginBottom: 4 }}>발주 관리</h1>
-          <p style={{ fontSize: 13, color: GRAY, margin: 0 }}>발주서 접수 및 주문 처리 현황</p>
-        </div>
-
         {/* 현황 카드 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
           {([
-            { label: '발주 대기', key: '발주(주문 대기)', color: '#7c3aed', bg: '#f5f3ff' },
+            { label: '주문 대기', key: '발주(주문 대기)', color: '#7c3aed', bg: '#f5f3ff' },
             { label: '주문 완료', key: '주문완료', color: '#0369a1', bg: '#eff6ff' },
             { label: '세금계산서 요청', key: '세금계산서 요청', color: '#b45309', bg: '#fffbeb' },
             { label: '매출 완료', key: '매출완료', color: GREEN, bg: '#f0fdf4' },

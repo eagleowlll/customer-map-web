@@ -47,15 +47,18 @@ export async function POST(req: Request) {
       delivery_method: deliveryMethod || null,
     }).eq('quote_id', Number(quoteId))
 
-    // 영업관리팀 알림
-    const { data: managers } = await supabaseAdmin
+    // 영업관리팀 + superadmin 알림
+    const { data: allEng } = await supabaseAdmin
       .from('engineers')
-      .select('engineer_id')
-      .eq('teams', '영업관리')
+      .select('engineer_id, teams, permission_level')
 
-    if (managers && managers.length > 0) {
+    const targets = (allEng || []).filter((e: { engineer_id: number; teams: string | null; permission_level: string }) =>
+      e.teams === '영업관리' || e.permission_level === 'superadmin'
+    )
+
+    if (targets.length > 0) {
       await supabaseAdmin.from('notifications').insert(
-        managers.map((m: { engineer_id: number }) => ({
+        targets.map((m: { engineer_id: number }) => ({
           engineer_id: m.engineer_id,
           title: '📦 발주서 등록',
           message: `${sender?.name || user.email}이(가) 발주서를 등록했습니다. [${quoteNumber}]`,
@@ -110,10 +113,13 @@ export async function POST(req: Request) {
       tax_invoice_requested_at: new Date().toISOString(),
     }).eq('quote_id', Number(quoteId))
 
-    const { data: managers } = await supabaseAdmin
+    const { data: taxAllEng } = await supabaseAdmin
       .from('engineers')
-      .select('engineer_id')
-      .eq('teams', '영업관리')
+      .select('engineer_id, teams, permission_level')
+
+    const taxTargets = (taxAllEng || []).filter((e: { engineer_id: number; teams: string | null; permission_level: string }) =>
+      e.teams === '영업관리' || e.permission_level === 'superadmin'
+    )
 
     const { data: quote } = await supabaseAdmin
       .from('quotes')
@@ -121,9 +127,9 @@ export async function POST(req: Request) {
       .eq('quote_id', Number(quoteId))
       .single()
 
-    if (managers && managers.length > 0) {
+    if (taxTargets.length > 0) {
       await supabaseAdmin.from('notifications').insert(
-        managers.map((m: { engineer_id: number }) => ({
+        taxTargets.map((m: { engineer_id: number }) => ({
           engineer_id: m.engineer_id,
           title: '🧾 세금계산서 발행 요청',
           message: `${sender?.name || user.email}이(가) 세금계산서 발행을 요청했습니다. [${quote?.quote_number}]${taxDate ? ` 요청일: ${taxDate}` : ''}`,

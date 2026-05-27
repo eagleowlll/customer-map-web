@@ -667,7 +667,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
               <thead style={{ position: 'sticky', top: 0, background: CARD_BG, zIndex: 1 }}>
                 <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
                   {['견적번호', '날짜', '대리점', '고객사', '품목', '매출액', '순이익', '상태', '관리'].map(h => (
-                    <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap', background: '#f8fafc' }}>{h}</th>
+                    <th key={h} style={{ padding: '8px 10px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap', background: '#f8fafc' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -685,7 +685,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                     <tr key={q.quote_id} style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.12s ease' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap', textAlign: 'center' }}>
                         <span
                           onClick={async () => {
                             if (!q.pdf_url) return
@@ -704,20 +704,20 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                           {q.pdf_url && <span style={{ marginLeft: 4, fontSize: 9, color: MUTED }}>PDF</span>}
                         </span>
                       </td>
-                      <td style={{ padding: '8px 10px', color: MUTED, whiteSpace: 'nowrap', fontSize: 11 }}>{q.quote_date}</td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 10px', color: MUTED, whiteSpace: 'nowrap', fontSize: 11, textAlign: 'center' }}>{q.quote_date}</td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {q.dealer?.company_name
                           ? <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fff7ed', color: '#c2410c', fontWeight: 700, border: '1px solid #fed7aa' }}>{q.dealer.company_name}</span>
                           : <span style={{ fontSize: 11, color: MUTED }}>직판</span>}
                       </td>
-                      <td style={{ padding: '8px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis' }}>{q.customers?.company_name || '-'}</td>
-                      <td style={{ padding: '8px 10px', color: GRAY, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{itemNames}</td>
-                      <td style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', color: TEXT }}>₩{numKR(q.total_supply)}</td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '8px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{q.customers?.company_name || '-'}</td>
+                      <td style={{ padding: '8px 10px', color: GRAY, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{itemNames}</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', color: TEXT, textAlign: 'center' }}>₩{numKR(q.total_supply)}</td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {hasProfit ? <span style={{ fontWeight: 700, color: profitColor, fontSize: 11 }}>₩{numKR(q.total_profit!)}<span style={{ color: profitRateColor, marginLeft: 4 }}>{q.profit_rate?.toFixed(0)}%</span></span> : <span style={{ color: BORDER }}>—</span>}
                       </td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
                           <span style={{ padding: '3px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY, whiteSpace: 'nowrap' }}>{q.status}</span>
                           {showOrderInfo && (q.shipping_date || q.order_memo) && (
                             <div style={{ position: 'relative' }}
@@ -737,8 +737,8 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
                           {q.status === '견적중' && (
                             <button onClick={() => { setPoQuote(q); setPoFile(null) }}
                               style={{ padding: '3px 7px', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>
