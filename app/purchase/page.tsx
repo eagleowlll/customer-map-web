@@ -32,15 +32,17 @@ type PurchaseQuote = {
   shipping_date: string | null
   order_memo: string | null
   order_completed_at: string | null
+  order_completed_by: string | null
   tax_invoice_date: string | null
   tax_invoice_requested_at: string | null
   tax_invoice_completed_at: string | null
+  tax_completed_by: string | null
   delivery_info: string | null
   delivery_method: string | null
   subject: string | null
   engineer_id: number
   customer_id: number | null
-  engineers?: { name: string } | null
+  engineers?: { name: string; position: string | null } | null
 }
 
 type Engineer = {
@@ -65,6 +67,7 @@ export default function PurchasePage() {
   const supabase = createClient()
   const [quotes, setQuotes] = useState<PurchaseQuote[]>([])
   const [custMap, setCustMap] = useState<Record<number, string>>({})
+  const [engMap, setEngMap] = useState<Record<string, string>>({})
   const [me, setMe] = useState<Engineer | null>(null)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('전체')
@@ -84,19 +87,28 @@ export default function PurchasePage() {
   // 배송 주소 팝업
   const [addressPopupId, setAddressPopupId] = useState<number | null>(null)
   const [copiedId, setCopiedId] = useState<number | null>(null)
+  // 출하일정/메모 편집 모달
+  const [editScheduleModal, setEditScheduleModal] = useState<PurchaseQuote | null>(null)
+  const [editShippingDate, setEditShippingDate] = useState('')
+  const [editOrderMemo, setEditOrderMemo] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   const fetchAll = async () => {
     setLoading(true)
     const { data: userData } = await supabase.auth.getUser()
-    const [{ data: meData }, { data: qData }, { data: custData }] = await Promise.all([
+    const [{ data: meData }, { data: qData }, { data: custData }, { data: engData }] = await Promise.all([
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
       supabase.from('quotes')
-        .select('quote_id, quote_number, quote_date, total_supply, status, pdf_url, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, delivery_info, delivery_method, subject, engineer_id, customer_id, engineers(name)')
+        .select('quote_id, quote_number, quote_date, total_supply, status, pdf_url, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, order_completed_by, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, tax_completed_by, delivery_info, delivery_method, subject, engineer_id, customer_id, engineers(name, position)')
         .in('status', ['발주(주문 대기)', '주문완료', '세금계산서 요청', '매출완료'])
         .order('purchase_order_at', { ascending: false }),
       supabase.from('customers').select('customer_id, company_name'),
+      supabase.from('engineers').select('name, position'),
     ])
     setMe(meData || null)
+    const em: Record<string, string> = {}
+    for (const e of engData || []) if (e.name && e.position) em[e.name] = e.position
+    setEngMap(em)
     const cm: Record<number, string> = {}
     for (const c of custData || []) cm[c.customer_id] = c.company_name
     setCustMap(cm)
@@ -129,7 +141,7 @@ export default function PurchasePage() {
     if (!s) return ''
     const d = new Date(s)
     const yy = String(d.getFullYear()).slice(2)
-    return `발행 일자 : ${yy}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
+    return `희망 발행일 : ${yy}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
   }
 
   const handleViewQuotePDF = async (q: PurchaseQuote) => {
@@ -174,6 +186,20 @@ export default function PurchasePage() {
     await fetch('/api/purchase-order', { method: 'POST', body: fd })
     setTaxProcessing(false)
     setTaxModal(null)
+    await fetchAll()
+  }
+
+  const handleEditSchedule = async () => {
+    if (!editScheduleModal) return
+    setEditSaving(true)
+    const fd = new FormData()
+    fd.append('quoteId', String(editScheduleModal.quote_id))
+    fd.append('action', 'update_schedule')
+    fd.append('shippingDate', editShippingDate)
+    fd.append('orderMemo', editOrderMemo)
+    await fetch('/api/purchase-order', { method: 'POST', body: fd })
+    setEditSaving(false)
+    setEditScheduleModal(null)
     await fetchAll()
   }
 
@@ -232,15 +258,17 @@ export default function PurchasePage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: `1px solid ${BORDER}` }}>
-                  {['견적서(견적번호)', '고객사', '담당자', '배송', '공급가액', '발주일', '출하예정', '메모', '상태', '발주서', '처리'].map(h => (
-                    <th key={h} style={{ padding: '9px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{h}</th>
+                  {['견적서(견적번호)', '고객사', '담당자', '배송', '공급가액', '발주일', '출하예정', '메모', '상태', '발주서'].map(h => (
+                    <th key={h} style={{ padding: '9px 10px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
+                  <th style={{ padding: '9px 10px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>처리</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(q => {
                   const company = custMap[q.customer_id ?? 0] ?? '-'
-                  const engName = (q.engineers as any)?.name ?? '-'
+                  const eng = q.engineers as any
+                  const engName = eng ? [eng.name, eng.position].filter(Boolean).join(' ') : '-'
                   const sc = STATUS_COLORS[q.status] || GRAY
                   const isParcel = q.delivery_method === '택배발송'
                   return (
@@ -248,7 +276,7 @@ export default function PurchasePage() {
                       style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.1s' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '9px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap', textAlign: 'center' }}>
                         <span
                           onClick={() => handleViewQuotePDF(q)}
                           style={{ cursor: q.pdf_url ? 'pointer' : 'default', textDecoration: q.pdf_url ? 'underline' : 'none', textUnderlineOffset: 2 }}>
@@ -256,25 +284,38 @@ export default function PurchasePage() {
                           {q.pdf_url && <span style={{ marginLeft: 4, fontSize: 9, color: MUTED }}>PDF</span>}
                         </span>
                       </td>
-                      <td style={{ padding: '9px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{company}</td>
-                      <td style={{ padding: '9px 10px', color: GRAY, whiteSpace: 'nowrap' }}>{engName}</td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{company}</td>
+                      <td style={{ padding: '9px 10px', color: GRAY, whiteSpace: 'nowrap', textAlign: 'center' }}>{engName}</td>
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {q.delivery_method ? (
                           <div style={{ position: 'relative', display: 'inline-block' }}>
                             <span
                               onClick={() => isParcel && q.delivery_info ? setAddressPopupId(addressPopupId === q.quote_id ? null : q.quote_id) : undefined}
-                              style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 700, background: isParcel ? '#eff6ff' : '#f0fdf4', color: isParcel ? '#1d4ed8' : '#15803d', border: `1px solid ${isParcel ? '#bfdbfe' : '#bbf7d0'}`, cursor: isParcel && q.delivery_info ? 'pointer' : 'default', userSelect: 'none' }}>
-                              {q.delivery_method}{isParcel && q.delivery_info ? ' 📋' : ''}
+                              style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 700, background: isParcel ? '#eff6ff' : '#f0fdf4', color: isParcel ? '#3b82f6' : '#16a34a', border: `1px solid ${isParcel ? '#dbeafe' : '#dcfce7'}`, cursor: isParcel && q.delivery_info ? 'pointer' : 'default', userSelect: 'none' }}>
+                              {q.delivery_method}
                             </span>
                             {addressPopupId === q.quote_id && q.delivery_info && (
                               <>
                                 <div onClick={() => setAddressPopupId(null)} style={{ position: 'fixed', inset: 0, zIndex: 9990 }} />
                                 <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 9991, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 14px', minWidth: 240, maxWidth: 320, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                                  <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 6 }}>배송 주소</div>
-                                  <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, wordBreak: 'break-all', marginBottom: 10 }}>{q.delivery_info}</div>
+                                  <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 8 }}>배송 정보</div>
+                                  <div style={{ marginBottom: 10 }}>
+                                    {q.delivery_info!.split('\n').map((line, i) => {
+                                      const [key, ...rest] = line.split(': ')
+                                      const val = rest.join(': ')
+                                      return (
+                                        <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4, fontSize: 12, lineHeight: 1.5 }}>
+                                          <span style={{ color: MUTED, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>{key}</span>
+                                          <span style={{ color: TEXT, wordBreak: 'break-all' }}>{val}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
                                   <button
                                     onClick={() => {
-                                      navigator.clipboard.writeText(q.delivery_info!)
+                                      const addressLine = q.delivery_info!.split('\n').find(l => l.startsWith('주소: '))
+                                      const addressOnly = addressLine ? addressLine.replace('주소: ', '') : q.delivery_info!
+                                      navigator.clipboard.writeText(addressOnly)
                                       setCopiedId(q.quote_id)
                                       setTimeout(() => setCopiedId(null), 1500)
                                     }}
@@ -287,14 +328,14 @@ export default function PurchasePage() {
                           </div>
                         ) : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
                       </td>
-                      <td style={{ padding: '9px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>
-                      <td style={{ padding: '9px 10px', color: MUTED, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtShort(q.purchase_order_at?.slice(0, 10) ?? null)}</td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 10px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center' }}>₩{numKR(q.total_supply)}</td>
+                      <td style={{ padding: '9px 10px', color: TEXT, fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap', textAlign: 'center' }}>{fmtShort(q.purchase_order_at?.slice(0, 10) ?? null)}</td>
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {q.shipping_date
-                          ? <span style={{ color: BLUE, fontWeight: 700, fontSize: 11 }}>{fmtShort(q.shipping_date)}</span>
-                          : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
+                          ? <span style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 12 }}>{fmtShort(q.shipping_date)}</span>
+                          : <span style={{ color: MUTED, fontSize: 12 }}>-</span>}
                       </td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {q.order_memo ? (
                           <div style={{ position: 'relative', display: 'inline-block' }}
                             onMouseEnter={() => setHoveredMemoId(q.quote_id)}
@@ -309,32 +350,47 @@ export default function PurchasePage() {
                           </div>
                         ) : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
                       </td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
                           <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: sc + '18', color: sc, whiteSpace: 'nowrap' }}>
                             {q.status === '세금계산서 요청' ? '세금계산서 발행 요청' : q.status}
                           </span>
                           {q.status === '세금계산서 요청' && q.tax_invoice_date && (
                             <span style={{ fontSize: 10, color: '#b45309', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtTaxDate(q.tax_invoice_date)}</span>
                           )}
+                          {q.status === '주문완료' && q.order_completed_by && (
+                            <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>
+                              처리 <span style={{ color: '#0369a1', fontWeight: 700 }}>
+                                {q.order_completed_by.includes(' ') ? q.order_completed_by : [q.order_completed_by, engMap[q.order_completed_by]].filter(Boolean).join(' ')}
+                              </span>
+                            </span>
+                          )}
+                          {q.status === '매출완료' && q.tax_completed_by && (
+                            <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap' }}>
+                              처리 <span style={{ color: GREEN, fontWeight: 700 }}>
+                                {q.tax_completed_by.includes(' ') ? q.tax_completed_by : [q.tax_completed_by, engMap[q.tax_completed_by]].filter(Boolean).join(' ')}
+                              </span>
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         {q.purchase_order_url ? (
                           <button onClick={() => handleViewPO(q)}
-                            style={{ padding: '4px 9px', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#7c3aed' }}>
+                            style={{ padding: '4px 9px', background: '#f3f4f6', border: `1px solid ${BORDER}`, borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: TEXT }}>
                             PDF
                           </button>
                         ) : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
                       </td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
-                        {q.status === '발주(주문 대기)' && (
-                          <button
-                            onClick={() => { setOrderModal(q); setShippingDate(q.shipping_date || ''); setOrderMemo(q.order_memo || '') }}
-                            style={{ padding: '4px 10px', background: BLUE, border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                            주문완료 처리
-                          </button>
-                        )}
+                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap', position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', paddingRight: 28 }}>
+                          {q.status === '발주(주문 대기)' && (
+                            <button
+                              onClick={() => { setOrderModal(q); setShippingDate(q.shipping_date || ''); setOrderMemo(q.order_memo || '') }}
+                              style={{ padding: '4px 10px', background: '#7c3aed', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                              주문완료 처리
+                            </button>
+                          )}
                           {q.status === '세금계산서 요청' && (
                             <button
                               onClick={() => setTaxModal(q)}
@@ -343,9 +399,17 @@ export default function PurchasePage() {
                             </button>
                           )}
                           {(q.status === '주문완료' || q.status === '매출완료') && (
-                            <span style={{ fontSize: 11, color: MUTED }}>처리완료</span>
+                            <span style={{ fontSize: 10, color: MUTED, padding: '3px 8px', borderRadius: 6, border: `1px solid ${BORDER}`, fontWeight: 600 }}>처리완료</span>
                           )}
-                        </td>
+                        </div>
+                        <button
+                          onClick={() => { setEditScheduleModal(q); setEditShippingDate(q.shipping_date || ''); setEditOrderMemo(q.order_memo || '') }}
+                          style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, color: MUTED }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.color = GRAY }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = MUTED }}>
+                          ⋮
+                        </button>
+                      </td>
                       </tr>
                     )
                   })}
@@ -414,6 +478,37 @@ export default function PurchasePage() {
               <button onClick={handleCompleteTax} disabled={taxProcessing}
                 style={{ flex: 1, padding: 10, background: GREEN, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, opacity: taxProcessing ? 0.7 : 1 }}>
                 {taxProcessing ? '처리 중...' : '발행완료 확정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 출하일정/메모 편집 모달 */}
+      {editScheduleModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 400, padding: 28, boxShadow: '0 12px 48px rgba(0,0,0,0.25)' }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: TEXT, marginBottom: 4 }}>일정/메모 수정</div>
+            <div style={{ fontSize: 12, color: GRAY, marginBottom: 20 }}>{editScheduleModal.quote_number} · {custMap[editScheduleModal.customer_id ?? 0] ?? '-'}</div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: GRAY, marginBottom: 5, fontWeight: 600 }}>출하 예정일</div>
+              <input type="date" value={editShippingDate} onChange={e => setEditShippingDate(e.target.value)}
+                style={{ ...inp, colorScheme: 'light' }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, color: GRAY, marginBottom: 5, fontWeight: 600 }}>메모</div>
+              <textarea value={editOrderMemo} onChange={e => setEditOrderMemo(e.target.value)} rows={3}
+                placeholder="납품 조건, 특이사항 등 메모"
+                style={{ ...inp, resize: 'vertical', lineHeight: 1.5 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEditScheduleModal(null)} disabled={editSaving}
+                style={{ flex: 1, padding: 10, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                취소
+              </button>
+              <button onClick={handleEditSchedule} disabled={editSaving}
+                style={{ flex: 1, padding: 10, background: BLUE, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, opacity: editSaving ? 0.7 : 1 }}>
+                {editSaving ? '저장 중...' : '저장'}
               </button>
             </div>
           </div>

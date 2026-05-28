@@ -22,9 +22,11 @@ export async function POST(req: Request) {
 
   const { data: sender } = await supabaseAdmin
     .from('engineers')
-    .select('engineer_id, name')
+    .select('engineer_id, name, position')
     .eq('email', user.email!)
     .single()
+
+  const senderLabel = sender ? [sender.name, (sender as any).position].filter(Boolean).join(' ') : (user.email ?? '')
 
   // 발주서 업로드
   if (action === 'upload') {
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
         targets.map((m: { engineer_id: number }) => ({
           engineer_id: m.engineer_id,
           title: '📦 발주서 등록',
-          message: `${sender?.name || user.email}이(가) 발주서를 등록했습니다. [${quoteNumber}]`,
+          message: `${senderLabel}이(가) 발주서를 등록했습니다. [${quoteNumber}]`,
           type: 'purchase_order',
           link: '/purchase',
           is_read: false,
@@ -89,6 +91,7 @@ export async function POST(req: Request) {
       shipping_date: shippingDate || null,
       order_memo: orderMemo || null,
       order_completed_at: new Date().toISOString(),
+      order_completed_by: senderLabel,
     }).eq('quote_id', Number(quoteId))
 
     // 견적 발행자에게 알림
@@ -134,7 +137,7 @@ export async function POST(req: Request) {
         taxTargets.map((m: { engineer_id: number }) => ({
           engineer_id: m.engineer_id,
           title: '🧾 세금계산서 발행 요청',
-          message: `${sender?.name || user.email}이(가) 세금계산서 발행을 요청했습니다. [${quote?.quote_number}]${taxDate ? ` 요청일: ${taxDate}` : ''}`,
+          message: `${senderLabel}이(가) 세금계산서 발행을 요청했습니다. [${quote?.quote_number}]${taxDate ? ` 요청일: ${taxDate}` : ''}`,
           type: 'tax_invoice_request',
           link: '/purchase',
           is_read: false,
@@ -155,6 +158,7 @@ export async function POST(req: Request) {
     await supabaseAdmin.from('quotes').update({
       status: '매출완료',
       tax_invoice_completed_at: new Date().toISOString(),
+      tax_completed_by: senderLabel,
     }).eq('quote_id', Number(quoteId))
 
     if (quote?.engineer_id) {
@@ -163,6 +167,38 @@ export async function POST(req: Request) {
         title: '🎉 세금계산서 발행 완료',
         message: `[${quote.quote_number}] 세금계산서가 발행되었습니다. 매출 완료 처리되었습니다.`,
         type: 'tax_invoice_completed',
+        link: '/sales',
+        is_read: false,
+      })
+    }
+    return NextResponse.json({ success: true })
+  }
+
+  // 출하일정/메모 수정
+  if (action === 'update_schedule') {
+    const shippingDate = formData.get('shippingDate') as string | null
+    const orderMemo = formData.get('orderMemo') as string | null
+
+    const { data: quote } = await supabaseAdmin
+      .from('quotes')
+      .select('quote_number, engineer_id')
+      .eq('quote_id', Number(quoteId))
+      .single()
+
+    await supabaseAdmin.from('quotes').update({
+      shipping_date: shippingDate || null,
+      order_memo: orderMemo || null,
+    }).eq('quote_id', Number(quoteId))
+
+    if (quote?.engineer_id) {
+      const parts: string[] = []
+      if (shippingDate) parts.push(`출하 예정: ${shippingDate}`)
+      if (orderMemo) parts.push(`메모: ${orderMemo}`)
+      await supabaseAdmin.from('notifications').insert({
+        engineer_id: quote.engineer_id,
+        title: '📅 출하일정/메모 업데이트',
+        message: `[${quote.quote_number}] ${senderLabel}이(가) 일정/메모를 수정했습니다.${parts.length > 0 ? ' ' + parts.join(' / ') : ''}`,
+        type: 'schedule_updated',
         link: '/sales',
         is_read: false,
       })

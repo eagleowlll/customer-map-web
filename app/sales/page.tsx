@@ -39,8 +39,10 @@ type Quote = {
   shipping_date?: string | null
   order_memo?: string | null
   order_completed_at?: string | null
+  order_completed_by?: string | null
   tax_invoice_date?: string | null
   tax_invoice_requested_at?: string | null
+  tax_completed_by?: string | null
   delivery_method?: string | null
   engineers?: { name: string; position: string | null }
   customers?: { company_name: string } | null
@@ -503,10 +505,11 @@ function TeamCard({ teamId, engineers, filteredQuotes, targets, mode, fy, onCard
 }
 
 // ── 개인 견적 모달 ────────────────────────────────────────────────────────────
-function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onStatusSave }: {
+function EngineerQuoteModal({ engineer, quotes, currentEngineerId, engineers, onClose, onStatusSave }: {
   engineer: Engineer & { quotedAmt: number; revenueAmt: number; profitAmt: number; profitRate: number | null; targetAmt: number; achieve: number | null }
   quotes: Quote[]
   currentEngineerId: number | null
+  engineers: Engineer[]
   onClose: () => void
   onStatusSave: (q: Quote, status: string, orderDate: string, revenueDate: string, failReason: string) => Promise<void>
 })
@@ -526,6 +529,10 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
   const [poFile, setPoFile] = useState<File | null>(null)
   const [poDelivery, setPoDelivery] = useState<'직납' | '택배발송'>('직납')
   const [poAddress, setPoAddress] = useState('')
+  const [poAddressMode, setPoAddressMode] = useState<'company' | 'direct'>('company')
+  const [poCompanyAddress, setPoCompanyAddress] = useState<string | null>(null)
+  const [poContacts, setPoContacts] = useState<{ contact_id: number; name: string; phone: string | null; position: string | null; department: string | null }[]>([])
+  const [poContactId, setPoContactId] = useState<number | ''>('')
   const [poUploading, setPoUploading] = useState(false)
   const [poIsDragging, setPoIsDragging] = useState(false)
   const poFileRef = useRef<HTMLInputElement>(null)
@@ -555,6 +562,19 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     setEditQuote(null)
   }
 
+  useEffect(() => {
+    if (!poQuote?.customer_id) { setPoContacts([]); setPoCompanyAddress(null); return }
+    Promise.all([
+      supabase.from('contacts').select('contact_id, name, phone, position, department').eq('customer_id', poQuote.customer_id).order('contact_id'),
+      supabase.from('customers').select('address').eq('customer_id', poQuote.customer_id).single(),
+    ]).then(([{ data: contacts }, { data: cust }]) => {
+      setPoContacts(contacts ?? [])
+      setPoCompanyAddress(cust?.address ?? null)
+      setPoAddressMode('company')
+      setPoAddress('')
+    })
+  }, [poQuote])
+
   const handlePoUpload = async () => {
     if (!poQuote || !poFile) return
     setPoUploading(true)
@@ -564,7 +584,18 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     fd.append('action', 'upload')
     fd.append('file', poFile)
     fd.append('deliveryMethod', poDelivery)
-    if (poDelivery === '택배발송' && poAddress.trim()) fd.append('deliveryAddress', poAddress.trim())
+    if (poDelivery === '택배발송') {
+      const selectedContact = poContacts.find(c => c.contact_id === poContactId)
+      const finalAddress = poAddressMode === 'company' ? (poCompanyAddress ?? '') : poAddress.trim()
+      const parts: string[] = []
+      if (selectedContact) {
+        const label = [selectedContact.name, selectedContact.position || selectedContact.department].filter(Boolean).join(' ')
+        parts.push(`받는사람: ${label}`)
+        if (selectedContact.phone) parts.push(`연락처: ${selectedContact.phone}`)
+      }
+      if (finalAddress) parts.push(`주소: ${finalAddress}`)
+      if (parts.length > 0) fd.append('deliveryAddress', parts.join('\n'))
+    }
     const res = await fetch('/api/purchase-order', { method: 'POST', body: fd })
     const json = await res.json().catch(() => ({}))
     setPoUploading(false)
@@ -575,6 +606,10 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     setPoQuote(null)
     setPoFile(null)
     setPoAddress('')
+    setPoAddressMode('company')
+    setPoCompanyAddress(null)
+    setPoContactId('')
+    setPoContacts([])
     await onStatusSave(poQuote, '발주(주문 대기)', '', '', '')
   }
 
@@ -727,24 +762,45 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                           </span>
                           {showOrderInfo && (q.shipping_date || q.order_memo) && (
                             <div style={{ position: 'relative' }}
-                              onMouseEnter={() => q.order_memo ? setHoveredMemoId(q.quote_id) : undefined}
+                              onMouseEnter={() => setHoveredMemoId(q.quote_id)}
                               onMouseLeave={() => setHoveredMemoId(null)}>
-                              <span style={{ fontSize: 10, color: '#0369a1', fontWeight: 600, cursor: q.order_memo ? 'help' : 'default', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                {q.shipping_date || '날짜미정'}
+                              <span style={{ fontSize: 10, cursor: 'help', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <span style={{ color: MUTED, fontWeight: 600 }}>출하예정</span>
+                                <span style={{ color: '#0369a1', fontWeight: 700 }}>{q.shipping_date || '미정'}</span>
                                 {q.order_memo && <span style={{ fontSize: 9 }}>📋</span>}
                               </span>
-                              {hoveredMemoId === q.quote_id && q.order_memo && (
-                                <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 9999, background: '#1e293b', color: '#e2e8f0', borderRadius: 9, padding: '8px 12px', fontSize: 11, minWidth: 160, maxWidth: 240, lineHeight: 1.6, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', pointerEvents: 'none' }}>
-                                  <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 3, fontWeight: 700 }}>담당자 메모</div>
-                                  {q.order_memo}
-                                </div>
-                              )}
+                              {hoveredMemoId === q.quote_id && (() => {
+                                const rawProcessor = q.tax_completed_by || q.order_completed_by
+                                const enrichProcessor = (raw: string | null | undefined) => {
+                                  if (!raw) return '-'
+                                  // 이미 직급 포함된 경우 (공백 포함) 그대로 사용
+                                  if (raw.includes(' ')) return raw
+                                  // 이름만 있는 경우 engineers 목록에서 직급 룩업
+                                  const found = engineers.find(e => e.name === raw)
+                                  return found?.position ? `${raw} ${found.position}` : raw
+                                }
+                                const processor = enrichProcessor(rawProcessor)
+                                return (
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: '#1e293b', color: '#e2e8f0', borderRadius: 9, padding: '8px 12px', fontSize: 11, minWidth: 180, maxWidth: 260, lineHeight: 1.6, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', pointerEvents: 'none' }}>
+                                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, marginBottom: 4 }}>처리 담당자</div>
+                                    <div style={{ fontWeight: 700, color: '#e2e8f0', marginBottom: q.order_memo ? 8 : 0 }}>
+                                      {processor}
+                                    </div>
+                                    {q.order_memo && (
+                                      <>
+                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, marginBottom: 3 }}>메모</div>
+                                        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{q.order_memo}</div>
+                                      </>
+                                    )}
+                                  </div>
+                                )
+                              })()}
                             </div>
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                           {q.status === '견적중' && (
                             <button onClick={() => { setPoQuote(q); setPoFile(null) }}
                               style={{ padding: '3px 7px', background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>
@@ -757,13 +813,12 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                               계산서 요청
                             </button>
                           )}
-                          <button onClick={() => { setEditQuote(q); setEditStatus('취소요청'); setEditFailReason(q.fail_reason || '') }}
-                            style={{ padding: '3px 7px', background: '#f8fafc', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 10, fontWeight: 600, color: GRAY }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.color = '#be123c'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#fecdd3' }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc'; (e.currentTarget as HTMLButtonElement).style.color = GRAY; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER }}
-                          >
-                            취소/실패
-                          </button>
+                          <button
+                            onClick={() => { setEditQuote(q); setEditStatus('취소요청'); setEditFailReason(q.fail_reason || '') }}
+                            style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 13, color: MUTED, lineHeight: 1, flexShrink: 0 }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#fecdd3'; (e.currentTarget as HTMLButtonElement).style.color = '#be123c' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER; (e.currentTarget as HTMLButtonElement).style.color = MUTED }}
+                          >⋮</button>
                         </div>
                       </td>
                     </tr>
@@ -801,16 +856,47 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                 </div>
               </div>
               {poDelivery === '택배발송' && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>배송 주소</div>
-                  <textarea
-                    value={poAddress}
-                    onChange={e => setPoAddress(e.target.value)}
-                    placeholder="배송받을 주소를 입력하세요"
-                    rows={2}
-                    style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, outline: 'none', resize: 'vertical', lineHeight: 1.5, boxSizing: 'border-box', fontFamily: 'inherit' }}
-                  />
-                </div>
+                <>
+                  {poContacts.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>받는 담당자</div>
+                      <select
+                        value={poContactId}
+                        onChange={e => setPoContactId(e.target.value ? Number(e.target.value) : '')}
+                        style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, outline: 'none', background: '#fff', boxSizing: 'border-box' }}>
+                        <option value=''>-- 담당자 선택 (선택사항) --</option>
+                        {poContacts.map(c => {
+                          const label = [c.name, c.position || c.department].filter(Boolean).join(' · ')
+                          return <option key={c.contact_id} value={c.contact_id}>{label}{c.phone ? ` (${c.phone})` : ''}</option>
+                        })}
+                      </select>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>배송 주소</div>
+                    <select
+                      value={poAddressMode}
+                      onChange={e => { setPoAddressMode(e.target.value as 'company' | 'direct'); setPoAddress('') }}
+                      style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, outline: 'none', background: '#fff', boxSizing: 'border-box', marginBottom: 6 }}>
+                      {poCompanyAddress && <option value="company">🏢 회사 주소: {poCompanyAddress}</option>}
+                      <option value="direct">✏️ 직접 입력</option>
+                    </select>
+                    {poAddressMode === 'direct' && (
+                      <textarea
+                        value={poAddress}
+                        onChange={e => setPoAddress(e.target.value)}
+                        placeholder="배송받을 주소를 입력하세요"
+                        rows={2}
+                        style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, outline: 'none', resize: 'vertical', lineHeight: 1.5, boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      />
+                    )}
+                    {poAddressMode === 'company' && poCompanyAddress && (
+                      <div style={{ padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 12, color: '#15803d', lineHeight: 1.5 }}>
+                        {poCompanyAddress}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>발주서 PDF</div>
@@ -1247,6 +1333,7 @@ const visibleEngineers = sortedEngineers.filter(e => {
           engineer={selectedEngineer}
           quotes={filteredQuotes.filter(q => q.engineer_id === selectedEngineer.engineer_id)}
           currentEngineerId={currentEngineer?.engineer_id ?? null}
+          engineers={engineers}
           onClose={() => setSelectedEngineer(null)}
           onStatusSave={async (q, status, orderDate, revenueDate, failReason) => {
             await handleStatusSave(q, status, orderDate, revenueDate, failReason)
