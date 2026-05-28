@@ -68,6 +68,9 @@ export default function MapView({
     const overlayContent = document.createElement('div')
     overlayContent.addEventListener('click', (e) => e.stopPropagation())
     overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
+    overlayContent.addEventListener('touchstart', (e) => e.stopPropagation())
+    overlayContent.addEventListener('touchend', (e) => e.stopPropagation())
+    overlayContent.addEventListener('touchmove', (e) => e.stopPropagation())
 
     const statusColor = c.status === '활성' ? '#16a34a' : c.status === '잠재' ? '#f59e0b' : c.status === '이탈' ? '#ef4444' : '#9ca3af'
     overlayContent.innerHTML = `
@@ -105,7 +108,7 @@ export default function MapView({
           ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${l}</span>`).join('')}
         </div>
         <div style="display:flex; gap:8px; padding:10px 12px;">
-          <button onclick="window.location.href='/customer/${c.customer_id}'"
+          <button data-detail="1"
              style="flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;border:none;cursor:pointer;">
             상세보기
           </button>
@@ -120,6 +123,17 @@ export default function MapView({
         </div>
       </div>
     `
+
+    const detailBtn = overlayContent.querySelector('[data-detail]') as HTMLElement | null
+    if (detailBtn) {
+      detailBtn.addEventListener('click', () => {
+        window.location.href = `/customer/${c.customer_id}`
+      })
+      detailBtn.addEventListener('touchend', (e) => {
+        e.preventDefault()
+        window.location.href = `/customer/${c.customer_id}`
+      })
+    }
 
     return new kakao.maps.CustomOverlay({
       content: overlayContent,

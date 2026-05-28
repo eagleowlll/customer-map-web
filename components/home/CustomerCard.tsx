@@ -92,33 +92,34 @@ export default function CustomerCard({ customer, devices, onMove, onDetailClick 
           대리점 {customer.agency ?? '-'}
         </div>
 
-        {/* 장비 태그 + 상세보기 버튼 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 4,
-            flex: 1, minWidth: 0, overflow: 'hidden', maxHeight: 46,
-          }}>
-            {hasNoDevice ? (
-              <span style={{ fontSize: 11, color: '#c4c9d1', fontStyle: 'italic' }}>장비 없음</span>
-            ) : deviceLines.map((line, i) => (
-              <span key={i} style={{
-                fontSize: 11, padding: '2px 7px', borderRadius: 6,
-                background: '#eff4ff', color: '#234ea2', fontWeight: 600,
-                whiteSpace: 'nowrap', maxWidth: 160,
-                overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {line}
-              </span>
-            ))}
-          </div>
+        {/* 장비 태그 */}
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 4,
+          overflow: 'hidden', maxHeight: 44, marginBottom: 8,
+        }}>
+          {hasNoDevice ? (
+            <span style={{ fontSize: 11, color: '#c4c9d1', fontStyle: 'italic' }}>장비 없음</span>
+          ) : deviceLines.map((line, i) => (
+            <span key={i} style={{
+              fontSize: 11, padding: '2px 7px', borderRadius: 6,
+              background: '#eff4ff', color: '#234ea2', fontWeight: 600,
+              whiteSpace: 'nowrap', maxWidth: '100%',
+              overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {line}
+            </span>
+          ))}
+        </div>
 
+        {/* 상세보기 버튼 — 항상 오른쪽 끝, 태그와 분리 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <a
             href={`/customer/${customer.customer_id}`}
             onClick={(e) => { e.stopPropagation(); onDetailClick() }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               fontSize: 12, fontWeight: 700, color: '#234ea2',
-              whiteSpace: 'nowrap', flexShrink: 0,
+              whiteSpace: 'nowrap',
               padding: '4px 9px', borderRadius: 7,
               background: hovered ? '#eff4ff' : '#f4f5f7',
               transition: 'background 0.15s ease',
