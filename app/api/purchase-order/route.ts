@@ -39,12 +39,14 @@ export async function POST(req: Request) {
     if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
     const deliveryMethod = formData.get('deliveryMethod') as string | null
+    const deliveryAddress = formData.get('deliveryAddress') as string | null
 
     await supabaseAdmin.from('quotes').update({
       status: '발주(주문 대기)',
       purchase_order_url: `purchase_orders/${fileName}`,
       purchase_order_at: new Date().toISOString(),
       delivery_method: deliveryMethod || null,
+      delivery_info: deliveryAddress || null,
     }).eq('quote_id', Number(quoteId))
 
     // 영업관리팀 + superadmin 알림

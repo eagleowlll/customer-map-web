@@ -81,6 +81,9 @@ export default function PurchasePage() {
   const [taxProcessing, setTaxProcessing] = useState(false)
   // 메모 툴팁
   const [hoveredMemoId, setHoveredMemoId] = useState<number | null>(null)
+  // 배송 주소 팝업
+  const [addressPopupId, setAddressPopupId] = useState<number | null>(null)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
 
   const fetchAll = async () => {
     setLoading(true)
@@ -257,9 +260,31 @@ export default function PurchasePage() {
                       <td style={{ padding: '9px 10px', color: GRAY, whiteSpace: 'nowrap' }}>{engName}</td>
                       <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
                         {q.delivery_method ? (
-                          <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 700, background: isParcel ? '#eff6ff' : '#f0fdf4', color: isParcel ? '#1d4ed8' : '#15803d', border: `1px solid ${isParcel ? '#bfdbfe' : '#bbf7d0'}` }}>
-                            {q.delivery_method}
-                          </span>
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <span
+                              onClick={() => isParcel && q.delivery_info ? setAddressPopupId(addressPopupId === q.quote_id ? null : q.quote_id) : undefined}
+                              style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 700, background: isParcel ? '#eff6ff' : '#f0fdf4', color: isParcel ? '#1d4ed8' : '#15803d', border: `1px solid ${isParcel ? '#bfdbfe' : '#bbf7d0'}`, cursor: isParcel && q.delivery_info ? 'pointer' : 'default', userSelect: 'none' }}>
+                              {q.delivery_method}{isParcel && q.delivery_info ? ' 📋' : ''}
+                            </span>
+                            {addressPopupId === q.quote_id && q.delivery_info && (
+                              <>
+                                <div onClick={() => setAddressPopupId(null)} style={{ position: 'fixed', inset: 0, zIndex: 9990 }} />
+                                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 9991, background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '12px 14px', minWidth: 240, maxWidth: 320, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+                                  <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 6 }}>배송 주소</div>
+                                  <div style={{ fontSize: 12, color: TEXT, lineHeight: 1.6, wordBreak: 'break-all', marginBottom: 10 }}>{q.delivery_info}</div>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(q.delivery_info!)
+                                      setCopiedId(q.quote_id)
+                                      setTimeout(() => setCopiedId(null), 1500)
+                                    }}
+                                    style={{ width: '100%', padding: '5px 0', background: copiedId === q.quote_id ? '#f0fdf4' : '#f3f4f6', border: `1px solid ${copiedId === q.quote_id ? '#bbf7d0' : BORDER}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: copiedId === q.quote_id ? GREEN : GRAY, transition: 'all 0.2s' }}>
+                                    {copiedId === q.quote_id ? '✓ 복사됨' : '주소 복사'}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         ) : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
                       </td>
                       <td style={{ padding: '9px 10px', fontWeight: 700, whiteSpace: 'nowrap' }}>₩{numKR(q.total_supply)}</td>

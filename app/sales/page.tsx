@@ -525,6 +525,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
   const [poQuote, setPoQuote] = useState<Quote | null>(null)
   const [poFile, setPoFile] = useState<File | null>(null)
   const [poDelivery, setPoDelivery] = useState<'직납' | '택배발송'>('직납')
+  const [poAddress, setPoAddress] = useState('')
   const [poUploading, setPoUploading] = useState(false)
   const [poIsDragging, setPoIsDragging] = useState(false)
   const poFileRef = useRef<HTMLInputElement>(null)
@@ -563,6 +564,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     fd.append('action', 'upload')
     fd.append('file', poFile)
     fd.append('deliveryMethod', poDelivery)
+    if (poDelivery === '택배발송' && poAddress.trim()) fd.append('deliveryAddress', poAddress.trim())
     const res = await fetch('/api/purchase-order', { method: 'POST', body: fd })
     const json = await res.json().catch(() => ({}))
     setPoUploading(false)
@@ -572,6 +574,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
     }
     setPoQuote(null)
     setPoFile(null)
+    setPoAddress('')
     await onStatusSave(poQuote, '발주(주문 대기)', '', '', '')
   }
 
@@ -797,6 +800,18 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                   ))}
                 </div>
               </div>
+              {poDelivery === '택배발송' && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>배송 주소</div>
+                  <textarea
+                    value={poAddress}
+                    onChange={e => setPoAddress(e.target.value)}
+                    placeholder="배송받을 주소를 입력하세요"
+                    rows={2}
+                    style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, outline: 'none', resize: 'vertical', lineHeight: 1.5, boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                </div>
+              )}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>발주서 PDF</div>
                 <div
