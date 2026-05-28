@@ -67,7 +67,7 @@ export default function CustomerList({
         ref={listScrollRef}
         onScroll={onScrollSave}
         className="customer-list-scroll"
-        style={{ height: '100%', overflowY: 'auto', padding: '8px' }}
+        style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', padding: '8px', boxSizing: 'border-box' }}
       >
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)

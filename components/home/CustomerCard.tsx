@@ -30,14 +30,14 @@ export default function CustomerCard({ customer, devices, onMove, onDetailClick 
   const hasNoDevice = deviceLines.length === 1 && deviceLines[0] === '-'
 
   return (
-    <a
-      href={`/customer/${customer.customer_id}`}
-      onClick={() => { onMove(); onDetailClick() }}
+    <div
+      onClick={onMove}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
         display: 'flex',
+        width: '100%',
         marginBottom: 8,
         borderRadius: 14,
         border: `1px solid ${hovered ? '#dce1ea' : '#eaecef'}`,
@@ -45,8 +45,6 @@ export default function CustomerCard({ customer, devices, onMove, onDetailClick 
         cursor: 'pointer',
         overflow: 'hidden',
         boxSizing: 'border-box',
-        textDecoration: 'none',
-        color: 'inherit',
         boxShadow: hovered
           ? '0 6px 20px rgba(0,0,0,0.09)'
           : '0 1px 3px rgba(0,0,0,0.04)',
@@ -114,7 +112,9 @@ export default function CustomerCard({ customer, devices, onMove, onDetailClick 
             ))}
           </div>
 
-          <span
+          <a
+            href={`/customer/${customer.customer_id}`}
+            onClick={(e) => { e.stopPropagation(); onDetailClick() }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               fontSize: 12, fontWeight: 700, color: '#234ea2',
@@ -122,15 +122,16 @@ export default function CustomerCard({ customer, devices, onMove, onDetailClick 
               padding: '4px 9px', borderRadius: 7,
               background: hovered ? '#eff4ff' : '#f4f5f7',
               transition: 'background 0.15s ease',
+              textDecoration: 'none',
             }}
           >
             상세보기
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="9 18 15 12 9 6" />
             </svg>
-          </span>
+          </a>
         </div>
       </div>
-    </a>
+    </div>
   )
 }

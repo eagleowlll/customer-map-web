@@ -421,10 +421,11 @@ useEffect(() => {
   .home-grid { grid-template-columns: 1fr !important; grid-template-rows: 1fr !important; }
   .mobile-tab-bar { display: flex !important; }
   .mobile-hide { display: none !important; }
-  .home-wrapper { height: calc(100dvh - 44px) !important; padding: 12px !important; }
-  .home-grid { height: 100% !important; }
-  .home-grid > div { height: 100% !important; min-height: 0 !important; }
+  .home-wrapper { height: calc(100dvh - 44px) !important; padding: 12px !important; overflow: hidden !important; }
+  .home-grid { height: 100% !important; overflow: hidden !important; }
+  .home-grid > div { height: 100% !important; min-height: 0 !important; min-width: 0 !important; overflow: hidden !important; }
   .home-grid > div > div { height: 100% !important; }
+  body { overflow-x: hidden !important; }
 }
       `}</style>
 
@@ -499,7 +500,7 @@ useEffect(() => {
           minHeight: 0,
         }}
       >
-<div className={mobileTab === 'map' ? 'mobile-hide' : ''} style={{ minHeight: 0, height: '100%' }}>
+<div className={mobileTab === 'map' ? 'mobile-hide' : ''} style={{ minHeight: 0, minWidth: 0, height: '100%', overflow: 'hidden' }}>
           <Sidebar
             query={query}
             setQuery={setQuery}
