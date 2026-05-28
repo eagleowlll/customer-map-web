@@ -105,10 +105,10 @@ export default function MapView({
           ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${l}</span>`).join('')}
         </div>
         <div style="display:flex; gap:8px; padding:10px 12px;">
-          <a href="/customer/${c.customer_id}"
-             style="flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
+          <button onclick="window.location.href='/customer/${c.customer_id}'"
+             style="flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;border:none;cursor:pointer;">
             상세보기
-          </a>
+          </button>
           <a href="${navUrlUlsan}" target="_blank" rel="noopener noreferrer"
              style="flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
             울산 출발
