@@ -933,18 +933,25 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                             <div><span style={{ fontWeight: 700, color: '#234ea2' }}>{item.item_code}</span><span style={{ marginLeft: 6, color: '#374151' }}>{item.item_name_jp}</span><span style={{ marginLeft: 6, color: '#6b7280' }}>({item.model_jp})</span></div>
                             <div style={{ color: '#9ca3af', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span>정가: ¥{item.price_jpy?.toLocaleString()} / 구입가: ¥{item.cost_jpy?.toLocaleString()}</span>
-                              {(item.stock_quantity != null || item.delivery_time != null) && (
-                                <span style={{
-                                  fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5,
-                                  ...(item.stock_quantity && item.stock_quantity > 0
-                                    ? { background: '#dcfce7', color: '#15803d' }
-                                    : { background: '#fef9c3', color: '#854d0e' })
-                                }}>
-                                  {item.stock_quantity && item.stock_quantity > 0
-                                    ? `재고 ${item.stock_quantity}개`
-                                    : `발주 후 ${item.delivery_time ?? '-'}주`}
-                                </span>
-                              )}
+                              {(() => {
+                                const hasStock = item.stock_quantity != null && item.stock_quantity > 0
+                                const hasDelivery = item.delivery_time != null
+                                if (hasStock) return (
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: '#dcfce7', color: '#15803d' }}>
+                                    재고 {item.stock_quantity}개
+                                  </span>
+                                )
+                                if (hasDelivery) return (
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: '#fef9c3', color: '#854d0e' }}>
+                                    발주 후 {item.delivery_time}주
+                                  </span>
+                                )
+                                return (
+                                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: '#fee2e2', color: '#b91c1c' }}>
+                                    담당자 납기 문의
+                                  </span>
+                                )
+                              })()}
                             </div>
                           </div>
                         ))}

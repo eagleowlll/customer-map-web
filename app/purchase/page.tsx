@@ -26,6 +26,7 @@ type PurchaseQuote = {
   quote_date: string
   total_supply: number
   status: string
+  pdf_url: string | null
   purchase_order_url: string | null
   purchase_order_at: string | null
   shipping_date: string | null
@@ -87,7 +88,7 @@ export default function PurchasePage() {
     const [{ data: meData }, { data: qData }, { data: custData }] = await Promise.all([
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
       supabase.from('quotes')
-        .select('quote_id, quote_number, quote_date, total_supply, status, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, delivery_info, delivery_method, subject, engineer_id, customer_id, engineers(name)')
+        .select('quote_id, quote_number, quote_date, total_supply, status, pdf_url, purchase_order_url, purchase_order_at, shipping_date, order_memo, order_completed_at, tax_invoice_date, tax_invoice_requested_at, tax_invoice_completed_at, delivery_info, delivery_method, subject, engineer_id, customer_id, engineers(name)')
         .in('status', ['발주(주문 대기)', '주문완료', '세금계산서 요청', '매출완료'])
         .order('purchase_order_at', { ascending: false }),
       supabase.from('customers').select('customer_id, company_name'),
@@ -119,6 +120,23 @@ export default function PurchasePage() {
     '주문완료': quotes.filter(q => q.status === '주문완료').length,
     '세금계산서 요청': quotes.filter(q => q.status === '세금계산서 요청').length,
     '매출완료': quotes.filter(q => q.status === '매출완료').length,
+  }
+
+  const fmtTaxDate = (s: string | null) => {
+    if (!s) return ''
+    const d = new Date(s)
+    const yy = String(d.getFullYear()).slice(2)
+    return `발행 일자 : ${yy}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
+  }
+
+  const handleViewQuotePDF = async (q: PurchaseQuote) => {
+    if (!q.pdf_url) return
+    if (q.pdf_url.includes('synology')) { window.open(q.pdf_url, '_blank'); return }
+    const path = q.pdf_url.startsWith('quote-pdfs/') ? q.pdf_url.replace('quote-pdfs/', '') : q.pdf_url.split('/quote-pdfs/')[1]
+    if (!path) return
+    const res = await fetch(`/api/quote-pdf?path=${encodeURIComponent(path)}`)
+    const json = await res.json()
+    if (json.signedUrl) window.open(json.signedUrl, '_blank')
   }
 
   const handleViewPO = async (q: PurchaseQuote) => {
@@ -211,7 +229,7 @@ export default function PurchasePage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: `1px solid ${BORDER}` }}>
-                  {['견적번호', '고객사', '담당자', '배송', '공급가액', '발주일', '출하예정', '메모', '상태', '발주서', '처리'].map(h => (
+                  {['견적서(견적번호)', '고객사', '담당자', '배송', '공급가액', '발주일', '출하예정', '메모', '상태', '발주서', '처리'].map(h => (
                     <th key={h} style={{ padding: '9px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: MUTED, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -227,7 +245,14 @@ export default function PurchasePage() {
                       style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.1s' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '9px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>{q.quote_number}</td>
+                      <td style={{ padding: '9px 10px', fontWeight: 700, color: BLUE, whiteSpace: 'nowrap' }}>
+                        <span
+                          onClick={() => handleViewQuotePDF(q)}
+                          style={{ cursor: q.pdf_url ? 'pointer' : 'default', textDecoration: q.pdf_url ? 'underline' : 'none', textUnderlineOffset: 2 }}>
+                          {q.quote_number}
+                          {q.pdf_url && <span style={{ marginLeft: 4, fontSize: 9, color: MUTED }}>PDF</span>}
+                        </span>
+                      </td>
                       <td style={{ padding: '9px 10px', fontWeight: 600, whiteSpace: 'nowrap', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis' }}>{company}</td>
                       <td style={{ padding: '9px 10px', color: GRAY, whiteSpace: 'nowrap' }}>{engName}</td>
                       <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
@@ -260,10 +285,12 @@ export default function PurchasePage() {
                         ) : <span style={{ color: MUTED, fontSize: 11 }}>-</span>}
                       </td>
                       <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: sc + '18', color: sc, whiteSpace: 'nowrap', display: 'inline-block' }}>{q.status}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
+                          <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: sc + '18', color: sc, whiteSpace: 'nowrap' }}>
+                            {q.status === '세금계산서 요청' ? '세금계산서 발행 요청' : q.status}
+                          </span>
                           {q.status === '세금계산서 요청' && q.tax_invoice_date && (
-                            <span style={{ fontSize: 10, color: '#b45309', fontWeight: 600 }}>{fmtShort(q.tax_invoice_date)}</span>
+                            <span style={{ fontSize: 10, color: '#b45309', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtTaxDate(q.tax_invoice_date)}</span>
                           )}
                         </div>
                       </td>

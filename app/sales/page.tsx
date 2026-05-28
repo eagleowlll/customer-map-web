@@ -577,6 +577,7 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
 
   const handleTaxRequest = async () => {
     if (!taxQuote) return
+    if (!taxDate) { alert('요청 발행일을 선택해주세요.'); return }
     setTaxSending(true)
     const fd = new FormData()
     fd.append('quoteId', String(taxQuote.quote_id))
@@ -718,7 +719,9 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
                       </td>
                       <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
-                          <span style={{ padding: '3px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY, whiteSpace: 'nowrap' }}>{q.status}</span>
+                          <span style={{ padding: '3px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: (STATUS_COLORS[q.status] || GRAY) + '18', color: STATUS_COLORS[q.status] || GRAY, whiteSpace: 'nowrap', alignSelf: 'center' }}>
+                            {q.status === '세금계산서 요청' ? '세금계산서 발행 요청' : q.status}
+                          </span>
                           {showOrderInfo && (q.shipping_date || q.order_memo) && (
                             <div style={{ position: 'relative' }}
                               onMouseEnter={() => q.order_memo ? setHoveredMemoId(q.quote_id) : undefined}
@@ -844,15 +847,15 @@ function EngineerQuoteModal({ engineer, quotes, currentEngineerId, onClose, onSt
               <div style={{ fontSize: 15, fontWeight: 800, color: TEXT, marginBottom: 6 }}>세금계산서 발행 요청</div>
               <div style={{ fontSize: 12, color: GRAY, marginBottom: 16 }}>{taxQuote.quote_number}</div>
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>요청 발행일 (선택)</div>
+                <div style={{ fontSize: 11, color: GRAY, marginBottom: 6, fontWeight: 600 }}>요청 발행일 <span style={{ color: '#dc2626' }}>*</span></div>
                 <input type="date" value={taxDate} onChange={e => setTaxDate(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, outline: 'none', colorScheme: 'light', boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: `1px solid ${taxDate ? BORDER : '#fca5a5'}`, borderRadius: 8, fontSize: 13, outline: 'none', colorScheme: 'light', boxSizing: 'border-box' }} />
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => { setTaxQuote(null); setTaxDate('') }} disabled={taxSending}
                   style={{ flex: 1, padding: 9, background: '#f3f4f6', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>취소</button>
-                <button onClick={handleTaxRequest} disabled={taxSending}
-                  style={{ flex: 1, padding: 9, background: '#b45309', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, opacity: taxSending ? 0.6 : 1 }}>
+                <button onClick={handleTaxRequest} disabled={taxSending || !taxDate}
+                  style={{ flex: 1, padding: 9, background: '#b45309', color: '#fff', border: 'none', borderRadius: 8, cursor: taxDate ? 'pointer' : 'not-allowed', fontWeight: 700, opacity: (taxSending || !taxDate) ? 0.45 : 1 }}>
                   {taxSending ? '요청 중...' : '발행 요청'}
                 </button>
               </div>
