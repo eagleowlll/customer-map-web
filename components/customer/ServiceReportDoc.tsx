@@ -7,6 +7,7 @@ type Props = {
   customer: Customer
   contact: Contact | null
   engineerNames: string
+  firstEngineerName: string
   engineerSignDataUrl?: string
   customerSignDataUrl?: string
 }
@@ -15,7 +16,7 @@ const RS = StyleSheet.create({
   page: { fontSize: 9, padding: 30, backgroundColor: '#fff' },
 })
 
-export default function ServiceReportDoc({ service, device, customer, contact, engineerNames, engineerSignDataUrl, customerSignDataUrl }: Props) {
+export default function ServiceReportDoc({ service, device, customer, contact, engineerNames, firstEngineerName, engineerSignDataUrl, customerSignDataUrl }: Props) {
   const deviceTitle = `${device.device_name ?? ''} ${device.device_name2 ?? ''} ${device.option ?? ''}`.replace(/\s+/g, ' ').trim()
   const fontFamily = 'NotoSansCJK'
 
@@ -104,10 +105,11 @@ export default function ServiceReportDoc({ service, device, customer, contact, e
                   <Text style={{ fontSize: 8, fontFamily, textAlign: 'center' }}>{'고\n객'}</Text>
                 </View>
                 <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
-                  {customerSignDataUrl ? <Image src={customerSignDataUrl} style={{ width: 80, height: 40, objectFit: 'contain' }} /> : null}
+                  <Text style={{ fontSize: 9, fontFamily, textAlign: 'center' }}>{contact?.name ?? ''}</Text>
                 </View>
                 <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
                   <Text style={{ fontSize: 8, fontFamily, textAlign: 'center' }}>{'서\n명'}</Text>
+                  {customerSignDataUrl && <Image src={customerSignDataUrl} style={{ position: 'absolute', width: 34, height: 68, objectFit: 'contain' }} />}
                 </View>
               </View>
               <View style={{ height: 72, flexDirection: 'row' }}>
@@ -115,10 +117,11 @@ export default function ServiceReportDoc({ service, device, customer, contact, e
                   <Text style={{ fontSize: 8, fontFamily, textAlign: 'center' }}>{'담\n당'}</Text>
                 </View>
                 <View style={{ flex: 1, borderRightWidth: 0.5, borderRightColor: '#999', justifyContent: 'center', alignItems: 'center' }}>
-                  {engineerSignDataUrl ? <Image src={engineerSignDataUrl} style={{ width: 80, height: 40, objectFit: 'contain' }} /> : null}
+                  <Text style={{ fontSize: 9, fontFamily, textAlign: 'center' }}>{firstEngineerName}</Text>
                 </View>
                 <View style={{ width: 36, justifyContent: 'center', alignItems: 'center' }}>
                   <Text style={{ fontSize: 8, fontFamily, textAlign: 'center' }}>{'서\n명'}</Text>
+                  {engineerSignDataUrl && <Image src={engineerSignDataUrl} style={{ position: 'absolute', width: 34, height: 68, objectFit: 'contain' }} />}
                 </View>
               </View>
             </View>

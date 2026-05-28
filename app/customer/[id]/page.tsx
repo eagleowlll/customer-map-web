@@ -183,11 +183,14 @@ export default function CustomerDetailPage() {
   // ── PDF 생성 ──
   const handlePrintReport = useCallback(async (service: ServiceHistory, device: Device, engineerSignDataUrl?: string, customerSignDataUrl?: string) => {
     const contact = contacts.find(c => c.contact_id === service.contact_id) ?? null
-    const engineerNames = (service.service_engineers ?? []).map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
+    const engineers = service.service_engineers ?? []
+    const engineerNames = engineers.map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
+    const firstEngineerName = engineers[0]?.engineers.name ?? ''
     const blob = await pdf(
       <ServiceReportDoc
         service={service} device={device} customer={customer!} contact={contact}
-        engineerNames={engineerNames} engineerSignDataUrl={engineerSignDataUrl} customerSignDataUrl={customerSignDataUrl}
+        engineerNames={engineerNames} firstEngineerName={firstEngineerName}
+        engineerSignDataUrl={engineerSignDataUrl} customerSignDataUrl={customerSignDataUrl}
       />
     ).toBlob()
     const url = URL.createObjectURL(blob)

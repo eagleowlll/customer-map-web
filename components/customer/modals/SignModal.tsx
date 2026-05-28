@@ -44,29 +44,30 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
   }
 
   return (
-    <div style={modalOverlayStyle}>
+    <div style={{ ...modalOverlayStyle, alignItems: 'flex-start', overflowY: 'auto' }}>
       <div style={{
-        width: '100%', maxWidth: 520, background: '#ffffff', borderRadius: 20, padding: 28,
+        margin: 'auto', width: '100%', maxWidth: 260,
+        background: '#ffffff', borderRadius: 16, padding: 16,
         boxShadow: '0 16px 48px rgba(0,0,0,0.22)', border: `1px solid ${INPUT_BORDER}`,
         animation: 'modal-in 0.18s ease',
       }}>
         {/* 스텝 인디케이터 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
           {[1, 2].map((step) => (
             <div key={step} style={{ display: 'flex', alignItems: 'center', flex: step === 1 ? 'none' : 1 }}>
               <div style={{
-                width: 30, height: 30, borderRadius: '50%',
+                width: 24, height: 24, borderRadius: '50%',
                 background: step <= signStep ? WHITE_BUTTON_BG : '#e5e7eb',
                 color: step <= signStep ? '#fff' : TEXT_MUTED,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 800, fontSize: 13, flexShrink: 0,
+                fontWeight: 800, fontSize: 11, flexShrink: 0,
                 transition: 'all 0.2s ease',
               }}>
                 {step}
               </div>
               {step === 1 && (
                 <div style={{
-                  height: 2, flex: 1, margin: '0 8px',
+                  height: 2, flex: 1, margin: '0 6px',
                   background: signStep === 2 ? WHITE_BUTTON_BG : '#e5e7eb',
                   borderRadius: 2, transition: 'background 0.2s ease',
                 }} />
@@ -76,70 +77,72 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
         </div>
 
         {/* 타이틀 */}
-        <div style={{ fontSize: 17, fontWeight: 800, color: TEXT_PRIMARY, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT_PRIMARY, marginBottom: 2 }}>
           {signStep === 1 ? '엔지니어 서명' : '고객 담당자 서명'}
         </div>
-        <div style={{ fontSize: 13, color: TEXT_MUTED, marginBottom: 18 }}>
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 10 }}>
           {signStep === 1 ? '아래 칸에 서명해주세요' : '고객 담당자분께 서명을 받아주세요'}
         </div>
 
-        {/* 서명 캔버스 */}
-        {[
-          { ref: engineerSignRef, step: 1, signing: engineerSigning, setSigning: setEngineerSigning },
-          { ref: customerSignRef, step: 2, signing: customerSigning, setSigning: setCustomerSigning },
-        ].map(({ ref, step, signing, setSigning }) => (
-          <canvas
-            key={step}
-            ref={ref}
-            width={900}
-            height={240}
-            style={{
-              width: '100%', height: 200, borderRadius: 12, background: '#fafafa',
-              border: `2px solid ${INPUT_BORDER}`, cursor: 'crosshair', touchAction: 'none',
-              display: signStep === step ? 'block' : 'none',
-            }}
-            onPointerDown={(e) => {
-              setSigning(true)
-              const canvas = ref.current!
-              const rect = canvas.getBoundingClientRect()
-              const ctx = canvas.getContext('2d')!
-              ctx.beginPath()
-              ctx.moveTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
-              canvas.setPointerCapture(e.pointerId)
-            }}
-            onPointerMove={(e) => {
-              if (!signing) return
-              const canvas = ref.current!
-              const rect = canvas.getBoundingClientRect()
-              const ctx = canvas.getContext('2d')!
-              ctx.lineWidth = 3
-              ctx.lineCap = 'round'
-              ctx.lineJoin = 'round'
-              ctx.strokeStyle = '#111'
-              ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
-              ctx.stroke()
-            }}
-            onPointerUp={() => setSigning(false)}
-          />
-        ))}
+        {/* 서명 캔버스 — PDF 서명 칸과 동일 비율 (1:2 세로) */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          {[
+            { ref: engineerSignRef, step: 1, signing: engineerSigning, setSigning: setEngineerSigning },
+            { ref: customerSignRef, step: 2, signing: customerSigning, setSigning: setCustomerSigning },
+          ].map(({ ref, step, signing, setSigning }) => (
+            <canvas
+              key={step}
+              ref={ref}
+              width={456}
+              height={912}
+              style={{
+                width: 228, height: 456, borderRadius: 10, background: '#fafafa',
+                border: `2px solid ${INPUT_BORDER}`, cursor: 'crosshair', touchAction: 'none',
+                display: signStep === step ? 'block' : 'none',
+              }}
+              onPointerDown={(e) => {
+                setSigning(true)
+                const canvas = ref.current!
+                const rect = canvas.getBoundingClientRect()
+                const ctx = canvas.getContext('2d')!
+                ctx.beginPath()
+                ctx.moveTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
+                canvas.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                if (!signing) return
+                const canvas = ref.current!
+                const rect = canvas.getBoundingClientRect()
+                const ctx = canvas.getContext('2d')!
+                ctx.lineWidth = 8
+                ctx.lineCap = 'round'
+                ctx.lineJoin = 'round'
+                ctx.strokeStyle = '#111'
+                ctx.lineTo((e.clientX - rect.left) * canvas.width / rect.width, (e.clientY - rect.top) * canvas.height / rect.height)
+                ctx.stroke()
+              }}
+              onPointerUp={() => setSigning(false)}
+            />
+          ))}
+        </div>
 
         <button
           onClick={clearCanvas}
           style={{
-            marginTop: 10, padding: '5px 13px',
+            marginTop: 8, padding: '4px 11px',
             background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`,
-            borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: TEXT_SECONDARY,
+            borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY,
           }}
         >
           지우기
         </button>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 22, gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, gap: 8 }}>
           <button
             onClick={handleBack}
             style={{
-              padding: '11px 20px', background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`,
-              borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14, color: TEXT_PRIMARY,
+              padding: '9px 16px', background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`,
+              borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 13, color: TEXT_PRIMARY,
             }}
           >
             {signStep === 2 ? '← 이전' : '취소'}
@@ -147,8 +150,8 @@ export default function SignModal({ isOpen, onClose, onComplete }: Props) {
           <button
             onClick={handleNext}
             style={{
-              padding: '11px 28px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT,
-              border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14,
+              padding: '9px 22px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT,
+              border: 'none', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 13,
             }}
           >
             {signStep === 1 ? '다음 →' : 'PDF 생성'}
