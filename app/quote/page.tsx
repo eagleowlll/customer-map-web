@@ -412,6 +412,19 @@ export default function QuotePage() {
   const [priceInputOpen, setPriceInputOpen] = useState<Record<string, boolean>>({})
   const [editingProfitRate, setEditingProfitRate] = useState<Record<string, boolean>>({})
   const [profitRateInput, setProfitRateInput] = useState<Record<string, string>>({})
+  const [showPriceGuide, setShowPriceGuide] = useState(false)
+  const priceGuideRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!showPriceGuide) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (priceGuideRef.current && !priceGuideRef.current.contains(e.target as Node)) {
+        setShowPriceGuide(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showPriceGuide])
 
   const today = new Date()
   const yyyy = today.getFullYear()
@@ -885,18 +898,79 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
           </div>
 
           {/* 품목 */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 20px', border: '1px solid #e2e4e9', position: 'relative', overflow: 'hidden' }}>
-            {Array.from({ length: 20 }, (_, i) => i).map(i => (
-              <div key={i} style={{ position: 'absolute', top: `${i * 140}px`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10, transform: 'rotate(-20deg)', opacity: 0.05 }}>
-                <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
-              </div>
-            ))}
+          <div onClick={() => showPriceGuide && setShowPriceGuide(false)} style={{ background: '#fff', borderRadius: 14, padding: '20px 20px', border: '1px solid #e2e4e9', position: 'relative' }}>
+            {/* 워터마크 — 자체 overflow:hidden 컨테이너로 분리하여 팝업이 잘리지 않도록 */}
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 10, borderRadius: 14 }}>
+              {Array.from({ length: 20 }, (_, i) => i).map(i => (
+                <div key={i} style={{ position: 'absolute', top: `${i * 140}px`, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(-20deg)', opacity: 0.05 }}>
+                  <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
+                </div>
+              ))}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ width: 3, height: 16, background: '#234ea2', borderRadius: 2, flexShrink: 0 }} />
               <span style={{ fontWeight: 800, fontSize: 14, color: '#111113', letterSpacing: '-0.2px' }}>품목</span>
               {rows.length > 0 && (
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#eff4ff', color: '#234ea2' }}>{rows.length}</span>
               )}
+              {/* 마진/정도검사 가이드 버튼 — 오른쪽 끝 */}
+              <div ref={priceGuideRef} style={{ marginLeft: 'auto', position: 'relative' }}>
+                <button
+                  onClick={() => setShowPriceGuide(p => !p)}
+                  title="마진 및 정도검사 가격 안내"
+                  style={{ width: 20, height: 20, borderRadius: '50%', background: showPriceGuide ? '#234ea2' : '#e8edf5', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 900, color: showPriceGuide ? '#fff' : '#234ea2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 1 }}
+                >!</button>
+                {/* 팝업 — 버튼 오른쪽, 세로 중앙 정렬 */}
+                {showPriceGuide && (
+                  <div
+                    style={{ position: 'absolute', left: 'calc(100% + 8px)', top: '50%', transform: 'translateY(-50%)', zIndex: 300, background: '#fff', borderRadius: 14, border: '1px solid #e2e4e9', boxShadow: '0 12px 36px rgba(0,0,0,0.16)', width: 340, padding: '16px 18px', maxHeight: '70vh', overflowY: 'auto' }}
+                  >
+                  {/* 닫기 */}
+                  <button onClick={() => setShowPriceGuide(false)} style={{ position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: '50%', border: 'none', background: '#f4f5f7', cursor: 'pointer', fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+
+                  {/* 섹션1: 견적서 마진 */}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: '#1e3a6e', borderRadius: 7, padding: '4px 10px', marginBottom: 8, display: 'inline-block' }}>견적서 제출 마진</div>
+                    {[
+                      { label: '대리점 및 기존 고객사 (스타일러스)', value: '40%' },
+                      { label: '신규고객사 (스타일러스)', value: '50%' },
+                      { label: '장비 업그레이드 / 일본가격문의', value: '60%' },
+                    ].map((item, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 6px', borderRadius: 6, background: i % 2 === 0 ? '#f8fafc' : '#fff', marginBottom: 2 }}>
+                        <span style={{ fontSize: 11, color: '#374151' }}>{item.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: '#234ea2', flexShrink: 0, marginLeft: 8 }}>{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ height: 1, background: '#e2e4e9', marginBottom: 14 }} />
+
+                  {/* 섹션2: 정도검사 */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: '#1e3a6e', borderRadius: 7, padding: '4px 10px', marginBottom: 8, display: 'inline-block' }}>측정기 정도 검사</div>
+                    {[
+                      { cat: '83', items: [{ label: '조도', price: '600,000' }, { label: '형상', price: '800,000' }, { label: '조도형상', price: '1,000,000' }] },
+                      { cat: '84', items: [{ label: '소형 43C', price: '800,000' }, { label: '중형 R-NEX200', price: '1,000,000' }, { label: 'R55/R60', price: '1,200,000' }, { label: 'R73A', price: '4,000,000' }] },
+                      { cat: '81', items: [{ label: 'CMM', price: '3,500,000' }] },
+                    ].map((group, gi) => (
+                      <div key={gi} style={{ display: 'flex', marginBottom: gi < 2 ? 6 : 0 }}>
+                        <div style={{ width: 28, flexShrink: 0, display: 'flex', alignItems: 'flex-start', paddingTop: 5 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: '#234ea2', borderRadius: 5, padding: '1px 5px' }}>{group.cat}</span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          {group.items.map((item, ii) => (
+                            <div key={ii} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: 5, background: ii % 2 === 0 ? '#f8fafc' : '#fff', marginBottom: 2 }}>
+                              <span style={{ fontSize: 11, color: '#374151' }}>{item.label}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#111113' }}>₩{item.price}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                )}
+              </div>
             </div>
 
             {rows.map((row, rowIdx) => (

@@ -45,16 +45,20 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
   }
 
   return (
-    <div onClick={onClose} style={modalOverlayStyle}>
+    <div onClick={onClose} style={{ ...modalOverlayStyle, alignItems: 'flex-start', overflowY: 'auto' }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 620, background: '#ffffff', borderRadius: 20, padding: 28,
+          width: '100%', maxWidth: 620, background: '#ffffff', borderRadius: 20,
           boxShadow: '0 16px 48px rgba(0,0,0,0.22)', border: `1px solid ${INPUT_BORDER}`,
           animation: 'modal-in 0.18s ease',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'calc(100dvh - 40px)',
+          margin: 'auto',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+        {/* 헤더 — 고정 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 16px', flexShrink: 0, borderBottom: `1px solid ${INPUT_BORDER}` }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_PRIMARY }}>서비스 레포트 추가</div>
           <button
             onClick={onClose}
@@ -62,10 +66,11 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
           >✕</button>
         </div>
 
-        <div style={{ display: 'grid', gap: 14 }}>
+        {/* 본문 — 스크롤 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px', display: 'grid', gap: 14 }}>
           <div>
             <label style={labelStyle}>서비스 내용</label>
-            <textarea value={form.service_notes} onChange={(e) => setForm(p => ({ ...p, service_notes: e.target.value }))} placeholder="서비스 내용을 입력하세요" rows={7} style={textareaStyle} />
+            <textarea value={form.service_notes} onChange={(e) => setForm(p => ({ ...p, service_notes: e.target.value }))} placeholder="서비스 내용을 입력하세요" rows={5} style={textareaStyle} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.2fr', gap: 12 }}>
@@ -130,7 +135,7 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
               </button>
             </div>
             {showExtraEngineers && (
-              <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 7, paddingTop: 10, borderTop: `1px solid ${INPUT_BORDER}` }}>
+              <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 7, paddingTop: 10, borderTop: `1px solid ${INPUT_BORDER}`, maxHeight: 160, overflowY: 'auto' }}>
                 {engineers.filter(e => !selectedEngineerIds.includes(e.engineer_id)).map(eng => (
                   <button key={eng.engineer_id} onClick={() => { setSelectedEngineerIds(p => [...p, eng.engineer_id]); setShowExtraEngineers(false) }}
                     style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${INPUT_BORDER}`, background: INPUT_BG, color: TEXT_PRIMARY, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
@@ -142,7 +147,8 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
+        {/* 푸터 — 고정 */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 24px 20px', flexShrink: 0, borderTop: `1px solid ${INPUT_BORDER}` }}>
           <button onClick={onClose} style={{ padding: '10px 16px', background: '#f4f5f7', color: TEXT_PRIMARY, borderRadius: 10, border: `1px solid ${INPUT_BORDER}`, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>취소</button>
           <button onClick={handleSave} disabled={isSaving} style={{ padding: '10px 20px', background: WHITE_BUTTON_BG, color: WHITE_BUTTON_TEXT, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, opacity: isSaving ? 0.7 : 1 }}>
             {isSaving ? '저장 중...' : '저장'}

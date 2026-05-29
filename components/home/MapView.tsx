@@ -107,32 +107,46 @@ export default function MapView({
         <div style="padding:10px 16px; border-bottom:1px solid #f3f4f6; display:flex; flex-wrap:wrap; gap:4px;">
           ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${l}</span>`).join('')}
         </div>
-        <div style="display:flex; gap:8px; padding:10px 12px;">
-          <button data-detail="1"
-             style="flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;border:none;cursor:pointer;">
-            상세보기
-          </button>
-          <a href="${navUrlUlsan}" target="_blank" rel="noopener noreferrer"
-             style="flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
-            울산 출발
-          </a>
-          <a href="${navUrlDongtan}" target="_blank" rel="noopener noreferrer"
-             style="flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;">
-            동탄 출발
-          </a>
+        <div class="overlay-action-row" style="display:flex; gap:8px; padding:10px 12px;">
         </div>
       </div>
     `
 
-    const detailBtn = overlayContent.querySelector('[data-detail]') as HTMLElement | null
-    if (detailBtn) {
-      detailBtn.addEventListener('click', () => {
-        window.location.href = `/customer/${c.customer_id}`
-      })
-      detailBtn.addEventListener('touchend', (e) => {
-        e.preventDefault()
-        window.location.href = `/customer/${c.customer_id}`
-      })
+    // 버튼을 DOM API로 직접 생성 — innerHTML querySelector 방식 대신 직접 참조 보장
+    const actionRow = overlayContent.querySelector('.overlay-action-row') as HTMLElement
+    if (actionRow) {
+      const detailUrl = `/customer/${c.customer_id}`
+      let navigated = false
+      const goDetail = () => {
+        if (navigated) return
+        navigated = true
+        window.location.href = detailUrl
+      }
+
+      const detailBtn = document.createElement('button')
+      detailBtn.textContent = '상세보기'
+      detailBtn.style.cssText = 'flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;'
+      // touchstart에서 stopPropagation — 카카오맵이 터치 시퀀스 자체를 가로채지 못하도록
+      detailBtn.addEventListener('touchstart', (e) => { e.stopPropagation() }, { passive: true })
+      detailBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); goDetail() })
+      detailBtn.addEventListener('pointerup', (e) => { e.stopPropagation(); goDetail() })
+      detailBtn.addEventListener('click', (e) => { e.stopPropagation(); goDetail() })
+
+      const makeNavLink = (href: string, label: string) => {
+        const a = document.createElement('a')
+        a.href = href
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        a.textContent = label
+        a.style.cssText = 'flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;'
+        a.addEventListener('touchstart', (e) => { e.stopPropagation() }, { passive: true })
+        a.addEventListener('click', (e) => { e.stopPropagation() })
+        return a
+      }
+
+      actionRow.appendChild(detailBtn)
+      actionRow.appendChild(makeNavLink(navUrlUlsan, '울산 출발'))
+      actionRow.appendChild(makeNavLink(navUrlDongtan, '동탄 출발'))
     }
 
     return new kakao.maps.CustomOverlay({
