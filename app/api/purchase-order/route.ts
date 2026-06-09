@@ -12,6 +12,16 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // 권한 확인: superadmin 또는 영업관리팀만 발주 처리 가능
+  const { data: caller } = await supabase
+    .from('engineers')
+    .select('engineer_id, name, position, permission_level, teams')
+    .eq('email', user.email!)
+    .single()
+  if (!caller || !(caller.permission_level === 'superadmin' || caller.teams === '영업관리')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   const quoteId = formData.get('quoteId') as string | null
@@ -20,20 +30,22 @@ export async function POST(req: Request) {
 
   if (!quoteId) return NextResponse.json({ error: '필수 값 누락' }, { status: 400 })
 
-  const { data: sender } = await supabaseAdmin
-    .from('engineers')
-    .select('engineer_id, name, position')
-    .eq('email', user.email!)
-    .single()
-
-  const senderLabel = sender ? [sender.name, (sender as any).position].filter(Boolean).join(' ') : (user.email ?? '')
+  const sender = caller
+  const senderLabel = [sender.name, sender.position].filter(Boolean).join(' ') || (user.email ?? '')
 
   // 발주서 업로드
   if (action === 'upload') {
     if (!file || !quoteNumber) return NextResponse.json({ error: '파일 또는 견적번호 누락' }, { status: 400 })
 
-    const fileName = `${quoteNumber}_${Date.now()}.pdf`
     const arrayBuffer = await file.arrayBuffer()
+
+    // PDF 파일 시그니처 검증 (magic bytes: %PDF = 0x25 0x50 0x44 0x46)
+    const header = new Uint8Array(arrayBuffer.slice(0, 4))
+    if (header[0] !== 0x25 || header[1] !== 0x50 || header[2] !== 0x44 || header[3] !== 0x46) {
+      return NextResponse.json({ error: 'PDF 파일만 업로드 가능합니다.' }, { status: 400 })
+    }
+
+    const fileName = `${quoteNumber}_${Date.now()}.pdf`
     const { error: uploadError } = await supabaseAdmin.storage
       .from('purchase_orders')
       .upload(fileName, arrayBuffer, { contentType: 'application/pdf', upsert: true })
@@ -218,7 +230,25 @@ export async function GET(req: Request) {
   const path = searchParams.get('path')
   if (!path) return NextResponse.json({ error: 'path required' }, { status: 400 })
 
-  const fileName = path.replace('purchase_orders/', '')
+  // 경로 정규화 및 순회 공격 방지
+  const safePath = path.replace(/\.\./g, '').replace(/^\/+/, '')
+  const fileName = safePath.startsWith('purchase_orders/')
+    ? safePath.slice('purchase_orders/'.length)
+    : safePath
+
+  if (!fileName || fileName.includes('/')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 })
+  }
+
+  // DB에서 해당 파일이 실제 발주서인지 확인 (RLS 적용됨)
+  const { count } = await supabase
+    .from('quotes')
+    .select('quote_id', { count: 'exact', head: true })
+    .eq('purchase_order_url', `purchase_orders/${fileName}`)
+  if (!count || count === 0) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   const { data, error } = await supabaseAdmin.storage
     .from('purchase_orders')
     .createSignedUrl(fileName, 600)

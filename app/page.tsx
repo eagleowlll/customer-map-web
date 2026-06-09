@@ -372,8 +372,7 @@ useEffect(() => {
 
     if (uploadError) throw uploadError
 
-    const { data } = supabase.storage.from('packing-lists').getPublicUrl(fileName)
-    return data.publicUrl
+    return fileName
   }
 
 

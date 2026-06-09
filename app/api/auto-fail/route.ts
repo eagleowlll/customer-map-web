@@ -12,6 +12,15 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: caller } = await supabase
+    .from('engineers')
+    .select('permission_level')
+    .eq('email', user.email!)
+    .single()
+  if (!caller || !['superadmin', 'manager'].includes(caller.permission_level)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - 30)
   const cutoffStr = cutoff.toISOString().split('T')[0]

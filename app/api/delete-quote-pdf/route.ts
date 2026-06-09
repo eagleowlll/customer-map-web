@@ -8,16 +8,41 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // 권한 확인 (superadmin 또는 manager만 허용)
+  const { data: caller } = await supabase
+    .from('engineers')
+    .select('permission_level')
+    .eq('email', user.email!)
+    .single()
+  if (!caller || !['superadmin', 'manager'].includes(caller.permission_level)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const body = await req.json()
   const { filePath } = body
   if (!filePath?.trim()) return NextResponse.json({ error: 'filePath required' }, { status: 400 })
+
+  // 경로 순회 공격 방지: 파일명만 허용 (폴더 구분자 금지)
+  const safePath = filePath.trim().replace(/\.\./g, '').replace(/^\/+/, '')
+  if (!safePath || safePath.includes('/')) {
+    return NextResponse.json({ error: 'Invalid file path' }, { status: 400 })
+  }
+
+  // DB에서 해당 파일이 실제 견적서 PDF인지 확인
+  const { count } = await supabase
+    .from('quotes')
+    .select('quote_id', { count: 'exact', head: true })
+    .eq('pdf_url', `quote-pdfs/${safePath}`)
+  if (count === 0) {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 })
+  }
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { error } = await supabaseAdmin.storage.from('quote-pdfs').remove([filePath.trim()])
+  const { error } = await supabaseAdmin.storage.from('quote-pdfs').remove([safePath])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ success: true })

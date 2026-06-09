@@ -283,23 +283,30 @@ export default function AdminPage() {
     if (!editEngineer) return
     if (!editForm.name.trim()) { alert('이름을 입력해주세요.'); return }
     setEditLoading(true)
-    const updateData: Record<string, unknown> = {
-      name: editForm.name.trim(),
-      position: editForm.position,
-      teams: editForm.teams,
-      email: editForm.email.trim(),
-      initials: editForm.initials.trim().toUpperCase(),
-      is_inventory_manager: editForm.is_inventory_manager,
+    try {
+      const res = await fetch('/api/update-engineer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          engineer_id: editEngineer.engineer_id,
+          name: editForm.name.trim(),
+          position: editForm.position,
+          teams: editForm.teams,
+          email: editForm.email.trim(),
+          initials: editForm.initials.trim().toUpperCase(),
+          is_inventory_manager: editForm.is_inventory_manager,
+          permission_level: editForm.permission_level,
+        }),
+      })
+      const result = await res.json().catch(() => ({ error: `서버 오류 (${res.status})` }))
+      if (!res.ok || result.error) { alert(`오류: ${result.error ?? '알 수 없는 오류'}`); setEditLoading(false); return }
+      alert('직원 정보가 수정되었습니다.')
+      setEditEngineer(null)
+      fetchEngineers()
+    } catch {
+      alert('오류가 발생했습니다.')
     }
-    if (currentEngineer?.permission_level === 'superadmin') {
-      updateData.permission_level = editForm.permission_level
-    }
-    const { error } = await supabase.from('engineers').update(updateData).eq('engineer_id', editEngineer.engineer_id)
     setEditLoading(false)
-    if (error) { alert(error.message); return }
-    alert('직원 정보가 수정되었습니다.')
-    setEditEngineer(null)
-    fetchEngineers()
   }
 
   const handleDeleteEngineer = async () => {

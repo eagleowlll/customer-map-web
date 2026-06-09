@@ -59,6 +59,10 @@ export default function MapView({
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const restoredMapStateAppliedRef = useRef(false)
 
+  // HTML 특수문자 이스케이프 — innerHTML에 DB 데이터 삽입 시 XSS 방지
+  const esc = (s: string | null | undefined): string =>
+    (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
   // 오버레이 동적 생성 함수
   const createOverlay = (c: Customer, map: any, kakao: any) => {
     const devices = deviceMap.get(Number(c.customer_id)) || []
@@ -93,19 +97,19 @@ export default function MapView({
         ">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
             <div style="font-weight:700; font-size:14px; color:#111111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
-              ${c.company_name}
+              ${esc(c.company_name)}
             </div>
             <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:99px; background:${statusColor}1a; color:${statusColor}; flex-shrink:0; white-space:nowrap;">
-              ${c.status ?? '-'}
+              ${esc(c.status) || '-'}
             </span>
           </div>
           <div style="font-size:12px; color:#6b7280; margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${c.address ?? '-'}
+            ${esc(c.address) || '-'}
           </div>
-          <div style="font-size:11px; color:#adb5bd;">대리점 ${c.agency ?? '-'}</div>
+          <div style="font-size:11px; color:#adb5bd;">대리점 ${esc(c.agency) || '-'}</div>
         </div>
         <div style="padding:10px 16px; border-bottom:1px solid #f3f4f6; display:flex; flex-wrap:wrap; gap:4px;">
-          ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${l}</span>`).join('')}
+          ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${esc(l)}</span>`).join('')}
         </div>
         <div class="overlay-action-row" style="display:flex; gap:8px; padding:10px 12px;">
         </div>
@@ -439,23 +443,24 @@ useEffect(() => {
           <button
             onClick={() => setShowCategoryMenu(prev => !prev)}
             style={{
-              padding: '7px 13px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              border: 'none',
-              background: selectedCategories.length === 3 ? 'rgba(255,255,255,0.92)' : '#0891b2',
+              padding: '7px 13px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontWeight: 700, fontSize: 13,
+              background: selectedCategories.length === 3 ? 'rgba(255,255,255,0.92)' : '#234ea2',
               color: selectedCategories.length === 3 ? '#1a1a2e' : '#ffffff',
               boxShadow: selectedCategories.length === 3
                 ? '0 2px 8px rgba(0,0,0,0.10)'
-                : '0 4px 12px rgba(8,145,178,0.28)',
+                : '0 4px 12px rgba(35,78,162,0.32)',
               backdropFilter: 'blur(6px)',
-              transition: 'all 0.15s ease',
+              transition: 'background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease',
             }}>
-            계열{selectedCategories.length < 3 ? ` (${selectedCategories.sort().join(',')})` : ''}
+            계열{selectedCategories.length < 3 ? ` (${[...selectedCategories].sort().join(',')})` : ''}
           </button>
           {showCategoryMenu && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 2000,
-              background: '#ffffff', borderRadius: 10, padding: '5px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)',
+              borderRadius: 12, padding: '6px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
               display: 'flex', flexDirection: 'row', gap: 4,
             }}>
               {['81', '83', '84'].map(cat => {
@@ -465,9 +470,10 @@ useEffect(() => {
                     style={{
                       padding: '7px 14px', borderRadius: 8, border: 'none',
                       cursor: 'pointer', fontWeight: 700, fontSize: 13,
-                      background: checked ? '#234ea2' : '#f4f5f7',
-                      color: checked ? '#fff' : '#555',
-                      transition: 'background 0.15s ease, color 0.15s ease',
+                      background: checked ? '#234ea2' : 'rgba(0,0,0,0.05)',
+                      color: checked ? '#ffffff' : '#1a1a2e',
+                      boxShadow: checked ? '0 3px 8px rgba(35,78,162,0.28)' : 'none',
+                      transition: 'background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease',
                     }}>
                     {cat}
                   </button>

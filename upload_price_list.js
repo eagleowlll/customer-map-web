@@ -3,7 +3,9 @@ const XLSX = require('xlsx');
 const https = require('https');
 const fs = require('fs');
 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5ZXdocGR2dGl4eHJjdXZmcnpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NDA1MjksImV4cCI6MjA4OTIxNjUyOX0.DLoedbhKfSeawxpMxZ4nKqegRHjUuCOy8Xw2R16M3kE';
+// 실행 전 환경변수 설정: export SUPABASE_ANON_KEY=<키값>
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SUPABASE_KEY) { console.error('SUPABASE_ANON_KEY 환경변수를 설정해주세요.'); process.exit(1); }
 
 const filePath = process.argv[2];
 if (!filePath || !fs.existsSync(filePath)) {

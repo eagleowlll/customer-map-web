@@ -97,6 +97,7 @@ export default function CustomerDetailPage() {
       const me = (engineersData as any[]).find(e => e.email === user.email)
       if (me) setCurrentUserEngineerId(me.engineer_id)
     }
+
     setLoading(false)
   }
 

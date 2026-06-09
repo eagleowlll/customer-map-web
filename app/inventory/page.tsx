@@ -247,50 +247,18 @@ function InventoryPage() {
     }
   }
 
-  // ── 승인 ──
+  // ── 승인 ── (서버 API 경유 — 권한 강제)
   const handleApprove = async (req: InventoryRequest) => {
-    if (!currentEngineer) return
-    const item = items.find(i => i.item_id === req.item_id)
-    if (!item) { alert('품목 정보를 찾을 수 없습니다.'); return }
-    if (item.quantity < req.quantity) { alert(`현재 재고(${item.quantity}개)가 요청 수량(${req.quantity}개)보다 부족합니다.`); return }
     if (!confirm(`${req.inventory_items?.item_name ?? '품목'} ${req.quantity}개 출고 요청을 승인하시겠습니까?`)) return
-
     setIsProcessing(true)
     try {
-      const { error: e1 } = await supabase.from('inventory_items')
-        .update({ quantity: item.quantity - req.quantity })
-        .eq('item_id', req.item_id)
-      if (e1) throw e1
-
-      const { error: e2 } = await supabase.from('inventory_requests').update({
-        status: '승인',
-        processed_at: new Date().toISOString(),
-        processed_by: currentEngineer.engineer_id,
-      }).eq('request_id', req.request_id)
-      if (e2) throw e2
-
-      const { error: e3 } = await supabase.from('inventory_logs').insert([{
-        item_id: req.item_id,
-        engineer_id: currentEngineer.engineer_id,
-        requester_id: req.requester_id,
-        quantity_out: req.quantity,
-        log_type: 'out',
-        outlet_company: req.outlet_company,
-        reason: req.reason,
-        logged_at: new Date().toISOString(),
-      }])
-      if (e3) throw e3
-
-      await supabase.from('notifications').insert([{
-        engineer_id: req.requester_id,
-        title: '출고 요청 승인됨',
-        message: `${req.inventory_items?.item_name ?? '품목'} ${req.quantity}개 출고 요청이 승인되었습니다`,
-        type: 'stock_approved',
-        link: '/inventory?tab=requests',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      }])
-
+      const res = await fetch('/api/inventory-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', request_id: req.request_id }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(result.error || '승인 처리 중 오류가 발생했습니다.'); return }
       alert('승인이 완료되었습니다.')
       await fetchAll()
     } catch (err) {
@@ -300,30 +268,19 @@ function InventoryPage() {
     }
   }
 
-  // ── 반려 ──
+  // ── 반려 ── (서버 API 경유 — 권한 강제)
   const handleReject = async () => {
-    if (!rejectingRequest || !currentEngineer) return
+    if (!rejectingRequest) return
     if (!rejectReason.trim()) { alert('반려 사유를 입력해주세요.'); return }
     setIsProcessing(true)
     try {
-      const { error: e1 } = await supabase.from('inventory_requests').update({
-        status: '반려',
-        reject_reason: rejectReason.trim(),
-        processed_at: new Date().toISOString(),
-        processed_by: currentEngineer.engineer_id,
-      }).eq('request_id', rejectingRequest.request_id)
-      if (e1) throw e1
-
-      await supabase.from('notifications').insert([{
-        engineer_id: rejectingRequest.requester_id,
-        title: '출고 요청 반려됨',
-        message: `${rejectingRequest.inventory_items?.item_name ?? '품목'} ${rejectingRequest.quantity}개 출고 요청이 반려되었습니다. 사유: ${rejectReason.trim()}`,
-        type: 'stock_rejected',
-        link: '/inventory?tab=requests',
-        is_read: false,
-        created_at: new Date().toISOString(),
-      }])
-
+      const res = await fetch('/api/inventory-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', request_id: rejectingRequest.request_id, reject_reason: rejectReason }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(result.error || '반려 처리 중 오류가 발생했습니다.'); return }
       alert('반려 처리되었습니다.')
       setRejectingRequest(null); setRejectReason('')
       await fetchAll()

@@ -5,7 +5,9 @@
 const https = require('https');
 const fs = require('fs');
 
-const KAKAO_KEY = '77d16398471efccaf575c4927a11497b';
+// 실행 전 환경변수 설정: export KAKAO_REST_API_KEY=<키값>
+const KAKAO_KEY = process.env.KAKAO_REST_API_KEY;
+if (!KAKAO_KEY) { console.error('KAKAO_REST_API_KEY 환경변수를 설정해주세요.'); process.exit(1); }
 
 const companies = [
   { name: 'TSP', address: '경북 구미시 옥계2공단로 45' },
