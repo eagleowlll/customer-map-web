@@ -287,9 +287,21 @@ const QuotePDFDoc = React.memo(function QuotePDFDoc({ company, receiver, quoteNo
   )
 }, (prev, next) => JSON.stringify(prev) === JSON.stringify(next))
 
-type ProfitPanelProps = { rows: QuoteRow[]; exchangeRate: number; rateUpdatedAt: string; rateLoading: boolean; onFetchRate: () => void }
+type ProfitPanelProps = { rows: QuoteRow[]; exchangeRate: number; rateUpdatedAt: string; rateLoading: boolean; onFetchRate: () => void; onRateChange: (rate: number) => void }
 
-function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRate }: ProfitPanelProps) {
+function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRate, onRateChange }: ProfitPanelProps) {
+  const [editingRate, setEditingRate] = useState(false)
+  const [editRateVal, setEditRateVal] = useState('')
+
+  const startEdit = () => {
+    setEditRateVal(exchangeRate ? exchangeRate.toFixed(4) : '')
+    setEditingRate(true)
+  }
+  const commitEdit = () => {
+    const n = parseFloat(editRateVal)
+    if (!isNaN(n) && n > 0) onRateChange(n)
+    setEditingRate(false)
+  }
   const totalSupply = rows.reduce((s, r) => s + r.supply_price, 0)
   const totalProduct = rows.reduce((s, r) => s + r.product_price, 0)
   const totalProfit = rows.reduce((s, r) => s + r.profit, 0)
@@ -304,10 +316,25 @@ function ProfitPanel({ rows, exchangeRate, rateUpdatedAt, rateLoading, onFetchRa
             <span style={{ fontSize: 13, fontWeight: 800, color: '#111113', letterSpacing: '-0.2px' }}>수익 분석</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
-              {exchangeRate ? `${exchangeRate.toFixed(4)}원` : '환율 로딩중...'}
-            </span>
-            {rateUpdatedAt && <span style={{ fontSize: 10, color: '#9ca3af' }}>({rateUpdatedAt})</span>}
+            {editingRate ? (
+              <input
+                type="number"
+                value={editRateVal}
+                onChange={e => setEditRateVal(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingRate(false) }}
+                autoFocus
+                style={{ width: 80, fontSize: 11, fontWeight: 700, color: '#234ea2', border: '1px solid #234ea2', borderRadius: 5, padding: '1px 5px', outline: 'none' }}
+              />
+            ) : (
+              <span
+                onDoubleClick={startEdit}
+                title="더블클릭하여 수동 입력"
+                style={{ fontSize: 11, color: '#6b7280', fontWeight: 500, cursor: 'text', borderBottom: '1px dashed #9ca3af' }}>
+                {exchangeRate ? `${exchangeRate.toFixed(4)}원` : '환율 로딩중...'}
+              </span>
+            )}
+            {rateUpdatedAt && !editingRate && <span style={{ fontSize: 10, color: '#9ca3af' }}>({rateUpdatedAt})</span>}
             <button
               onClick={onFetchRate}
               disabled={rateLoading}
@@ -705,6 +732,13 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
   useEffect(() => { fetchRate() }, [fetchRate])
   useEffect(() => { if (!exchangeRate) return; setRows(prev => prev.map(r => calcRow(r, exchangeRate))) }, [exchangeRate])
 
+  const handleRateChange = useCallback(async (rate: number) => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    setExchangeRate(rate)
+    setRateUpdatedAt(todayStr)
+    await supabase.from('exchange_rate').insert([{ rate, updated_at: todayStr }])
+  }, [])
+
   const handleSearch = async (rowId: string, q: string) => {
     setSearchQuery(prev => ({ ...prev, [rowId]: q }))
     if (!q.trim()) { setSearchResults(prev => ({ ...prev, [rowId]: [] })); return }
@@ -906,7 +940,7 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
                 <span style={{ fontSize: 42, fontWeight: 900, color: '#000', whiteSpace: 'nowrap' }}>{engineerName}</span>
               </div>
             ))}
-            <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} />
+            <ProfitPanel rows={rows} exchangeRate={exchangeRate} rateUpdatedAt={rateUpdatedAt} rateLoading={rateLoading} onFetchRate={fetchRate} onRateChange={handleRateChange} />
           </div>
 
           {/* 품목 */}
