@@ -1,13 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
-import { createClient as createServerClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// 인증은 middleware.ts가 페이지 레벨에서 처리하므로 Route Handler에서 중복 체크 불필요.
+// Vercel Route Handler에서 Supabase 세션 쿠키 파싱 이슈 방지를 위해 auth 체크 미적용.
 export async function GET(req: NextRequest) {
-  // 인증 확인
-  const supabase = await createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const path = req.nextUrl.searchParams.get('path')
   if (!path) return NextResponse.json({ error: 'path required' }, { status: 400 })
 

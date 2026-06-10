@@ -673,18 +673,30 @@ alert(`✅ 견적서 ${quoteNo} 확정 완료!`)
   const fetchRate = useCallback(async () => {
     setRateLoading(true)
     try {
-      const { data } = await supabase.from('exchange_rate').select('*').order('id', { ascending: false }).limit(1).single()
+      const { data: cached } = await supabase.from('exchange_rate').select('*').order('id', { ascending: false }).limit(1).single()
       const todayStr = new Date().toISOString().slice(0, 10)
-      if (data && data.updated_at === todayStr) {
-        setExchangeRate(Number(data.rate)); setRateUpdatedAt(data.updated_at); setRateLoading(false); return
+
+      // 오늘 날짜 캐시가 있으면 바로 사용
+      if (cached && cached.updated_at === todayStr) {
+        setExchangeRate(Number(cached.rate)); setRateUpdatedAt(cached.updated_at); setRateLoading(false); return
       }
-      const res = await fetch('/api/exchange-rate')
-      const json = await res.json()
-      const jpy = json.jpy
-      if (jpy) {
-        const rate = parseFloat(jpy.deal_bas_r.replace(',', '')) / 100
-        setExchangeRate(rate); setRateUpdatedAt(todayStr)
-        await supabase.from('exchange_rate').insert([{ rate, updated_at: todayStr }])
+
+      // 외부 API 호출
+      try {
+        const res = await fetch('/api/exchange-rate')
+        const json = await res.json()
+        const jpy = json.jpy
+        if (jpy && jpy.deal_bas_r) {
+          const rate = parseFloat(jpy.deal_bas_r.replace(',', '')) / 100
+          setExchangeRate(rate); setRateUpdatedAt(todayStr)
+          await supabase.from('exchange_rate').insert([{ rate, updated_at: todayStr }])
+          setRateLoading(false); return
+        }
+      } catch { /* API 실패 시 아래 캐시 fallback 사용 */ }
+
+      // API 실패 시 DB에 저장된 가장 최근 환율로 fallback
+      if (cached && cached.rate) {
+        setExchangeRate(Number(cached.rate)); setRateUpdatedAt(cached.updated_at)
       }
     } catch (e) { console.error(e) }
     setRateLoading(false)
