@@ -15,15 +15,6 @@ export async function GET(req: NextRequest) {
   const safePath = path.replace(/\.\./g, '').replace(/^\/+/, '')
   if (!safePath) return NextResponse.json({ error: 'Invalid path' }, { status: 400 })
 
-  // DB에서 해당 파일이 실제 견적서 PDF인지 확인 (RLS 적용됨)
-  const { count } = await supabase
-    .from('quotes')
-    .select('quote_id', { count: 'exact', head: true })
-    .eq('pdf_url', `quote-pdfs/${safePath}`)
-  if (!count || count === 0) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
