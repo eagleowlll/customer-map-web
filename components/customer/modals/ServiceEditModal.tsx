@@ -83,6 +83,7 @@ export default function ServiceEditModal({ service, contacts, engineers, isSavin
                 <option value="A/S">A/S</option>
                 <option value="B/S">B/S</option>
                 <option value="교육">교육</option>
+                <option value="유선기술지원">유선 기술지원</option>
               </select>
             </div>
             <div>

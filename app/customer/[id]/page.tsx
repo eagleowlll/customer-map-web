@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Font, pdf } from '@react-pdf/renderer'
-import { loadKakaoMap } from '@/lib/loadKakaoMap'
+import { geocodeAddress } from '@/lib/geocode'
 import { createClient } from '@/lib/supabase/client'
 
 import type { Customer, Device, Contact, ServiceHistory, Engineer, Quote, ServiceForm, DeviceForm, ContactForm, CustomerEditFormData } from '@/components/customer/types'
@@ -106,18 +106,6 @@ export default function CustomerDetailPage() {
     fetchDetail()
   }, [customerId])
 
-  // ── 주소 → 좌표 변환 ──
-  const geocodeAddress = async (address: string) => {
-    const kakao = await loadKakaoMap()
-    return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-      if (!kakao.maps.services) { reject(new Error('Kakao Maps services 라이브러리가 로드되지 않았습니다.')); return }
-      const geocoder = new kakao.maps.services.Geocoder()
-      geocoder.addressSearch(address, (result: any[], status: string) => {
-        if (status !== kakao.maps.services.Status.OK || !result[0]) { reject(new Error('주소 좌표 변환 실패')); return }
-        resolve({ latitude: Number(result[0].y), longitude: Number(result[0].x) })
-      })
-    })
-  }
 
   // ── 서비스 CRUD ──
   const handleAddService = async (form: ServiceForm, engineerIds: number[]) => {

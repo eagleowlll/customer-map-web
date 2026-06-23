@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isActiveInPeriod } from '@/lib/engineers'
 
 const BLUE = '#234ea2'
 const PAGE_BG = '#f4f5f7'
@@ -11,7 +12,7 @@ const TEXT = '#111113'
 const GRAY = '#6b7280'
 const MUTED = '#9ca3af'
 
-const SERVICE_TYPES = ['신규설치', '이전설치', 'A/S', 'B/S', '교육']
+const SERVICE_TYPES = ['신규설치', '이전설치', 'A/S', 'B/S', '교육', '유선기술지원']
 const TEAM_OPTIONS = ['전체', '1팀', '2팀', '3팀', '4팀']
 
 const SERVICE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -20,6 +21,7 @@ const SERVICE_COLORS: Record<string, { bg: string; text: string; dot: string }> 
   'A/S':     { bg: '#fffbeb', text: '#d97706', dot: '#d97706' },
   'B/S':     { bg: '#fdf4ff', text: '#7c3aed', dot: '#7c3aed' },
   '교육':    { bg: '#f0fdf4', text: '#059669', dot: '#059669' },
+  '유선기술지원': { bg: '#f0fdfa', text: '#0d9488', dot: '#0d9488' },
 }
 
 const TEAM_COLORS: Record<string, { bg: string; text: string }> = {
@@ -35,6 +37,7 @@ type Engineer = {
   position: string | null
   teams: string | null
   email: string | null
+  resigned_date: string | null
 }
 
 type ActivityRow = {
@@ -144,6 +147,8 @@ export default function ActivityPage() {
     const positionOrder: Record<string, number> = { '수석': 0, '책임': 1, '선임': 2, '사원': 3 }
     const sortedEngineers = (engineers ?? [])
       .filter((e: any) => !['임원', '영업관리'].includes(e.teams ?? ''))
+      // 퇴사자는 조회 기간 시작일까지 재직했을 때만 표시 (7/10 퇴사 → 8월 조회 시 숨김)
+      .filter((e: any) => isActiveInPeriod(e.resigned_date, start))
       .sort((a, b) => {
         const aOrder = positionOrder[a.position ?? ''] ?? 99
         const bOrder = positionOrder[b.position ?? ''] ?? 99
@@ -411,7 +416,7 @@ export default function ActivityPage() {
                     <div style={{ display: 'grid', gap: 7, marginBottom: 12 }}>
                       {SERVICE_TYPES.map((type) => {
                         const sc = SERVICE_COLORS[type]
-                        const cnt = row.counts[type]
+                        const cnt = row.counts[type] ?? 0
                         return (
                           <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

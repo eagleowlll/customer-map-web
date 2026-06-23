@@ -50,6 +50,7 @@ export type Engineer = {
   engineer_id: number
   name: string
   position: string | null
+  resigned_date?: string | null
 }
 
 export type Quote = {

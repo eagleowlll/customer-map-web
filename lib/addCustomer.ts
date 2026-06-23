@@ -45,24 +45,8 @@ export const addCustomer = async ({
   let insertedCustomerId = 0
 
   try {
-    const { loadKakaoMap } = await import('@/lib/loadKakaoMap')
-    const kakao = await loadKakaoMap()
-
-    const coords = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-      const geocoder = new kakao.maps.services.Geocoder()
-
-      geocoder.addressSearch(customerForm.address, (result: any[], status: string) => {
-        if (status !== kakao.maps.services.Status.OK || !result[0]) {
-          reject(new Error('주소 좌표 변환 실패'))
-          return
-        }
-
-        resolve({
-          latitude: Number(result[0].y),
-          longitude: Number(result[0].x),
-        })
-      })
-    })
+    const { geocodeAddress } = await import('@/lib/geocode')
+    const coords = await geocodeAddress(customerForm.address)
 
     const { data: insertedCustomer, error: customerError } = await supabase
       .from('customers')

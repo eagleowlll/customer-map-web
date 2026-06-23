@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isActiveInPeriod } from '@/lib/engineers'
 
 const BLUE = '#234ea2'
 const PAGE_BG = '#f4f5f7'
@@ -55,6 +56,7 @@ type Engineer = {
   position: string | null
   teams: string | null
   permission_level: string
+  resigned_date?: string | null
 }
 
 type SalesTarget = {
@@ -1031,7 +1033,7 @@ export default function SalesPage() {
       supabase.from('quotes')
         .select('*, engineers(name, position), quote_items(product_name, price_list(model_jp))')
         .order('quote_date', { ascending: false }).order('quote_number', { ascending: false }),
-      supabase.from('engineers').select('engineer_id, name, position, teams, permission_level').order('engineer_id'),
+      supabase.from('engineers').select('engineer_id, name, position, teams, permission_level, resigned_date').order('engineer_id'),
       supabase.from('sales_targets').select('*'),
       supabase.from('engineers').select('*').eq('email', userData.user?.email || '').single(),
       supabase.from('customers').select('customer_id, company_name'),
@@ -1053,9 +1055,24 @@ export default function SalesPage() {
   const teams = [...new Set(engineers.map(e => e.teams).filter(Boolean))].sort() as string[]
   const sortedEngineers = [...engineers].sort((a, b) => (POSITION_ORDER[a.position ?? ''] ?? 99) - (POSITION_ORDER[b.position ?? ''] ?? 99))
 
-  // 권한별 열람 가능 엔지니어 필터
+  // 조회 기간의 시작일(YYYY-MM-DD) — 회계연도 4월 시작 기준
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const periodStart = (() => {
+    if (mode === 'month') {
+      const targetYear = month < 4 ? fy + 1 : fy
+      return `${targetYear}-${pad(month)}-01`
+    }
+    if (mode === 'q2') return `${fy}-07-01`
+    if (mode === 'q3') return `${fy}-10-01`
+    if (mode === 'q4') return `${fy + 1}-01-01`
+    // year, q1 → 회계연도 시작
+    return `${fy}-04-01`
+  })()
+
+  // 권한별 열람 가능 엔지니어 필터 (+ 퇴사자는 조회 기간 시작일까지 재직한 경우만)
 const visibleEngineers = sortedEngineers.filter(e => {
     if (['임원', '영업관리'].includes(e.teams ?? '')) return false
+    if (!isActiveInPeriod(e.resigned_date, periodStart)) return false
     if (!currentEngineer) return false
     if (currentEngineer.permission_level === 'superadmin') return true
     if (currentEngineer.permission_level === 'manager') return e.teams === currentEngineer.teams
@@ -1081,7 +1098,7 @@ const visibleEngineers = sortedEngineers.filter(e => {
     return true
   }
 
-  const allEngineers = sortedEngineers.filter(e => !['임원', '영업관리'].includes(e.teams ?? ''))
+  const allEngineers = sortedEngineers.filter(e => !['임원', '영업관리'].includes(e.teams ?? '') && isActiveInPeriod(e.resigned_date, periodStart))
   const allEngineerIds = allEngineers.map(e => e.engineer_id)
   const filteredQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy) && (teamFilter ? filteredEngineerIds.includes(q.engineer_id) : true))
   const allFilteredQuotes = quotes.filter(q => matchPeriod(q.quote_date, fy) && allEngineerIds.includes(q.engineer_id))

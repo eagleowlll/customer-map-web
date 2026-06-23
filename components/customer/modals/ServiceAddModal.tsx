@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Contact, Engineer, ServiceForm } from '../types'
+import { isCurrentlyEmployed } from '@/lib/engineers'
 import {
   INPUT_BG, INPUT_BORDER, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY,
   WHITE_BUTTON_BG, WHITE_BUTTON_TEXT, inputStyle, dateInputStyle, textareaStyle, modalOverlayStyle,
@@ -35,6 +36,10 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
   }, [deviceId, currentUserEngineerId])
 
   if (deviceId === null) return null
+
+  // 현재 재직 중인 엔지니어만 신규 배정 대상으로 노출 (퇴사자 제외)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const selectableEngineers = engineers.filter(e => isCurrentlyEmployed(e.resigned_date, todayStr))
 
   const handleSave = () => {
     if (!form.visit_date.trim()) { alert('방문일자를 입력해주세요.'); return }
@@ -82,6 +87,7 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
                 <option value="A/S">A/S</option>
                 <option value="B/S">B/S</option>
                 <option value="교육">교육</option>
+                <option value="유선기술지원">유선 기술지원</option>
               </select>
             </div>
             <div>
@@ -136,7 +142,7 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
             </div>
             {showExtraEngineers && (
               <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 7, paddingTop: 10, borderTop: `1px solid ${INPUT_BORDER}`, maxHeight: 160, overflowY: 'auto' }}>
-                {engineers.filter(e => !selectedEngineerIds.includes(e.engineer_id)).map(eng => (
+                {selectableEngineers.filter(e => !selectedEngineerIds.includes(e.engineer_id)).map(eng => (
                   <button key={eng.engineer_id} onClick={() => { setSelectedEngineerIds(p => [...p, eng.engineer_id]); setShowExtraEngineers(false) }}
                     style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${INPUT_BORDER}`, background: INPUT_BG, color: TEXT_PRIMARY, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
                     {eng.name} {eng.position || ''}

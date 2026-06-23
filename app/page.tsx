@@ -328,29 +328,8 @@ useEffect(() => {
 }, [filteredCustomers])
 
   const geocodeAddress = async (address: string) => {
-    const { loadKakaoMap } = await import('@/lib/loadKakaoMap')
-    const kakao = await loadKakaoMap()
-
-    return new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-      if (!kakao.maps.services) {
-        reject(new Error('Kakao Maps services 라이브러리가 로드되지 않았습니다.'))
-        return
-      }
-
-      const geocoder = new kakao.maps.services.Geocoder()
-
-      geocoder.addressSearch(address, (result: any[], status: string) => {
-        if (status !== kakao.maps.services.Status.OK || !result[0]) {
-          reject(new Error('주소 좌표 변환 실패'))
-          return
-        }
-
-        resolve({
-          latitude: Number(result[0].y),
-          longitude: Number(result[0].x),
-        })
-      })
-    })
+    const { geocodeAddress: geocode } = await import('@/lib/geocode')
+    return geocode(address)
   }
 
   const uploadPackingList = async (file: File, customerId: number, index: number) => {

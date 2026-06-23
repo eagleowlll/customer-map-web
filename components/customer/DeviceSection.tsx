@@ -11,6 +11,7 @@ const SERVICE_TYPE_COLOR: Record<string, string> = {
   'A/S': '#f59e0b',
   'B/S': '#ef4444',
   '교육': '#16a34a',
+  '유선기술지원': '#0d9488',
 }
 
 type Props = {
