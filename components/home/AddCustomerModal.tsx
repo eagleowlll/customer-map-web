@@ -345,15 +345,43 @@ export default function AddCustomerModal({
                     </select>
                   </div>
 
-                  <div
+                  <label
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 10,
+                      ...inputStyle,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      cursor: 'pointer',
+                      overflow: 'hidden',
                     }}
                   >
-                   
-
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: WHITE_BUTTON_TEXT,
+                        background: WHITE_BUTTON_BG,
+                        borderRadius: 7,
+                        padding: '5px 10px',
+                      }}
+                    >
+                      파일 선택
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 12,
+                        color: device.packing_file ? TEXT_PRIMARY : '#9ca3af',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {device.packing_file
+                        ? device.packing_file.name
+                        : '납입의사록•패킹리스트 파일 선택'}
+                    </span>
                     <input
                       type="file"
                       accept=".pdf,.xlsx,.xls,.doc,.docx,.png,.jpg,.jpeg"
@@ -364,9 +392,9 @@ export default function AddCustomerModal({
                           e.target.files?.[0] ?? null
                         )
                       }
-                      style={inputStyle}
+                      style={{ display: 'none' }}
                     />
-                  </div>
+                  </label>
                 </div>
               </div>
             ))}

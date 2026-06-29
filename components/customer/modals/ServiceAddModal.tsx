@@ -128,10 +128,10 @@ export default function ServiceAddModal({ deviceId, contacts, engineers, current
                 const eng = engineers.find(e => e.engineer_id === id)
                 if (!eng) return null
                 return (
-                  <button key={id} onClick={() => id !== currentUserEngineerId && setSelectedEngineerIds(p => p.filter(i => i !== id))}
-                    style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid #234ea2', background: '#234ea2', color: '#ffffff', fontWeight: 700, fontSize: 12, cursor: id === currentUserEngineerId ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button key={id} onClick={() => setSelectedEngineerIds(p => p.filter(i => i !== id))}
+                    style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid #234ea2', background: '#234ea2', color: '#ffffff', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                     {eng.name} {eng.position || ''}
-                    {id !== currentUserEngineerId && <span style={{ fontSize: 12, opacity: 0.8 }}>✕</span>}
+                    <span style={{ fontSize: 12, opacity: 0.8 }}>✕</span>
                   </button>
                 )
               })}

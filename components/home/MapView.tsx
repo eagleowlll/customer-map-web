@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { loadKakaoMap } from '@/lib/loadKakaoMap'
+import { geocodeAddress } from '@/lib/geocode'
 import {
   BASE_LAT,
   BASE_LNG,
-  BASE_NAME,
   CARD_BG,
   INPUT_BORDER,
   PANEL_BG,
@@ -59,6 +59,13 @@ export default function MapView({
   const [showCategoryMenu, setShowCategoryMenu] = useState(false)
   const restoredMapStateAppliedRef = useRef(false)
 
+  // 길찾기 출발지 — 동탄 좌표는 고정, 울산·구미는 init에서 주소를 지오코딩해 채운다.
+  const originsRef = useRef<Record<string, { lat: number; lng: number; name: string }>>({
+    ulsan: { lat: BASE_LAT, lng: BASE_LNG, name: '울산 울주군 삼남읍 울산역로 274' },
+    gumi: { lat: 36.0315, lng: 128.3899, name: '경북 칠곡군 남중리1길 14' },
+    dongtan: { lat: 37.217719, lng: 127.108180, name: '경기 화성시 동탄구 동탄대로24길 31-8' },
+  })
+
   // HTML 특수문자 이스케이프 — innerHTML에 DB 데이터 삽입 시 XSS 방지
   const esc = (s: string | null | undefined): string =>
     (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -67,8 +74,8 @@ export default function MapView({
   const createOverlay = (c: Customer, map: any, kakao: any) => {
     const devices = deviceMap.get(Number(c.customer_id)) || []
     const deviceLines = getDeviceLines(devices)
-    const navUrlUlsan = `https://map.naver.com/p/directions/${BASE_LNG},${BASE_LAT},${encodeURIComponent(BASE_NAME)}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
-    const navUrlDongtan = `https://map.naver.com/p/directions/127.108180,37.217719,${encodeURIComponent('경기 화성시 동탄구 동탄대로24길 31-8')}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
+    const makeNavUrl = (o: { lat: number; lng: number; name: string }) =>
+      `https://map.naver.com/p/directions/${o.lng},${o.lat},${encodeURIComponent(o.name)}/${c.longitude},${c.latitude},${encodeURIComponent(c.company_name)}/-/car`
     const overlayContent = document.createElement('div')
     overlayContent.addEventListener('click', (e) => e.stopPropagation())
     overlayContent.addEventListener('mousedown', (e) => e.stopPropagation())
@@ -79,46 +86,53 @@ export default function MapView({
     const statusColor = c.status === '활성' ? '#16a34a' : c.status === '잠재' ? '#f59e0b' : c.status === '이탈' ? '#ef4444' : '#9ca3af'
     overlayContent.innerHTML = `
       <div style="
-        width:300px;
+        width:296px;
         background:#ffffff;
         color:#111111;
         border-radius:16px;
         border:1px solid #e5e7eb;
         font-size:13px;
-        line-height:1.6;
+        line-height:1.55;
         box-sizing:border-box;
         word-break:break-word;
         box-shadow:0 16px 40px rgba(0,0,0,0.18);
         overflow:hidden;
       ">
-        <div style="
-          padding:14px 16px 12px;
-          border-bottom:1px solid #f3f4f6;
-        ">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
-            <div style="font-weight:700; font-size:14px; color:#111111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
-              ${esc(c.company_name)}
+        <div style="padding:16px 16px 14px; display:flex; flex-direction:column; gap:12px;">
+
+          <div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;">
+              <div style="font-weight:700; font-size:15px; color:#111111; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+                ${esc(c.company_name)}
+              </div>
+              <span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:${statusColor}1a; color:${statusColor}; flex-shrink:0; white-space:nowrap;">
+                ${esc(c.status) || '-'}
+              </span>
             </div>
-            <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:99px; background:${statusColor}1a; color:${statusColor}; flex-shrink:0; white-space:nowrap;">
-              ${esc(c.status) || '-'}
-            </span>
+            <div style="font-size:12px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${esc(c.address) || '-'}
+            </div>
+            <div style="font-size:11px; color:#adb5bd; margin-top:2px;">대리점 ${esc(c.agency) || '-'}</div>
           </div>
-          <div style="font-size:12px; color:#6b7280; margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${esc(c.address) || '-'}
+
+          ${deviceLines.length ? `<div style="display:flex; flex-wrap:wrap; gap:5px;">
+            ${deviceLines.map(l => `<span style="font-size:11px; padding:3px 8px; border-radius:7px; background:#f1f5fd; color:#234ea2; font-weight:600; white-space:nowrap;">${esc(l)}</span>`).join('')}
+          </div>` : ''}
+
+          <div class="overlay-detail"></div>
+
+          <div class="overlay-nav" style="display:flex; align-items:center; gap:7px;">
+            <span style="font-size:11px; color:#9ca3af; font-weight:600; flex-shrink:0;">길찾기</span>
           </div>
-          <div style="font-size:11px; color:#adb5bd;">대리점 ${esc(c.agency) || '-'}</div>
-        </div>
-        <div style="padding:10px 16px; border-bottom:1px solid #f3f4f6; display:flex; flex-wrap:wrap; gap:4px;">
-          ${deviceLines.map(l => `<span style="font-size:11px; padding:2px 7px; border-radius:6px; background:#eff4ff; color:#234ea2; font-weight:600; white-space:nowrap;">${esc(l)}</span>`).join('')}
-        </div>
-        <div class="overlay-action-row" style="display:flex; gap:8px; padding:10px 12px;">
+
         </div>
       </div>
     `
 
     // 버튼을 DOM API로 직접 생성 — innerHTML querySelector 방식 대신 직접 참조 보장
-    const actionRow = overlayContent.querySelector('.overlay-action-row') as HTMLElement
-    if (actionRow) {
+    const detailSlot = overlayContent.querySelector('.overlay-detail') as HTMLElement
+    const navRow = overlayContent.querySelector('.overlay-nav') as HTMLElement
+    if (detailSlot && navRow) {
       const detailUrl = `/customer/${c.customer_id}`
       let navigated = false
       const goDetail = () => {
@@ -129,7 +143,7 @@ export default function MapView({
 
       const detailBtn = document.createElement('button')
       detailBtn.textContent = '상세보기'
-      detailBtn.style.cssText = 'flex:1;text-align:center;padding:8px 10px;background:#234ea2;color:#ffffff;border-radius:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;'
+      detailBtn.style.cssText = 'width:100%;text-align:center;padding:10px;background:#234ea2;color:#ffffff;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;'
       // touchstart에서 stopPropagation — 카카오맵이 터치 시퀀스 자체를 가로채지 못하도록
       detailBtn.addEventListener('touchstart', (e) => { e.stopPropagation() }, { passive: true })
       detailBtn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); goDetail() })
@@ -142,15 +156,17 @@ export default function MapView({
         a.target = '_blank'
         a.rel = 'noopener noreferrer'
         a.textContent = label
-        a.style.cssText = 'flex:1;text-align:center;padding:8px 10px;background:#f4f5f7;color:#111111;border-radius:9px;font-size:12px;text-decoration:none;font-weight:700;'
+        a.style.cssText = 'flex:1 1 0;text-align:center;padding:7px 0;background:#ffffff;color:#374151;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;text-decoration:none;font-weight:600;'
         a.addEventListener('touchstart', (e) => { e.stopPropagation() }, { passive: true })
         a.addEventListener('click', (e) => { e.stopPropagation() })
         return a
       }
 
-      actionRow.appendChild(detailBtn)
-      actionRow.appendChild(makeNavLink(navUrlUlsan, '울산 출발'))
-      actionRow.appendChild(makeNavLink(navUrlDongtan, '동탄 출발'))
+      const O = originsRef.current
+      detailSlot.appendChild(detailBtn)
+      navRow.appendChild(makeNavLink(makeNavUrl(O.ulsan), '울산'))
+      navRow.appendChild(makeNavLink(makeNavUrl(O.gumi), '구미'))
+      navRow.appendChild(makeNavLink(makeNavUrl(O.dongtan), '동탄'))
     }
 
     return new kakao.maps.CustomOverlay({
@@ -169,6 +185,18 @@ useEffect(() => {
       if (!mapRef.current) return
       const kakao = await loadKakaoMap()
       if (!mounted) return
+
+      // 출발지(울산·구미) 주소를 좌표로 변환해 캐시 — 길찾기 출발 좌표 정확도 확보
+      void Promise.all(
+        (['ulsan', 'gumi'] as const).map(async (key) => {
+          try {
+            const { latitude, longitude } = await geocodeAddress(originsRef.current[key].name)
+            originsRef.current[key] = { ...originsRef.current[key], lat: latitude, lng: longitude }
+          } catch {
+            /* 지오코딩 실패 시 초기 좌표 유지 */
+          }
+        })
+      )
 
       if (!kakaoMapRef.current) {
        const isMobile = window.innerWidth <= 768

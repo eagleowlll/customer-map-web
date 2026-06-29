@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Device, ServiceHistory } from './types'
 import { INPUT_BORDER, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, WHITE_BUTTON_BG, WHITE_BUTTON_TEXT } from './constants'
 import { getInstallDisplay, getDefaultImageUrl } from './utils'
@@ -23,6 +23,8 @@ type Props = {
   onEditService: (service: ServiceHistory) => void
   onImageUpload: (device: Device) => void
   onPrintReport: (service: ServiceHistory, device: Device) => void
+  onUploadPacking: (device: Device, file: File) => void
+  onOpenPacking: (device: Device) => void
 }
 
 function ServiceCard({ h, d, onEdit, onPrint }: { h: ServiceHistory; d: Device; onEdit: () => void; onPrint: () => void }) {
@@ -108,7 +110,7 @@ function ServiceCard({ h, d, onEdit, onPrint }: { h: ServiceHistory; d: Device; 
   )
 }
 
-function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, supabaseUrl }: {
+function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onUploadPacking, onOpenPacking, supabaseUrl }: {
   d: Device
   deviceHistory: ServiceHistory[]
   onEditDevice: () => void
@@ -116,10 +118,13 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
   onEditService: (s: ServiceHistory) => void
   onImageUpload: () => void
   onPrintReport: (s: ServiceHistory) => void
+  onUploadPacking: (file: File) => void
+  onOpenPacking: () => void
   supabaseUrl: string
 }) {
   const deviceTitle = `${d.device_name ?? ''} ${d.device_name2 ?? ''} ${d.option ?? ''}`.replace(/\s+/g, ' ').trim()
   const defaultImg = getDefaultImageUrl(d, supabaseUrl)
+  const packingInputRef = useRef<HTMLInputElement | null>(null)
 
   return (
     <div style={{
@@ -146,14 +151,14 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
 
       {/* 이미지 영역 */}
       <div style={{
-        height: 140, borderRadius: 12, background: '#f4f5f7',
+        height: 170, borderRadius: 12, background: '#f4f5f7',
         marginBottom: 14, overflow: 'hidden',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {d.image_url ? (
-          <img src={d.image_url} alt={deviceTitle || 'device'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={d.image_url} alt={deviceTitle || 'device'} style={{ width: '100%', height: '100%', objectFit: 'fill' }} />
         ) : defaultImg ? (
-          <img src={defaultImg} alt={deviceTitle || 'device'} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 10, boxSizing: 'border-box' }} />
+          <img src={defaultImg} alt={deviceTitle || 'device'} style={{ width: '100%', height: '100%', objectFit: 'fill' }} />
         ) : (
           <button
             onClick={onImageUpload}
@@ -190,8 +195,46 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
       <div style={{ fontSize: 12, color: TEXT_SECONDARY, textAlign: 'center', marginBottom: 3 }}>
         S/N: {d.serial_number ?? '-'} &nbsp;|&nbsp; {d.program ?? '-'}
       </div>
-      <div style={{ fontSize: 12, color: TEXT_MUTED, textAlign: 'center', marginBottom: 14 }}>
+      <div style={{ fontSize: 12, color: TEXT_MUTED, textAlign: 'center', marginBottom: 8 }}>
         납입: {getInstallDisplay(d)}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+        {d.packing_list_url ? (
+          <button
+            onClick={onOpenPacking}
+            style={{
+              fontSize: 11, fontWeight: 700, color: WHITE_BUTTON_BG,
+              background: '#eff4ff', border: '1px solid #cfe0ff', borderRadius: 7,
+              padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            납입의사록•패킹리스트
+          </button>
+        ) : (
+          <>
+            <input
+              ref={packingInputRef}
+              type="file"
+              accept=".pdf,.xlsx,.xls,.doc,.docx,.png,.jpg,.jpeg"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) onUploadPacking(f)
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => packingInputRef.current?.click()}
+              style={{
+                fontSize: 11, fontWeight: 600, color: TEXT_MUTED,
+                background: '#f4f5f7', border: `1px solid ${INPUT_BORDER}`, borderRadius: 7,
+                padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              납입의사록•패킹리스트 업로드
+            </button>
+          </>
+        )}
       </div>
 
       {/* 서비스 추가 버튼 */}
@@ -228,7 +271,7 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
   )
 }
 
-export default function DeviceSection({ devices, historyByDevice, onAddDevice, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport }: Props) {
+export default function DeviceSection({ devices, historyByDevice, onAddDevice, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onUploadPacking, onOpenPacking }: Props) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
   return (
@@ -257,6 +300,8 @@ export default function DeviceSection({ devices, historyByDevice, onAddDevice, o
             onEditService={onEditService}
             onImageUpload={() => onImageUpload(d)}
             onPrintReport={(s) => onPrintReport(s, d)}
+            onUploadPacking={(file) => onUploadPacking(d, file)}
+            onOpenPacking={() => onOpenPacking(d)}
             supabaseUrl={supabaseUrl}
           />
         ))}

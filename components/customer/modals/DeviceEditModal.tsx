@@ -11,14 +11,16 @@ type Props = {
   device: Device | null
   isSaving: boolean
   onClose: () => void
-  onSave: (form: DeviceForm) => void
+  onSave: (form: DeviceForm, packingFile: File | null) => void
   onDelete: () => void
+  onOpenPacking: () => void
 }
 
 const labelStyle = { fontSize: 12, fontWeight: 600, color: TEXT_MUTED, marginBottom: 5, display: 'block' } as const
 
-export default function DeviceEditModal({ device, isSaving, onClose, onSave, onDelete }: Props) {
+export default function DeviceEditModal({ device, isSaving, onClose, onSave, onDelete, onOpenPacking }: Props) {
   const [form, setForm] = useState<DeviceForm>({ device_name: '', device_name2: '', option: '', serial_number: '', program: 'ACCTee', install_date: '', category: '20' })
+  const [packingFile, setPackingFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (device) {
@@ -31,6 +33,7 @@ export default function DeviceEditModal({ device, isSaving, onClose, onSave, onD
         install_date: device.install_date ?? '',
         category: device.category ?? '20',
       })
+      setPackingFile(null)
     }
   }, [device])
 
@@ -38,7 +41,7 @@ export default function DeviceEditModal({ device, isSaving, onClose, onSave, onD
 
   const handleSave = () => {
     if (!form.device_name.trim()) { alert('장비 라인업을 입력해주세요.'); return }
-    onSave(form)
+    onSave(form, packingFile)
   }
 
   return (
@@ -99,6 +102,44 @@ export default function DeviceEditModal({ device, isSaving, onClose, onSave, onD
                 <option value="84">84</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>
+              납입의사록•패킹리스트
+              {device.packing_list_url && (
+                <button
+                  type="button"
+                  onClick={onOpenPacking}
+                  style={{ marginLeft: 8, fontWeight: 700, color: WHITE_BUTTON_BG, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12 }}
+                >
+                  현재 파일 열기
+                </button>
+              )}
+            </label>
+            <label
+              style={{
+                ...inputStyle, display: 'flex', alignItems: 'center', gap: 8,
+                cursor: 'pointer', overflow: 'hidden',
+              }}
+            >
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: WHITE_BUTTON_TEXT, background: WHITE_BUTTON_BG, borderRadius: 7, padding: '5px 10px' }}>
+                파일 선택
+              </span>
+              <span style={{ flex: 1, fontSize: 12, color: packingFile ? TEXT_PRIMARY : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {packingFile
+                  ? packingFile.name
+                  : device.packing_list_url
+                    ? '등록됨 — 새 파일로 교체하려면 선택'
+                    : '납입의사록•패킹리스트 파일 선택'}
+              </span>
+              <input
+                type="file"
+                accept=".pdf,.xlsx,.xls,.doc,.docx,.png,.jpg,.jpeg"
+                onChange={(e) => setPackingFile(e.target.files?.[0] ?? null)}
+                style={{ display: 'none' }}
+              />
+            </label>
           </div>
         </div>
 

@@ -69,17 +69,36 @@ export const addCustomer = async ({
 
     insertedCustomerId = insertedCustomer.customer_id
 
-    const devicePayload = deviceForms.map((d: any) => ({
-      customer_id: insertedCustomerId,
-      device_name: d.device_name.trim(),
-      device_name2: d.device_name2.trim() || null,
-      option: d.option.trim() || null,
-      serial_number: d.serial_number.trim() || null,
-      program: d.program,
-      install_date: d.install_date || null,
-      category: d.category,
-      packing_list_url: null,
-    }))
+    const devicePayload = []
+    for (let i = 0; i < deviceForms.length; i++) {
+      const d = deviceForms[i]
+
+      // 납입의사록·패킹리스트 파일이 있으면 packing-lists(비공개) 버킷에 업로드.
+      // DB에는 전체 URL이 아니라 "저장 경로(파일명)"만 보관 → 열 때 서명 URL 발급.
+      let packingPath: string | null = null
+      if (d.packing_file) {
+        const ext = d.packing_file.name.split('.').pop()
+        const fileName = `packing-${insertedCustomerId}-${i}-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('packing-lists')
+          .upload(fileName, d.packing_file, { upsert: true })
+        if (!upErr) {
+          packingPath = fileName
+        }
+      }
+
+      devicePayload.push({
+        customer_id: insertedCustomerId,
+        device_name: d.device_name.trim(),
+        device_name2: d.device_name2.trim() || null,
+        option: d.option.trim() || null,
+        serial_number: d.serial_number.trim() || null,
+        program: d.program,
+        install_date: d.install_date || null,
+        category: d.category,
+        packing_list_url: packingPath,
+      })
+    }
 
     const { error: deviceError } = await supabase.from('devices').insert(devicePayload)
     if (deviceError) throw deviceError
