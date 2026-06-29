@@ -13,16 +13,18 @@ type Props = {
   engineers: Engineer[]
   isSaving: boolean
   onClose: () => void
-  onSave: (form: ServiceForm, engineerIds: number[]) => void
+  onSave: (form: ServiceForm, engineerIds: number[], reportFile: File | null) => void
   onDelete: () => void
+  onOpenReport: () => void
 }
 
 const labelStyle = { fontSize: 12, fontWeight: 600, color: TEXT_MUTED, marginBottom: 5, display: 'block' } as const
 
-export default function ServiceEditModal({ service, contacts, engineers, isSaving, onClose, onSave, onDelete }: Props) {
+export default function ServiceEditModal({ service, contacts, engineers, isSaving, onClose, onSave, onDelete, onOpenReport }: Props) {
   const [form, setForm] = useState<ServiceForm>({ visit_date: '', service_notes: '', visitor: '', service_type: '신규설치', contact_id: null, is_paid: true, work_hours: '2' })
   const [selectedEngineerIds, setSelectedEngineerIds] = useState<number[]>([])
   const [showExtraEngineers, setShowExtraEngineers] = useState(false)
+  const [reportFile, setReportFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (service) {
@@ -37,6 +39,7 @@ export default function ServiceEditModal({ service, contacts, engineers, isSavin
       })
       setSelectedEngineerIds((service.service_engineers ?? []).map(se => se.engineer_id))
       setShowExtraEngineers(false)
+      setReportFile(null)
     }
   }, [service])
 
@@ -47,7 +50,7 @@ export default function ServiceEditModal({ service, contacts, engineers, isSavin
     if (!form.service_notes.trim()) { alert('서비스 내용을 입력해주세요.'); return }
     if (!form.contact_id) { alert('고객 담당자를 선택해주세요.'); return }
     if (selectedEngineerIds.length === 0) { alert('방문 엔지니어를 선택해주세요.'); return }
-    onSave(form, selectedEngineerIds)
+    onSave(form, selectedEngineerIds, reportFile)
   }
 
   return (
@@ -146,6 +149,39 @@ export default function ServiceEditModal({ service, contacts, engineers, isSavin
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label style={labelStyle}>
+              서비스 레포트 파일
+              {service.report_url && (
+                <button
+                  type="button"
+                  onClick={onOpenReport}
+                  style={{ marginLeft: 8, fontWeight: 700, color: WHITE_BUTTON_BG, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12 }}
+                >
+                  현재 레포트 열기
+                </button>
+              )}
+            </label>
+            <label style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', overflow: 'hidden' }}>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: WHITE_BUTTON_TEXT, background: WHITE_BUTTON_BG, borderRadius: 7, padding: '5px 10px' }}>
+                파일 선택
+              </span>
+              <span style={{ flex: 1, fontSize: 12, color: reportFile ? TEXT_PRIMARY : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {reportFile
+                  ? reportFile.name
+                  : service.report_url
+                    ? '등록됨 — 새 파일로 교체하려면 선택'
+                    : '레포트 파일 선택 (PDF)'}
+              </span>
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                style={{ display: 'none' }}
+              />
+            </label>
           </div>
         </div>
 

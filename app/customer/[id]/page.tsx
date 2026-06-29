@@ -133,28 +133,51 @@ export default function CustomerDetailPage() {
     await fetchDetail()
   }
 
-  const handleUpdateService = async (form: ServiceForm, engineerIds: number[]) => {
+  const handleUpdateService = async (form: ServiceForm, engineerIds: number[], reportFile: File | null) => {
     if (!selectedService) return
     setIsSavingServiceEdit(true)
-    const visitYear = form.visit_date.slice(0, 4)
-    const engineerSnapshot = engineerIds
-      .map(id => engineers.find(e => e.engineer_id === id))
-      .filter(Boolean)
-      .map(e => `${e!.name} ${e!.position ?? ''}`.trim())
-      .join(', ')
-    const { error } = await supabase.from('service_history').update({
-      visit_year: visitYear, visit_date: form.visit_date.trim(),
-      service_notes: form.service_notes.trim(), visitor: engineerSnapshot || null,
-      service_type: form.service_type, contact_id: form.contact_id || null,
-      is_paid: form.is_paid, work_hours: form.work_hours ? parseFloat(form.work_hours) : null,
-    }).eq('service_id', selectedService.service_id)
-    if (error) { setIsSavingServiceEdit(false); alert(error.message || '서비스 기록 수정 중 오류가 발생했습니다.'); return }
-    await supabase.from('service_engineers').delete().eq('service_id', selectedService.service_id)
-    await supabase.from('service_engineers').insert(engineerIds.map(eid => ({ service_id: selectedService.service_id, engineer_id: eid })))
-    setIsSavingServiceEdit(false)
-    alert('서비스 기록이 수정되었습니다.')
-    setSelectedService(null)
-    await fetchDetail()
+    try {
+      const visitYear = form.visit_date.slice(0, 4)
+      const engineerSnapshot = engineerIds
+        .map(id => engineers.find(e => e.engineer_id === id))
+        .filter(Boolean)
+        .map(e => `${e!.name} ${e!.position ?? ''}`.trim())
+        .join(', ')
+
+      const updatePayload: Record<string, unknown> = {
+        visit_year: visitYear, visit_date: form.visit_date.trim(),
+        service_notes: form.service_notes.trim(), visitor: engineerSnapshot || null,
+        service_type: form.service_type, contact_id: form.contact_id || null,
+        is_paid: form.is_paid, work_hours: form.work_hours ? parseFloat(form.work_hours) : null,
+      }
+
+      // 새 레포트 파일이 선택됐으면 업로드 후 경로 갱신
+      let newReportPath: string | null = null
+      if (reportFile) {
+        newReportPath = await uploadReportFile(selectedService.service_id, reportFile)
+        updatePayload.report_url = newReportPath
+      }
+
+      const { error } = await supabase.from('service_history').update(updatePayload).eq('service_id', selectedService.service_id)
+      if (error) throw error
+
+      await supabase.from('service_engineers').delete().eq('service_id', selectedService.service_id)
+      await supabase.from('service_engineers').insert(engineerIds.map(eid => ({ service_id: selectedService.service_id, engineer_id: eid })))
+
+      // 레포트 교체 시 기존 파일 삭제
+      if (newReportPath && selectedService.report_url) {
+        const oldPath = toReportPath(selectedService.report_url)
+        if (oldPath && oldPath !== newReportPath) await supabase.storage.from('service-report').remove([oldPath])
+      }
+
+      alert('서비스 기록이 수정되었습니다.')
+      setSelectedService(null)
+      await fetchDetail()
+    } catch (error: any) {
+      alert(error?.message || '서비스 기록 수정 중 오류가 발생했습니다.')
+    } finally {
+      setIsSavingServiceEdit(false)
+    }
   }
 
   const handleDeleteService = async () => {
@@ -169,26 +192,74 @@ export default function CustomerDetailPage() {
     await fetchDetail()
   }
 
-  // ── PDF 생성 ──
+  // ── 서비스 레포트 (비공개 버킷 + 서명 URL) ──
+  // 저장값에서 service-report 버킷 내 경로만 추출 (과거 전체 URL 데이터 호환)
+  const toReportPath = (stored: string): string => {
+    const marker = '/service-report/'
+    const idx = stored.indexOf(marker)
+    return idx >= 0 ? stored.slice(idx + marker.length) : stored
+  }
+
+  // 사인 완료 후 PDF를 생성해 service-report 버킷에 저장 (다운로드 X)
   const handlePrintReport = useCallback(async (service: ServiceHistory, device: Device, engineerSignDataUrl?: string, customerSignDataUrl?: string) => {
-    const contact = contacts.find(c => c.contact_id === service.contact_id) ?? null
-    const engineers = service.service_engineers ?? []
-    const engineerNames = engineers.map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
-    const firstEngineerName = engineers[0]?.engineers.name ?? ''
-    const blob = await pdf(
-      <ServiceReportDoc
-        service={service} device={device} customer={customer!} contact={contact}
-        engineerNames={engineerNames} firstEngineerName={firstEngineerName}
-        engineerSignDataUrl={engineerSignDataUrl} customerSignDataUrl={customerSignDataUrl}
-      />
-    ).toBlob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${service.visit_date?.replace(/-/g, '') ?? 'unknown'}_${customer?.company_name ?? ''}_서비스레포트.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    try {
+      const contact = contacts.find(c => c.contact_id === service.contact_id) ?? null
+      const engineers = service.service_engineers ?? []
+      const engineerNames = engineers.map(se => `${se.engineers.name} ${se.engineers.position ?? ''}`.trim()).join(', ')
+      const firstEngineerName = engineers[0]?.engineers.name ?? ''
+      const blob = await pdf(
+        <ServiceReportDoc
+          service={service} device={device} customer={customer!} contact={contact}
+          engineerNames={engineerNames} firstEngineerName={firstEngineerName}
+          engineerSignDataUrl={engineerSignDataUrl} customerSignDataUrl={customerSignDataUrl}
+        />
+      ).toBlob()
+
+      const fileName = `report-${service.service_id}-${Date.now()}.pdf`
+      const { error: upErr } = await supabase.storage.from('service-report').upload(fileName, blob, { upsert: true, contentType: 'application/pdf' })
+      if (upErr) throw upErr
+
+      const { error: updErr } = await supabase.from('service_history').update({ report_url: fileName }).eq('service_id', service.service_id)
+      if (updErr) throw updErr
+
+      // 기존 레포트가 있으면 스토리지에서 삭제 (고아 파일 방지)
+      if (service.report_url) {
+        const oldPath = toReportPath(service.report_url)
+        if (oldPath && oldPath !== fileName) await supabase.storage.from('service-report').remove([oldPath])
+      }
+
+      alert('레포트가 저장되었습니다.')
+      await fetchDetail()
+    } catch (error: any) {
+      alert(error?.message || '레포트 저장 중 오류가 발생했습니다.')
+    }
   }, [contacts, customer])
+
+  // 저장된 레포트를 서명 URL로 열기
+  const handleOpenReport = async (service: ServiceHistory) => {
+    if (!service.report_url) return
+    const win = window.open('', '_blank')
+    try {
+      const path = toReportPath(service.report_url)
+      const { data, error } = await supabase.storage.from('service-report').createSignedUrl(path, 3600)
+      if (error || !data?.signedUrl) throw error || new Error('레포트를 열 수 없습니다.')
+      if (win) { win.opener = null; win.location.href = data.signedUrl }
+      else window.open(data.signedUrl, '_blank')
+    } catch (error: any) {
+      if (win) win.close()
+      alert(error?.message || '레포트를 여는 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 서비스 레포트 파일 업로드 → 저장 경로(파일명) 반환
+  const uploadReportFile = async (serviceId: number, file: File): Promise<string> => {
+    if (file.size > 20 * 1024 * 1024) throw new Error('파일 크기는 20MB 이하여야 합니다.')
+    const ext = file.name.split('.').pop()
+    const fileName = `report-${serviceId}-${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('service-report').upload(fileName, file, { upsert: true })
+    if (error) throw error
+    return fileName
+  }
 
   // ── 업체 CRUD ──
   const handleUpdateCustomer = async (form: CustomerEditFormData) => {
@@ -216,13 +287,25 @@ export default function CustomerDetailPage() {
 
   const handleDeleteCustomer = async () => {
     if (!customer) return
-    if (!confirm('이 업체를 삭제하시겠습니까?\n관련 담당자, 장비, 서비스기록도 모두 삭제됩니다.')) return
+    if (!confirm('이 업체를 삭제하시겠습니까?\n관련 담당자, 장비, 서비스기록, 견적/거래 이력이 모두 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.')) return
     setIsDeletingCustomer(true)
+    const cid = customer.customer_id
     try {
-      await supabase.from('service_history').delete().eq('customer_id', customer.customer_id)
-      await supabase.from('contacts').delete().eq('customer_id', customer.customer_id)
-      await supabase.from('devices').delete().eq('customer_id', customer.customer_id)
-      const { error } = await supabase.from('customers').delete().eq('customer_id', customer.customer_id)
+      // 견적(quotes): 자식(quote_items) 먼저 삭제 후 quotes 삭제
+      const { data: cQuotes } = await supabase.from('quotes').select('quote_id').eq('customer_id', cid)
+      const quoteIds = (cQuotes ?? []).map((q: { quote_id: number }) => q.quote_id)
+      if (quoteIds.length) {
+        await supabase.from('quote_items').delete().in('quote_id', quoteIds)
+        const { error: qErr } = await supabase.from('quotes').delete().in('quote_id', quoteIds)
+        if (qErr) throw qErr
+      }
+      // 이 업체가 대리점(dealer)으로 참조된 다른 견적은 연결만 해제
+      await supabase.from('quotes').update({ dealer_id: null }).eq('dealer_id', cid)
+
+      await supabase.from('service_history').delete().eq('customer_id', cid)
+      await supabase.from('contacts').delete().eq('customer_id', cid)
+      await supabase.from('devices').delete().eq('customer_id', cid)
+      const { error } = await supabase.from('customers').delete().eq('customer_id', cid)
       if (error) throw error
       alert('업체 및 관련 데이터가 삭제되었습니다.')
       setIsEditCustomerModalOpen(false)
@@ -521,6 +604,7 @@ export default function CustomerDetailPage() {
             setPendingReportDevice(device)
             setIsSignModalOpen(true)
           }}
+          onOpenReport={handleOpenReport}
           onUploadPacking={handleUploadPacking}
           onOpenPacking={handleOpenPacking}
         />
@@ -578,6 +662,7 @@ export default function CustomerDetailPage() {
         />
         <ServiceEditModal
           service={selectedService}
+          onOpenReport={() => selectedService && handleOpenReport(selectedService)}
           contacts={contacts}
           engineers={engineers}
           isSaving={isSavingServiceEdit}

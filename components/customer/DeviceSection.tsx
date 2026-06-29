@@ -23,11 +23,12 @@ type Props = {
   onEditService: (service: ServiceHistory) => void
   onImageUpload: (device: Device) => void
   onPrintReport: (service: ServiceHistory, device: Device) => void
+  onOpenReport: (service: ServiceHistory) => void
   onUploadPacking: (device: Device, file: File) => void
   onOpenPacking: (device: Device) => void
 }
 
-function ServiceCard({ h, d, onEdit, onPrint }: { h: ServiceHistory; d: Device; onEdit: () => void; onPrint: () => void }) {
+function ServiceCard({ h, d, onEdit, onPrint, onOpenReport }: { h: ServiceHistory; d: Device; onEdit: () => void; onPrint: () => void; onOpenReport: () => void }) {
   const [hovered, setHovered] = useState(false)
   const typeColor = SERVICE_TYPE_COLOR[h.service_type ?? ''] ?? TEXT_MUTED
 
@@ -74,17 +75,31 @@ function ServiceCard({ h, d, onEdit, onPrint }: { h: ServiceHistory; d: Device; 
             >
               수정
             </button>
-            <button
-              onClick={onPrint}
-              style={{
-                padding: '4px 9px', background: '#f0fdf4', color: '#16a34a',
-                borderRadius: 7, border: '1px solid #bbf7d0',
-                cursor: 'pointer', fontWeight: 700, fontSize: 11,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              레포트
-            </button>
+            {h.report_url ? (
+              <button
+                onClick={onOpenReport}
+                style={{
+                  padding: '4px 9px', background: '#f0fdf4', color: '#16a34a',
+                  borderRadius: 7, border: '1px solid #bbf7d0',
+                  cursor: 'pointer', fontWeight: 700, fontSize: 11,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                레포트
+              </button>
+            ) : (
+              <button
+                onClick={onPrint}
+                style={{
+                  padding: '4px 9px', background: '#f4f5f7', color: TEXT_SECONDARY,
+                  borderRadius: 7, border: `1px solid ${INPUT_BORDER}`,
+                  cursor: 'pointer', fontWeight: 600, fontSize: 11,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                레포트 작성
+              </button>
+            )}
           </div>
         </div>
 
@@ -110,7 +125,7 @@ function ServiceCard({ h, d, onEdit, onPrint }: { h: ServiceHistory; d: Device; 
   )
 }
 
-function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onUploadPacking, onOpenPacking, supabaseUrl }: {
+function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onOpenReport, onUploadPacking, onOpenPacking, supabaseUrl }: {
   d: Device
   deviceHistory: ServiceHistory[]
   onEditDevice: () => void
@@ -118,6 +133,7 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
   onEditService: (s: ServiceHistory) => void
   onImageUpload: () => void
   onPrintReport: (s: ServiceHistory) => void
+  onOpenReport: (s: ServiceHistory) => void
   onUploadPacking: (file: File) => void
   onOpenPacking: () => void
   supabaseUrl: string
@@ -264,6 +280,7 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
             d={d}
             onEdit={() => onEditService(h)}
             onPrint={() => onPrintReport(h)}
+            onOpenReport={() => onOpenReport(h)}
           />
         ))}
       </div>
@@ -271,7 +288,7 @@ function DeviceCard({ d, deviceHistory, onEditDevice, onAddService, onEditServic
   )
 }
 
-export default function DeviceSection({ devices, historyByDevice, onAddDevice, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onUploadPacking, onOpenPacking }: Props) {
+export default function DeviceSection({ devices, historyByDevice, onAddDevice, onEditDevice, onAddService, onEditService, onImageUpload, onPrintReport, onOpenReport, onUploadPacking, onOpenPacking }: Props) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
   return (
@@ -300,6 +317,7 @@ export default function DeviceSection({ devices, historyByDevice, onAddDevice, o
             onEditService={onEditService}
             onImageUpload={() => onImageUpload(d)}
             onPrintReport={(s) => onPrintReport(s, d)}
+            onOpenReport={(s) => onOpenReport(s)}
             onUploadPacking={(file) => onUploadPacking(d, file)}
             onOpenPacking={() => onOpenPacking(d)}
             supabaseUrl={supabaseUrl}

@@ -43,6 +43,7 @@ export type ServiceHistory = {
   contact_id: number | null
   is_paid: boolean | null
   work_hours: number | null
+  report_url: string | null
   service_engineers?: { engineer_id: number; engineers: { name: string; position: string | null } }[]
 }
 
