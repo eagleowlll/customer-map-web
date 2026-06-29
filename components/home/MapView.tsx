@@ -121,9 +121,7 @@ export default function MapView({
 
           <div class="overlay-detail"></div>
 
-          <div class="overlay-nav" style="display:flex; align-items:center; gap:7px;">
-            <span style="font-size:11px; color:#9ca3af; font-weight:600; flex-shrink:0;">길찾기</span>
-          </div>
+          <div class="overlay-nav" style="display:flex; align-items:center; gap:7px;"></div>
 
         </div>
       </div>
@@ -164,9 +162,9 @@ export default function MapView({
 
       const O = originsRef.current
       detailSlot.appendChild(detailBtn)
-      navRow.appendChild(makeNavLink(makeNavUrl(O.ulsan), '울산'))
-      navRow.appendChild(makeNavLink(makeNavUrl(O.gumi), '구미'))
-      navRow.appendChild(makeNavLink(makeNavUrl(O.dongtan), '동탄'))
+      navRow.appendChild(makeNavLink(makeNavUrl(O.ulsan), '울산 출발'))
+      navRow.appendChild(makeNavLink(makeNavUrl(O.gumi), '구미 출발'))
+      navRow.appendChild(makeNavLink(makeNavUrl(O.dongtan), '동탄 출발'))
     }
 
     return new kakao.maps.CustomOverlay({
@@ -420,7 +418,20 @@ useEffect(() => {
     }
 
     kakaoMap.setLevel(4)
-    kakaoMap.panTo(new (window as any).kakao.maps.LatLng(lat, lng))
+
+    // 마커를 화면 정중앙이 아니라 "중앙보다 살짝 아래"에 두어, 위쪽에 뜨는
+    // 설명 카드가 잘리지 않도록 지도 중심을 마커보다 위(북쪽)로 픽셀만큼 이동
+    const kakaoNS = (window as any).kakao.maps
+    const targetLatLng = new kakaoNS.LatLng(lat, lng)
+    try {
+      const OFFSET_Y = 100 // px — 클수록 마커가 더 아래로 내려감
+      const proj = kakaoMap.getProjection()
+      const markerPt = proj.pointFromCoords(targetLatLng)
+      const centerCoords = proj.coordsFromPoint(new kakaoNS.Point(markerPt.x, markerPt.y - OFFSET_Y))
+      kakaoMap.panTo(centerCoords)
+    } catch {
+      kakaoMap.panTo(targetLatLng)
+    }
 
     setTimeout(async () => {
       const kakao = await loadKakaoMap()
